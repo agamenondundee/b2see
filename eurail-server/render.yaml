@@ -1,0 +1,31 @@
+# Render Blueprint — your own Deutsche Bahn db-rest instance for the EU Rail tab.
+#
+# Why: the public v6.db.transport.rest is heavily rate-limited (DB retired the old
+# free API). Running your own instance gives you your own rate budget, and db-rest
+# enables CORS + is keyless, so the board can call it straight from the browser.
+#
+# One-click: copy this file to the repo ROOT as `render.yaml`, then in the Render
+# dashboard: New → Blueprint → connect this repo. (Render only auto-detects a
+# Blueprint named `render.yaml` at the repo root.) Or skip the file entirely and
+# use New → Web Service → "Deploy an existing image" with the image URL below.
+#
+# After it deploys you get an HTTPS URL like https://eurail-db-rest.onrender.com —
+# paste it into the board's Settings ⚙ → EU rail data URL.
+services:
+  - type: web
+    name: eurail-db-rest
+    runtime: image
+    plan: free            # free tier sleeps when idle (first request after is slow)
+    region: frankfurt     # close to DB's servers
+    image:
+      url: docker.io/derhuerst/db-rest:6
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: "3000"
+      # Cosmetic — db-rest uses it for self-referencing links in responses.
+      - key: HOSTNAME
+        value: eurail-db-rest.onrender.com
+      # Optional: set a Redis URL to enable server-side caching (gentler on DB).
+      # - key: REDIS_URL
+      #   value: redis://…
