@@ -1,17 +1,30 @@
-# b2see
+# Edinburgh Airport — Live Departures
 
-A modern, browser-based take on the 1984 arcade classic **Paperboy**, built
-with plain HTML5 Canvas and ES modules — no build step, no dependencies.
+A clean, mobile-friendly **departures board** for **Edinburgh Airport**
+(`EDI` / `EGPH`), built with plain HTML, CSS and ES modules — no build step, no
+framework, no dependencies. It deploys as a static site (e.g. GitHub Pages).
 
-Ride your route down a **isometric** scrolling street, deliver papers to your
-subscribers' mailboxes, rack up smashed windows on the houses that *didn't*
-subscribe, dodge traffic, dogs, pedestrians and the Grim Reaper — then clear
-the **BMX bonus course** at the end of the street.
+It ships with a realistic, auto-updating **demo board** so it works the moment
+you open it, and can switch to **real live flights** via the
+[AeroDataBox](https://aerodatabox.com/) API once you add a free API key.
 
-## Play
+## Features
 
-The game uses ES modules, so it needs to be served over HTTP (opening the file
-directly will be blocked by the browser):
+- **FIDS-style board** — time, destination, flight, gate and a colour-coded
+  status (Scheduled, Check-in, Boarding, Go to Gate, Gate Closing, Final Call,
+  Departed, Delayed, Cancelled). Delays show the revised time.
+- **Live, no setup** — demo mode generates a plausible day of real EDI routes
+  and airlines, with statuses that progress in real time.
+- **Real data when you want it** — AeroDataBox provider for actual departures.
+- **Search & filter** — by destination, flight number or airline, plus status
+  chips (Boarding / Delayed / Departed / Cancelled).
+- **Auto-refresh** (30s–5min, or off) and a manual refresh.
+- **Edinburgh local time** everywhere, regardless of where you're viewing from.
+- **Responsive** — a wide board on desktop, tidy cards on phones.
+
+## Run locally
+
+It uses ES modules, so serve it over HTTP (don't open the file directly):
 
 ```bash
 # from the repo root
@@ -19,88 +32,59 @@ python3 -m http.server 8000
 # then open http://localhost:8000/
 ```
 
-On phones/tablets, on-screen touch controls appear automatically.
+## Data sources
 
-## Controls
+The app talks to a small `Provider` interface (`src/providers.js`) so the UI
+doesn't care where flights come from.
 
-| Key            | Action               |
-| -------------- | -------------------- |
-| `←` / `→`      | Steer                |
-| `↑` / `↓`      | Pedal faster / brake |
-| `Z`            | Throw paper left     |
-| `X` / `Space`  | Throw paper right    |
-| `Enter`        | Start / continue / restart |
-| `M`            | Mute / unmute        |
+### Demo (default)
 
-## Gameplay
+Zero configuration. `src/demo-data.js` holds a curated daily timetable of real
+airlines and destinations EDI serves (easyJet, Ryanair, Jet2, British Airways,
+KLM, Emirates, United, Loganair, …). The schedule is deterministic per day, but
+gates/delays/statuses evolve with the clock so it behaves like a live board.
 
-- **Deliver** to the glowing mailboxes (flag up) of **subscriber** houses —
-  red roofs, lit windows — for points.
-- Consecutive deliveries build a **streak** that increases the bonus.
-- Hitting a **non-subscriber** house scores classic mischief points.
-- Missing a subscriber (it scrolls past undelivered) breaks your streak.
-- Run over **paper bundles** on the road to refill your supply.
-- Dodge **cars**, **cones**, **dogs**, **pedestrians**, and the homing
-  **Grim Reaper**. A crash costs a life and some papers; three ends the route.
-- Finish the street for a **route bonus**, then ride the **BMX bonus course** —
-  thread the cone gates and reach the finish for big points before the route
-  loops to the next, tougher street.
+### Live (AeroDataBox)
 
-## How it works
+Real departures via AeroDataBox on RapidAPI. To enable it:
 
-The world is modelled in 2D ground coordinates (`u` = lateral, `v` = forward),
-and an **isometric projection** (`src/iso.js`) maps them to the screen for the
-diagonal Paperboy look. All gameplay and collisions stay in clean `(u, v)`
-space. Audio is **synthesized at runtime** with the Web Audio API (no sound
-files), and the gameplay graphics are drawn **procedurally** — see "Art" below.
+1. Subscribe (free **Basic** tier) to
+   [AeroDataBox on RapidAPI](https://rapidapi.com/aedbx-aedbx/api/aerodatabox).
+2. Copy your `X-RapidAPI-Key`.
+3. In the app, open **Settings ⚙**, choose **Live**, paste the key, **Save**.
 
-Visual features:
+The key is stored **only in your browser** (`localStorage`) — it is never
+committed or uploaded. If a live request fails (bad key, rate limit, network),
+the board falls back to demo data and shows a notice, so it's never blank.
 
-- **Isometric volumes** — houses, cars and props are shaded 3D boxes/roofs with
-  directional **cast shadows**.
-- **Day/night cycle** (`src/atmosphere.js`) — a ~100s loop through day, dusk,
-  night and dawn that recolours the sky, haze and a world-wide tint; street
-  lamps glow at night.
-- **Parallax sky** (`src/sky.js`) — a horizon with distant mountains (day)
-  cross-fading to a lit-window city skyline (night), drifting clouds and stars,
-  using CC0 art (see `assets/CREDITS.md`).
-- **Distance fog**, a **vignette**, **particle effects** (delivery sparkles,
-  window shards, pickup sparkles, crash star-bursts, wheel dust) and **screen
-  shake**, plus animated tree sway and a leaning, pedalling rider.
+> **Why a key?** This is a purely static site with no backend, so the browser
+> calls the flight API directly. AeroDataBox's RapidAPI gateway supports
+> browser (CORS) requests. For a shared deployment where you don't want a
+> per-user key, put a tiny serverless proxy (e.g. a Cloudflare Worker) in front
+> of the API that injects the key server-side, and point the live provider's
+> base URL at it.
+
+## Deploy (GitHub Pages)
+
+This repo is a static site. Enable **Settings → Pages → Deploy from branch** and
+pick the branch/root. `.nojekyll` is included so the `src/` files are served
+as-is. No build step is required.
 
 ## Project layout
 
 ```
-index.html               # shell + start screen
+index.html          # app shell: header, toolbar, board, settings modal
 src/
-  main.js                # boot + game loop
-  game.js                # state machine, phases, scoring, collisions
-  world.js               # isometric ground + spawning (street & BMX)
-  iso.js                 # world -> screen isometric projection
-  entities.js            # player, paper, house, obstacle, hazard, bundle, gate
-  procsprites.js         # procedural artwork for every sprite
-  assets.js              # sprite loader (prefers real PNGs if present)
-  sprites.manifest.js    # maps sprite keys -> art (edit to add real sprites)
-  audio.js               # Web Audio SFX + music
-  input.js               # keyboard input
-  touch.js               # on-screen mobile controls
-  hud.js                 # score / lives / tally / game-over
-  constants.js           # all tuning values
-assets/                  # drop real sprite sheets here (see assets/README.md)
+  app.js            # orchestrator: state, rendering, refresh, settings, filters
+  providers.js      # demo + AeroDataBox (live) data providers, normalized output
+  demo-data.js      # curated EDI timetable + deterministic generator
+  config.js         # airport, defaults, status buckets, storage keys
+  time.js           # Europe/London time helpers & formatting
+  styles.css        # FIDS board styling (dark theme, responsive cards)
 ```
 
-## Art
+## Notes & limitations
 
-The **houses** use real **CC0 (public-domain)** isometric building art from
-**Kenney's "Isometric Tiles — Buildings"** pack (`assets/buildings/`). The rest
-of the gameplay sprites (vehicles, characters, trees and props) are drawn
-**procedurally in code** (`src/procsprites.js`, `src/isoart.js`). The renderer
-prefers a loaded PNG over the procedural fallback, so any sprite can be replaced
-with real art by dropping a sheet into [`assets/`](assets/) and pointing the
-manifest at it. See [`assets/README.md`](assets/README.md) and
-[`assets/CREDITS.md`](assets/CREDITS.md).
-
-The **sky/horizon** uses a handful of **CC0 (public-domain)** background images
-(mountains, city skyline, clouds, stars) in [`assets/sky/`](assets/sky/),
-sourced from [prom-game-kit](https://github.com/promdotdev/prom-game-kit). Full
-attribution and licensing is in [`assets/CREDITS.md`](assets/CREDITS.md).
+- Live data quality, coverage and rate limits depend on your AeroDataBox plan.
+- The free RapidAPI tier is rate-limited; the default auto-refresh is 1 minute.
+- All times are displayed in **Edinburgh (Europe/London)** local time.
