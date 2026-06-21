@@ -134,19 +134,36 @@ export function wallRect(ctx, cx, by, hw, hd, wall, along, up, w, h, color) {
   poly(ctx, [p0, p1, p2, p3], color);
 }
 
-// A vertical post + canopy (trees, lamps) — canopy as a layered blob.
-export function isoCanopy(ctx, cx, by, trunkH, r, trunkColor, leaf1, leaf2) {
+// A directional cast shadow: the footprint smeared toward the light's opposite
+// (up-left), giving objects a grounded 3D feel.
+export function isoCastShadow(ctx, cx, by, hw, hd, h) {
+  const ox = -h * 0.42;
+  const oy = -h * 0.28;
+  const A = pt(cx + ox, by + oy, -hw, -hd, 0);
+  const B = pt(cx + ox, by + oy, hw, -hd, 0);
+  const C = pt(cx + ox, by + oy, hw, hd, 0);
+  const D = pt(cx + ox, by + oy, -hw, hd, 0);
+  ctx.save();
+  ctx.globalAlpha = 0.16;
+  poly(ctx, [A, B, C, D], "#000");
+  ctx.restore();
+}
+
+// A vertical post + canopy (trees, lamps) — canopy as a layered blob. `sway`
+// shifts the foliage (not the trunk) for a gentle breeze.
+export function isoCanopy(ctx, cx, by, trunkH, r, trunkColor, leaf1, leaf2, sway = 0) {
   isoShadow(ctx, cx, by, r * 0.9, r * 0.4);
   ctx.fillStyle = trunkColor;
   ctx.fillRect(cx - r * 0.13, by - trunkH, r * 0.26, trunkH);
   const top = by - trunkH;
+  const sx = cx + sway;
   ctx.fillStyle = shade(leaf1, 0.85);
-  blob(ctx, cx, top - r * 0.1, r);
+  blob(ctx, sx, top - r * 0.1, r);
   ctx.fillStyle = leaf1;
-  blob(ctx, cx - r * 0.28, top - r * 0.25, r * 0.7);
-  blob(ctx, cx + r * 0.3, top - r * 0.2, r * 0.66);
+  blob(ctx, sx - r * 0.28, top - r * 0.25, r * 0.7);
+  blob(ctx, sx + r * 0.3, top - r * 0.2, r * 0.66);
   ctx.fillStyle = leaf2;
-  blob(ctx, cx - r * 0.1, top - r * 0.5, r * 0.55);
+  blob(ctx, sx - r * 0.1, top - r * 0.5, r * 0.55);
 }
 function blob(ctx, x, y, r) {
   ctx.beginPath();

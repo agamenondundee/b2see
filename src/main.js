@@ -3,6 +3,7 @@
 import { assets } from "./assets.js";
 import { input } from "./input.js";
 import { audio } from "./audio.js";
+import { clock } from "./clock.js";
 import { Game, Phase } from "./game.js";
 import { setupTouch } from "./touch.js";
 
@@ -54,6 +55,7 @@ async function boot() {
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
+    clock.t += dt;
     game.update(dt);
     game.draw();
     input.endFrame();

@@ -18,6 +18,8 @@ export class Player {
     this.invuln = 0;
     this.facing = "right";
     this.anim = 0;
+    this.lean = 0;
+    this.pedal = 0;
   }
 
   get box() {
@@ -40,6 +42,10 @@ export class Player {
     this.u += dir * PLAYER.steerSpeed * dt;
     this.u = clamp(this.u, bounds.roadLeft + 12, bounds.roadRight - 12);
 
+    // Lean into the steer (smoothed), and pedal faster with speed.
+    const targetLean = dir * 0.16;
+    this.lean += (targetLean - this.lean) * Math.min(1, dt * 10);
+    this.pedal += dt * (this.speed / 22);
     this.anim += dt * (this.speed / 40);
     if (this.invuln > 0) this.invuln -= dt;
   }
@@ -56,7 +62,15 @@ export class Player {
     if (this.invuln > 0 && Math.floor(this.invuln * 12) % 2 === 0) return;
     const p = project(this.u, this.v, cameraV);
     const frame = Math.floor(this.anim) % 2;
-    drawSprite(ctx, "player", p.x, p.y, depthScale(p.relV), { facing: this.facing }, frame);
+    drawSprite(
+      ctx,
+      "player",
+      p.x,
+      p.y,
+      depthScale(p.relV),
+      { facing: this.facing, lean: this.lean, pedal: this.pedal },
+      frame,
+    );
   }
 }
 

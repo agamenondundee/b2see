@@ -5,7 +5,19 @@
 
 import { assets } from "./assets.js";
 import { roundRect } from "./assets.js";
-import { isoBox, isoRoof, isoShadow, wallRect, isoCanopy, shade, mix, LIGHT, AX } from "./isoart.js";
+import { clock } from "./clock.js";
+import {
+  isoBox,
+  isoRoof,
+  isoShadow,
+  isoCastShadow,
+  wallRect,
+  isoCanopy,
+  shade,
+  mix,
+  LIGHT,
+  AX,
+} from "./isoart.js";
 
 const NOMINAL = {
   player: [40, 56],
@@ -46,12 +58,15 @@ function rect(ctx, x, y, w, h, color) {
 // ---- Player: BMX rider --------------------------------------------------
 function paintPlayer(ctx, cx, baseY, scale, opts, frame) {
   const s = scale;
+  const pedal = opts.pedal ?? frame * 1.6; // continuous pedalling phase
+  const lean = opts.lean ?? 0;
+  const bob = Math.sin(pedal * 2) * 1.0;
   isoShadow(ctx, cx, baseY, 22 * s, 8 * s);
   ctx.save();
-  ctx.translate(cx, baseY);
+  ctx.translate(cx, baseY - bob * s);
+  ctx.rotate(lean);
   if (opts.facing === "left") ctx.scale(-1, 1);
   ctx.scale(s, s);
-  const spin = frame % 2 === 0 ? 0 : Math.PI / 4;
 
   for (const wx of [-14, 14]) {
     ctx.fillStyle = "#15151a";
@@ -65,7 +80,7 @@ function paintPlayer(ctx, cx, baseY, scale, opts, frame) {
     ctx.strokeStyle = "#cfcfd6";
     ctx.lineWidth = 1;
     for (let a = 0; a < 4; a++) {
-      const ang = spin + (a * Math.PI) / 2;
+      const ang = pedal + (a * Math.PI) / 2;
       ctx.beginPath();
       ctx.moveTo(wx, -9);
       ctx.lineTo(wx + Math.cos(ang) * 8, -9 + Math.sin(ang) * 8);
@@ -85,15 +100,19 @@ function paintPlayer(ctx, cx, baseY, scale, opts, frame) {
   ctx.lineTo(14, -9);
   ctx.lineTo(10, -25);
   ctx.stroke();
-  // Legs.
+  // Legs pumping the pedals (feet orbit the crank at (-2,-11)).
   ctx.strokeStyle = "#2b59d9";
   ctx.lineWidth = 4.5;
-  ctx.beginPath();
-  ctx.moveTo(-2, -23);
-  ctx.lineTo(1, -11);
-  ctx.moveTo(-2, -23);
-  ctx.lineTo(-6, -10);
-  ctx.stroke();
+  const crankX = -2;
+  const crankY = -11;
+  for (const off of [0, Math.PI]) {
+    const fx = crankX + Math.cos(pedal + off) * 4;
+    const fy = crankY + Math.sin(pedal + off) * 4;
+    ctx.beginPath();
+    ctx.moveTo(-2, -23);
+    ctx.lineTo(fx, fy);
+    ctx.stroke();
+  }
   // Torso.
   ctx.strokeStyle = "#ffd23f";
   ctx.lineWidth = 8;
@@ -167,6 +186,7 @@ function paintHouse(ctx, cx, baseY, scale, opts) {
   const hd = 30 * s;
   const wallH = 42 * s;
 
+  isoCastShadow(ctx, cx, baseY, hw, hd, wallH + 22 * s);
   isoShadow(ctx, cx, baseY, hw * 1.5, hw * 0.7);
   const box = isoBox(ctx, cx, baseY, hw, hd, wallH, pal.wall);
 
@@ -393,7 +413,9 @@ function paintRamp(ctx, cx, baseY, scale) {
 function paintTree(ctx, cx, baseY, scale, opts) {
   const s = scale;
   const r = (opts.r ?? 20) * s;
-  isoCanopy(ctx, cx, baseY, 26 * s, r, "#5a3a1e", "#2f7d3a", "#48a35a");
+  // Gentle breeze sway, phase-offset per tree so they don't move in lockstep.
+  const sway = Math.sin(clock.t * 1.3 + cx * 0.04) * r * 0.12;
+  isoCanopy(ctx, cx, baseY, 26 * s, r, "#5a3a1e", "#2f7d3a", "#48a35a", sway);
 }
 function paintHedge(ctx, cx, baseY, scale, opts) {
   const s = scale;

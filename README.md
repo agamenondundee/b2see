@@ -52,7 +52,21 @@ The world is modelled in 2D ground coordinates (`u` = lateral, `v` = forward),
 and an **isometric projection** (`src/iso.js`) maps them to the screen for the
 diagonal Paperboy look. All gameplay and collisions stay in clean `(u, v)`
 space. Audio is **synthesized at runtime** with the Web Audio API (no sound
-files), and all graphics are drawn **procedurally** — see "Art" below.
+files), and the gameplay graphics are drawn **procedurally** — see "Art" below.
+
+Visual features:
+
+- **Isometric volumes** — houses, cars and props are shaded 3D boxes/roofs with
+  directional **cast shadows**.
+- **Day/night cycle** (`src/atmosphere.js`) — a ~100s loop through day, dusk,
+  night and dawn that recolours the sky, haze and a world-wide tint; street
+  lamps glow at night.
+- **Parallax sky** (`src/sky.js`) — a horizon with distant mountains (day)
+  cross-fading to a lit-window city skyline (night), drifting clouds and stars,
+  using CC0 art (see `assets/CREDITS.md`).
+- **Distance fog**, a **vignette**, **particle effects** (delivery sparkles,
+  window shards, pickup sparkles, crash star-bursts, wheel dust) and **screen
+  shake**, plus animated tree sway and a leaning, pedalling rider.
 
 ## Project layout
 
@@ -77,8 +91,14 @@ assets/                  # drop real sprite sheets here (see assets/README.md)
 
 ## Art
 
-Every sprite is drawn **procedurally in code** (`src/procsprites.js`), so the
-game looks complete with zero image files. To swap in real artwork, drop sprite
+The gameplay sprites (houses, vehicles, characters, props) are drawn
+**procedurally in code** (`src/procsprites.js`, `src/isoart.js`), so the game
+looks complete with zero sprite files. To swap in real artwork, drop sprite
 sheets into [`assets/`](assets/) and point the manifest at them — the renderer
 prefers a loaded PNG over the procedural fallback. See
 [`assets/README.md`](assets/README.md).
+
+The **sky/horizon** uses a handful of **CC0 (public-domain)** background images
+(mountains, city skyline, clouds, stars) in [`assets/sky/`](assets/sky/),
+sourced from [prom-game-kit](https://github.com/promdotdev/prom-game-kit). Full
+attribution and licensing is in [`assets/CREDITS.md`](assets/CREDITS.md).

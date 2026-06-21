@@ -6,6 +6,7 @@ import { STREET, COLORS, SPAWN, VIEW } from "./constants.js";
 import { project, groundQuad, depthScale } from "./iso.js";
 import { drawSprite } from "./procsprites.js";
 import { shade } from "./isoart.js";
+import { drawSky, HORIZON } from "./sky.js";
 import { House, Obstacle, Hazard, Bundle, Gate, Prop } from "./entities.js";
 
 const SPAWN_AHEAD = 980; // world v ahead of the player where things appear
@@ -147,13 +148,21 @@ export class World {
   }
 
   // ---- Rendering --------------------------------------------------------
-  drawGround(ctx, cameraV) {
+  drawGround(ctx, cameraV, atmos, lateral = 0) {
     const vNear = cameraV - 300;
     const vFar = cameraV + 1200;
 
+    // Parallax sky fills the top band; the ground is clipped below the horizon.
+    if (atmos) drawSky(ctx, atmos, cameraV, lateral);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, HORIZON, VIEW.width, VIEW.height - HORIZON);
+    ctx.clip();
+
     // Base lawn fills the screen.
     ctx.fillStyle = this.mode === "bmx" ? "#caa86a" : COLORS.lawn;
-    ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+    ctx.fillRect(0, HORIZON, VIEW.width, VIEW.height - HORIZON);
 
     // Alternating lawn/turf bands for a sense of motion.
     const band = 120;
@@ -212,12 +221,14 @@ export class World {
       }
     }
 
-    // Atmospheric haze toward the far (top) end for depth.
-    const grad = ctx.createLinearGradient(0, 0, 0, VIEW.height * 0.55);
-    grad.addColorStop(0, this.mode === "bmx" ? "rgba(225,205,160,0.55)" : "rgba(150,200,225,0.45)");
+    // Ground-level haze near the horizon for depth.
+    const grad = ctx.createLinearGradient(0, HORIZON, 0, HORIZON + 150);
+    grad.addColorStop(0, atmos ? atmos.haze : "rgba(150,200,225,0.4)");
     grad.addColorStop(1, "rgba(150,200,225,0)");
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, VIEW.width, VIEW.height * 0.55);
+    ctx.fillRect(0, HORIZON, VIEW.width, 150);
+
+    ctx.restore();
   }
 
   strip(ctx, uA, uB, vA, vB, cameraV) {
@@ -250,7 +261,19 @@ export class World {
       ...this.hazards,
     ];
     list.sort((a, b) => b.v - a.v);
-    for (const e of list) e.draw(ctx, cameraV);
+    // Fade entities into the haze as they approach the horizon.
+    for (const e of list) {
+      const relV = e.v - cameraV;
+      const fog = (relV - 430) / 110;
+      if (fog >= 1) continue; // fully hazed out
+      if (fog > 0) {
+        ctx.globalAlpha = 1 - fog;
+        e.draw(ctx, cameraV);
+        ctx.globalAlpha = 1;
+      } else {
+        e.draw(ctx, cameraV);
+      }
+    }
   }
 }
 

@@ -5,6 +5,8 @@ import { PLAYER, SCORING, ROUTE, STREET } from "./constants.js";
 import { input } from "./input.js";
 import { audio } from "./audio.js";
 import { effects } from "./effects.js";
+import { atmosphere } from "./atmosphere.js";
+import { clock } from "./clock.js";
 import { project } from "./iso.js";
 import { World } from "./world.js";
 import { Player, Paper, hit } from "./entities.js";
@@ -280,17 +282,24 @@ export class Game {
   draw() {
     const ctx = this.ctx;
     const cam = this.cameraV;
+    const atmos = atmosphere(clock.t / 100); // full day/night cycle ~100s
+    const lateral = this.player.u - STREET.roadMid;
 
     // World layer is offset by the screen-shake.
     const sh = effects.shakeOffset();
     ctx.save();
     ctx.translate(Math.round(sh.x), Math.round(sh.y));
-    this.world.drawGround(ctx, cam);
+    this.world.drawGround(ctx, cam, atmos, lateral);
     this.world.drawEntities(ctx, cam);
     for (const paper of this.papers) paper.draw(ctx, cam);
     this.player.draw(ctx, cam);
     drawFloatingText(ctx, this.popups, cam);
     effects.draw(ctx);
+    // Day/night colour grade over the world (not the HUD).
+    if (atmos.tint) {
+      ctx.fillStyle = atmos.tint;
+      ctx.fillRect(-20, -20, ctx.canvas.width + 40, ctx.canvas.height + 40);
+    }
     ctx.restore();
 
     // Damage flash.
