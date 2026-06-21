@@ -29,6 +29,7 @@
     <nav class="tabs" id="tabs" role="tablist" aria-label="Departure type">
       <button class="tab is-active" data-tab="flights" role="tab" aria-selected="true">🛫 Flights</button>
       <button class="tab" data-tab="trains" role="tab" aria-selected="false">🚆 Trains</button>
+      <button class="tab" data-tab="buses" role="tab" aria-selected="false">🚌 Buses</button>
     </nav>
 
     <section class="toolbar">
@@ -134,6 +135,30 @@
             proxy over National Rail’s Darwin feed (best-effort uptime). For reliability you can
             <a href="https://github.com/jpsingleton/Huxley2" target="_blank" rel="noopener">self-host Huxley2</a>
             and point this at it. Falls back to demo data if unreachable.
+          </p>
+        </div>
+
+        <h3 class="settings-group">🚌 Buses</h3>
+        <fieldset class="field">
+          <legend>Data source — Edinburgh Bus Station (St Andrew Square)</legend>
+          <label class="radio">
+            <input type="radio" name="busProvider" value="demo" />
+            <span><strong>Demo</strong> — realistic generated board, no setup</span>
+          </label>
+          <label class="radio">
+            <input type="radio" name="busProvider" value="live" />
+            <span><strong>Live</strong> — TransportAPI via the Worker proxy</span>
+          </label>
+        </fieldset>
+
+        <div class="field">
+          <label for="bus-atco">Bus stop ATCO code <span class="label-opt">(for live)</span></label>
+          <input id="bus-atco" type="text" placeholder="e.g. 6200247601" autocomplete="off" spellcheck="false" />
+          <p class="hint">
+            Live buses go through your <a href="https://github.com/agamenondundee/b2see/tree/main/proxy" target="_blank" rel="noopener">Worker proxy</a>
+            (add <code>TRANSPORTAPI_APP_ID</code> / <code>TRANSPORTAPI_APP_KEY</code> secrets, set the Proxy URL above).
+            Find a stance’s ATCO code with <a href="https://developer.transportapi.com/docs" target="_blank" rel="noopener">TransportAPI</a>.
+            Falls back to demo data.
           </p>
         </div>
 

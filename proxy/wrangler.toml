@@ -2,8 +2,12 @@ name = "edi-departures-proxy"
 main = "worker.js"
 compatibility_date = "2024-11-01"
 
-# The RapidAPI key is a SECRET, not a var. Set it after first deploy:
-#   wrangler secret put RAPIDAPI_KEY
+# Credentials are SECRETS, not vars. Set them after first deploy:
+#   wrangler secret put RAPIDAPI_KEY          # flights (AeroDataBox)
+#   wrangler secret put TRANSPORTAPI_APP_ID   # buses (TransportAPI)
+#   wrangler secret put TRANSPORTAPI_APP_KEY  # buses (TransportAPI)
+#
+# Each is optional — set only the ones for the feeds you want live.
 #
 # Optionally lock CORS to your site instead of allowing any origin ("*").
 # Uncomment and set to your Pages origin (no trailing slash):

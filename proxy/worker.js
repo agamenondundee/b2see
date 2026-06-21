@@ -1,54 +1,67 @@
-// Cloudflare Worker — AeroDataBox proxy for the Edinburgh departures board.
+// Cloudflare Worker — keyless proxy for the Edinburgh departures board.
 //
-// Why: the board is a static site, so calling AeroDataBox directly means every
-// visitor needs their own RapidAPI key. This Worker holds ONE key server-side
-// (as a secret) and adds CORS, so the deployed board can show live data with no
-// per-user key. Point the app's "Proxy URL" setting at this Worker.
+// Holds upstream API credentials as server-side secrets and adds CORS, so the
+// static board can show live data with no per-user key. Routes:
 //
-// Deploy: see proxy/README.md (wrangler deploy + `wrangler secret put RAPIDAPI_KEY`).
+//   /flights/*   -> AeroDataBox (RapidAPI)   — needs RAPIDAPI_KEY
+//   /bus/*       -> TransportAPI              — needs TRANSPORTAPI_APP_ID + _APP_KEY
+//
+// Trains don't go through here (their Huxley/Darwin feed is already CORS-enabled).
+// Deploy: see proxy/README.md.
 
-const UPSTREAM = 'https://aerodatabox.p.rapidapi.com';
-const UPSTREAM_HOST = 'aerodatabox.p.rapidapi.com';
-const EDGE_CACHE_SECONDS = 30; // spare the free-tier quota across visitors
+const AERO_UPSTREAM = 'https://aerodatabox.p.rapidapi.com';
+const AERO_HOST = 'aerodatabox.p.rapidapi.com';
+const TAPI_UPSTREAM = 'https://transportapi.com/v3/uk';
+const EDGE_CACHE_SECONDS = 30; // spare the free-tier quotas across visitors
 
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
     const cors = corsHeaders(origin, env.ALLOWED_ORIGIN || '*');
 
-    // CORS preflight.
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: cors });
-    }
-    if (request.method !== 'GET') {
-      return json({ error: 'Method not allowed' }, 405, cors);
-    }
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+    if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405, cors);
 
     const url = new URL(request.url);
+    const path = url.pathname;
 
-    // Health check.
-    if (url.pathname === '/' || url.pathname === '/health') {
-      return json({ ok: true, service: 'edi-departures-proxy', hasKey: !!env.RAPIDAPI_KEY }, 200, cors);
+    if (path === '/' || path === '/health') {
+      return json(
+        {
+          ok: true,
+          service: 'edi-departures-proxy',
+          flights: !!env.RAPIDAPI_KEY,
+          buses: !!(env.TRANSPORTAPI_APP_ID && env.TRANSPORTAPI_APP_KEY),
+        },
+        200,
+        cors,
+      );
     }
 
-    // Only proxy the flights/airport (FIDS) endpoints — never an open relay.
-    if (!url.pathname.startsWith('/flights/')) {
+    let target;
+    let upstreamHeaders;
+
+    if (path.startsWith('/flights/')) {
+      if (!env.RAPIDAPI_KEY) return json({ error: 'Proxy missing RAPIDAPI_KEY secret.' }, 500, cors);
+      target = AERO_UPSTREAM + path + url.search;
+      upstreamHeaders = { 'X-RapidAPI-Key': env.RAPIDAPI_KEY, 'X-RapidAPI-Host': AERO_HOST, Accept: 'application/json' };
+    } else if (path.startsWith('/bus/')) {
+      if (!env.TRANSPORTAPI_APP_ID || !env.TRANSPORTAPI_APP_KEY) {
+        return json({ error: 'Proxy missing TRANSPORTAPI_APP_ID / TRANSPORTAPI_APP_KEY secrets.' }, 500, cors);
+      }
+      const t = new URL(TAPI_UPSTREAM + path + url.search);
+      t.searchParams.set('app_id', env.TRANSPORTAPI_APP_ID);
+      t.searchParams.set('app_key', env.TRANSPORTAPI_APP_KEY);
+      target = t.toString();
+      upstreamHeaders = { Accept: 'application/json' };
+    } else {
       return json({ error: 'Not found' }, 404, cors);
     }
-    if (!env.RAPIDAPI_KEY) {
-      return json({ error: 'Proxy is missing the RAPIDAPI_KEY secret.' }, 500, cors);
-    }
-
-    const target = UPSTREAM + url.pathname + url.search;
 
     let upstream;
     try {
       upstream = await fetch(target, {
-        headers: {
-          'X-RapidAPI-Key': env.RAPIDAPI_KEY,
-          'X-RapidAPI-Host': UPSTREAM_HOST,
-          Accept: 'application/json',
-        },
+        headers: upstreamHeaders,
         cf: { cacheTtl: EDGE_CACHE_SECONDS, cacheEverything: true },
       });
     } catch {
@@ -68,7 +81,6 @@ export default {
 };
 
 function corsHeaders(origin, allowed) {
-  // allowed === '*' -> open; otherwise echo the origin only when it matches.
   const allowOrigin = allowed === '*' ? '*' : origin === allowed ? origin : allowed;
   return {
     'Access-Control-Allow-Origin': allowOrigin,
