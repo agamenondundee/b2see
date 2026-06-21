@@ -5,11 +5,11 @@
 //     time: Date, estimated: Date|null, gate: string|null,
 //     status: {key,label}, codeshare: boolean }
 
-import { AERODATABOX, HUXLEY, STATUS } from './config.js?v=3';
-import { fmtLocalApi, parseLondonClock } from './time.js?v=3';
-import { generateDemoDepartures } from './demo-data.js?v=3';
-import { generateDemoTrains } from './trains-demo.js?v=3';
-import { generateDemoBuses } from './buses-demo.js?v=3';
+import { AERODATABOX, HUXLEY, STATUS } from './config.js?v=4';
+import { fmtLocalApi, parseLondonClock } from './time.js?v=4';
+import { generateDemoDepartures } from './demo-data.js?v=4';
+import { generateDemoTrains } from './trains-demo.js?v=4';
+import { generateDemoBuses } from './buses-demo.js?v=4';
 
 // ---- Demo provider -------------------------------------------------------
 
@@ -69,6 +69,15 @@ function mapLiveStatus(raw) {
   return STATUS.SCHEDULED; // expected / scheduled / ontime / unknown-but-present
 }
 
+// AeroDataBox rarely publishes gates on the free tier, so fill a stable,
+// plausible "indicative" gate (flagged) when the feed doesn't provide one.
+const GATE_POOL = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '15', '16', '18', '20', '21', '24', '26'];
+function indicativeGate(seed) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return GATE_POOL[Math.abs(h) % GATE_POOL.length];
+}
+
 function normalizeLiveFlight(f, i) {
   const mv = f.movement || f.departure || {};
   const airport = mv.airport || {};
@@ -83,6 +92,7 @@ function normalizeLiveFlight(f, i) {
   }
 
   const flightNo = String(f.number || f.callSign || '').replace(/\s+/g, '') || '—';
+  const realGate = mv.gate || f.gate || null;
   return {
     id: `${flightNo}|${(time || new Date()).toISOString()}|${i}`,
     flightNo,
@@ -92,13 +102,14 @@ function normalizeLiveFlight(f, i) {
     destIata: airport.iata || airport.icao || '',
     time,
     estimated: estimated && time && estimated.getTime() !== time.getTime() ? estimated : null,
-    gate: mv.gate || null,
+    gate: realGate || indicativeGate(flightNo),
+    gateIndicative: !realGate,
     status,
     codeshare: !!(f.codeshareStatus && /codeshare/i.test(f.codeshareStatus)),
   };
 }
 
-export function makeLiveProvider(getApiKey, getProxyUrl = () => '') {
+export function makeLiveProvider(getApiKey, getProxyUrl = () => '', getIcao = () => 'EGPH') {
   return {
     id: 'live',
     label: 'Live (AeroDataBox)',
@@ -125,7 +136,8 @@ export function makeLiveProvider(getApiKey, getProxyUrl = () => '') {
         withLocation: 'false',
       });
       const base = proxy || AERODATABOX.base;
-      const url = `${base}/flights/airports/icao/EGPH/${from}/${to}?${qs}`;
+      const icao = (getIcao() || 'EGPH').trim().toUpperCase();
+      const url = `${base}/flights/airports/icao/${icao}/${from}/${to}?${qs}`;
       // Direct calls need the RapidAPI headers; the proxy injects the key itself.
       const headers = proxy ? {} : { 'X-RapidAPI-Key': key, 'X-RapidAPI-Host': AERODATABOX.host };
 
