@@ -78,14 +78,16 @@ function normalizeLiveFlight(f, i) {
   };
 }
 
-export function makeLiveProvider(getApiKey) {
+export function makeLiveProvider(getApiKey, getProxyUrl = () => '') {
   return {
     id: 'live',
     label: 'Live (AeroDataBox)',
     async fetchDepartures({ pastWindowMin, maxRows }) {
       const key = (getApiKey() || '').trim();
-      if (!key) {
-        const err = new Error('Add your AeroDataBox RapidAPI key in Settings to see live data.');
+      const proxy = (getProxyUrl() || '').trim().replace(/\/+$/, '');
+      // With a proxy the key lives server-side; without one we need a client key.
+      if (!proxy && !key) {
+        const err = new Error('Add an AeroDataBox key (or a proxy URL) in Settings to see live data.');
         err.code = 'NO_KEY';
         throw err;
       }
@@ -102,18 +104,20 @@ export function makeLiveProvider(getApiKey) {
         withPrivate: 'false',
         withLocation: 'false',
       });
-      const url = `${AERODATABOX.base}/flights/airports/icao/EGPH/${from}/${to}?${qs}`;
+      const base = proxy || AERODATABOX.base;
+      const url = `${base}/flights/airports/icao/EGPH/${from}/${to}?${qs}`;
+      // Direct calls need the RapidAPI headers; the proxy injects the key itself.
+      const headers = proxy ? {} : { 'X-RapidAPI-Key': key, 'X-RapidAPI-Host': AERODATABOX.host };
 
       let res;
       try {
-        res = await fetch(url, {
-          headers: {
-            'X-RapidAPI-Key': key,
-            'X-RapidAPI-Host': AERODATABOX.host,
-          },
-        });
+        res = await fetch(url, { headers });
       } catch (e) {
-        throw new Error('Could not reach AeroDataBox (network/CORS). Check your connection.');
+        throw new Error(
+          proxy
+            ? 'Could not reach the proxy. Check the Proxy URL in Settings.'
+            : 'Could not reach AeroDataBox (network/CORS). Check your connection.',
+        );
       }
 
       if (!res.ok) {

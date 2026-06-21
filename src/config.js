@@ -10,6 +10,7 @@ export const AIRPORT = {
 // localStorage keys.
 export const STORE = {
   apiKey: 'edi.rapidapi.key',
+  proxyUrl: 'edi.proxyUrl', // optional Cloudflare Worker proxy (key stays server-side)
   provider: 'edi.provider', // 'demo' | 'live'
   refreshMs: 'edi.refreshMs',
 };

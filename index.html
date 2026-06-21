@@ -82,13 +82,23 @@
         </fieldset>
 
         <div class="field">
-          <label for="api-key">AeroDataBox RapidAPI key</label>
+          <label for="api-key">AeroDataBox RapidAPI key <span class="label-opt">(not needed if using a proxy)</span></label>
           <input id="api-key" type="password" placeholder="Paste your X-RapidAPI-Key" autocomplete="off" spellcheck="false" />
           <p class="hint">
             Stored only in this browser (localStorage); never uploaded or committed.
             Get a free key: subscribe to
             <a href="https://rapidapi.com/aedbx-aedbx/api/aerodatabox" target="_blank" rel="noopener">AeroDataBox on RapidAPI</a>,
             then copy the <code>X-RapidAPI-Key</code> from the “Endpoints” tab.
+          </p>
+        </div>
+
+        <div class="field">
+          <label for="proxy-url">Proxy URL <span class="label-opt">(optional)</span></label>
+          <input id="proxy-url" type="url" placeholder="https://edi-departures-proxy.…workers.dev" autocomplete="off" spellcheck="false" />
+          <p class="hint">
+            Use a <a href="https://github.com/agamenondundee/b2see/tree/main/proxy" target="_blank" rel="noopener">Cloudflare Worker proxy</a>
+            so the deployed board shows live data with <strong>no per-user key</strong> — the key stays
+            server-side in the Worker. When set, the key field above is ignored.
           </p>
         </div>
 
