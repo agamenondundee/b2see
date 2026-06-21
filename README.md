@@ -18,6 +18,10 @@ Flights use [AeroDataBox](https://aerodatabox.com/) (free key); trains show
 - **FIDS-style board** — time, destination, flight/operator, gate/platform/stance
   and a colour-coded status (Scheduled, Boarding, Gate Closing, Departed,
   Delayed, Cancelled; On time for trains/buses). Delays show the revised time.
+- **Brand emblems** — real airline/operator logos (airlines via the avs.io CDN,
+  rail/bus via Clearbit) with an instant colour-coded monogram fallback, so it
+  always looks right even offline.
+- **Go-to-gate cue** — a flight's gate number lights up while it's boarding.
 - **Live, no setup** — demo mode generates a plausible day of real routes
   (airlines / train & coach operators), with statuses that progress in real time.
 - **Real data** — AeroDataBox for flights; National Rail (Darwin via Huxley) for

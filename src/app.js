@@ -1,7 +1,7 @@
 // Edinburgh live departures — tabbed orchestrator (Flights + Trains).
 
-import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATION, STATIONS } from './config.js?v=1';
-import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=1';
+import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATION, STATIONS } from './config.js?v=2';
+import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=2';
 import {
   demoProvider,
   makeLiveProvider,
@@ -9,7 +9,8 @@ import {
   makeTrainProvider,
   demoBusProvider,
   makeBusProvider,
-} from './providers.js?v=1';
+} from './providers.js?v=2';
+import { makeEmblem } from './emblems.js?v=2';
 
 // ---- Settings (persisted) ------------------------------------------------
 
@@ -65,6 +66,27 @@ function timeCell(item) {
   return time;
 }
 
+// Operator/flight cell: brand emblem + stacked text lines.
+function opCell(emblem, lines) {
+  const cell = el('span', 'col-flight');
+  cell.appendChild(emblem);
+  const txt = el('span', 'col-flight-txt');
+  for (const l of lines) txt.appendChild(l);
+  cell.appendChild(txt);
+  return cell;
+}
+
+const BOARDING_KEYS = ['boarding', 'gate', 'closing', 'final'];
+
+// Gate cell with a highlighted "go to gate" pill while boarding.
+function gateCell(value, active) {
+  const cell = el('span', 'col-gate');
+  const num = el('span', 'gate-num', value || '—');
+  if (value && active) num.classList.add('gate-go');
+  cell.appendChild(num);
+  return cell;
+}
+
 function buildFlightRow(f) {
   const row = el('div', `row status--${f.status.key}`);
   row.setAttribute('role', 'row');
@@ -75,14 +97,13 @@ function buildFlightRow(f) {
   if (f.destIata) dest.appendChild(el('span', 'dest-iata', f.destIata));
   row.appendChild(dest);
 
-  const flight = el('span', 'col-flight');
   const fno = el('span', 'flight-no', f.flightNo);
   if (f.codeshare) fno.appendChild(el('span', 'cs-tag', 'codeshare'));
-  flight.appendChild(fno);
-  if (f.airline) flight.appendChild(el('span', 'flight-airline', f.airline));
-  row.appendChild(flight);
+  const lines = [fno];
+  if (f.airline) lines.push(el('span', 'flight-airline', f.airline));
+  row.appendChild(opCell(makeEmblem({ kind: 'flight', code: f.airlineCode, name: f.airline }), lines));
 
-  row.appendChild(el('span', 'col-gate', f.gate || '—'));
+  row.appendChild(gateCell(f.gate, BOARDING_KEYS.includes(f.status.key)));
 
   const status = el('span', 'col-status');
   status.appendChild(el('span', `badge badge--${f.status.key}`, f.status.label));
@@ -100,9 +121,7 @@ function buildTrainRow(t) {
   if (t.via) dest.appendChild(el('span', 'dest-iata', `via ${t.via}`));
   row.appendChild(dest);
 
-  const op = el('span', 'col-flight');
-  op.appendChild(el('span', 'op-name', t.operator));
-  row.appendChild(op);
+  row.appendChild(opCell(makeEmblem({ kind: 'op', name: t.operator }), [el('span', 'op-name', t.operator)]));
 
   row.appendChild(el('span', 'col-gate', t.platform || '—'));
 
@@ -122,11 +141,10 @@ function buildBusRow(b) {
   if (b.via) dest.appendChild(el('span', 'dest-iata', `via ${b.via}`));
   row.appendChild(dest);
 
-  const svc = el('span', 'col-flight');
   const line = el('span', 'flight-no', b.line || '—');
-  svc.appendChild(line);
-  if (b.operator) svc.appendChild(el('span', 'flight-airline', b.operator));
-  row.appendChild(svc);
+  const lines = [line];
+  if (b.operator) lines.push(el('span', 'flight-airline', b.operator));
+  row.appendChild(opCell(makeEmblem({ kind: 'op', name: b.operator }), lines));
 
   row.appendChild(el('span', 'col-gate', b.stance || '—'));
 

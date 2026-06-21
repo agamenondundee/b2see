@@ -6,8 +6,8 @@
 // behaves like a live board with zero setup. The live provider (TransportAPI
 // via the Worker proxy) replaces this when configured.
 
-import { londonTimeAt, minutesUntil } from './time.js?v=1';
-import { STATUS } from './config.js?v=1';
+import { londonTimeAt, minutesUntil } from './time.js?v=2';
+import { STATUS } from './config.js?v=2';
 
 const OPERATORS = {
   SC: 'Scottish Citylink',
