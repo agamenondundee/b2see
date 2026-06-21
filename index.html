@@ -2,30 +2,115 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>b2see — Paperboy</title>
-  <link rel="stylesheet" href="src/style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Live departures board for Edinburgh Airport (EDI / EGPH)." />
+  <meta name="theme-color" content="#0a0e14" />
+  <title>Edinburgh Airport — Live Departures</title>
+  <link rel="stylesheet" href="src/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛫</text></svg>" />
 </head>
 <body>
-  <div id="game-shell">
-    <canvas id="game" width="800" height="600"></canvas>
-    <button id="mute-btn" title="Mute (M)">🔊</button>
+  <div id="app">
+    <header class="board-header">
+      <div class="brand">
+        <span class="brand-plane" aria-hidden="true">🛫</span>
+        <div class="brand-text">
+          <h1>Edinburgh Airport</h1>
+          <p class="brand-codes">EDI · EGPH</p>
+        </div>
+      </div>
+      <div class="header-title">DEPARTURES</div>
+      <div class="clock" aria-live="off">
+        <div class="clock-time" id="clock-time">--:--:--</div>
+        <div class="clock-date" id="clock-date">—</div>
+      </div>
+    </header>
 
-    <div id="overlay" class="overlay">
-      <div class="panel">
-        <h1>B2SEE</h1>
-        <p class="subtitle">A modern take on the 1984 classic <em>Paperboy</em></p>
-        <ul class="controls">
-          <li><b>&larr; &rarr;</b> &nbsp;steer &nbsp;&nbsp; <b>&uarr; &darr;</b> &nbsp;pedal / brake</li>
-          <li><b>Z</b> throw left &nbsp;&nbsp; <b>X</b> throw right</li>
-          <li>Deliver to <span class="good">subscriber</span> houses, dodge dogs,
-            traffic &amp; the Reaper, then ride the <span class="good">BMX</span> bonus course.</li>
-        </ul>
-        <button id="start-btn">Start Route</button>
+    <section class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon" aria-hidden="true">🔎</span>
+        <input id="search" type="search" placeholder="Search destination, flight or airline…"
+               autocomplete="off" aria-label="Search departures" />
+      </div>
+      <div class="filters" id="filters" role="group" aria-label="Filter by status"></div>
+      <div class="actions">
+        <span class="provider-badge" id="provider-badge" title="Active data source">demo</span>
+        <span class="updated" id="updated"></span>
+        <button class="icon-btn" id="refresh-btn" title="Refresh now" aria-label="Refresh now">⟳</button>
+        <button class="icon-btn" id="settings-btn" title="Settings" aria-label="Settings">⚙</button>
+      </div>
+    </section>
+
+    <main class="board" aria-live="polite">
+      <div class="board-head" role="row">
+        <span class="col-time">Time</span>
+        <span class="col-dest">Destination</span>
+        <span class="col-flight">Flight</span>
+        <span class="col-gate">Gate</span>
+        <span class="col-status">Status</span>
+      </div>
+      <div id="rows" class="rows"></div>
+      <div id="message" class="message" hidden></div>
+    </main>
+
+    <footer class="board-footer">
+      <span id="footer-note">Showing demo data — add an API key in Settings ⚙ for live flights.</span>
+      <span class="footer-spacer"></span>
+      <span>Times shown in Edinburgh local time.</span>
+    </footer>
+  </div>
+
+  <!-- Settings dialog -->
+  <div class="modal-backdrop" id="settings" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="modal-head">
+        <h2 id="settings-title">Settings</h2>
+        <button class="icon-btn" id="settings-close" aria-label="Close settings">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <fieldset class="field">
+          <legend>Data source</legend>
+          <label class="radio">
+            <input type="radio" name="provider" value="demo" />
+            <span><strong>Demo</strong> — realistic generated board, no setup</span>
+          </label>
+          <label class="radio">
+            <input type="radio" name="provider" value="live" />
+            <span><strong>Live</strong> — real flights via AeroDataBox</span>
+          </label>
+        </fieldset>
+
+        <div class="field">
+          <label for="api-key">AeroDataBox RapidAPI key</label>
+          <input id="api-key" type="password" placeholder="Paste your X-RapidAPI-Key" autocomplete="off" spellcheck="false" />
+          <p class="hint">
+            Stored only in this browser (localStorage); never uploaded or committed.
+            Get a free key: subscribe to
+            <a href="https://rapidapi.com/aedbx-aedbx/api/aerodatabox" target="_blank" rel="noopener">AeroDataBox on RapidAPI</a>,
+            then copy the <code>X-RapidAPI-Key</code> from the “Endpoints” tab.
+          </p>
+        </div>
+
+        <div class="field">
+          <label for="refresh">Auto-refresh</label>
+          <select id="refresh">
+            <option value="30000">Every 30 seconds</option>
+            <option value="60000">Every minute</option>
+            <option value="120000">Every 2 minutes</option>
+            <option value="300000">Every 5 minutes</option>
+            <option value="0">Off</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn-secondary" id="settings-cancel">Cancel</button>
+        <button class="btn-primary" id="settings-save">Save</button>
       </div>
     </div>
   </div>
 
-  <script type="module" src="src/main.js"></script>
+  <script type="module" src="src/app.js"></script>
 </body>
 </html>
