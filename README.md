@@ -24,8 +24,8 @@ Flights use [AeroDataBox](https://aerodatabox.com/) (free key); trains show
 - **Go-to-gate cue** — a flight's gate number lights up while it's boarding.
   (AeroDataBox rarely publishes gates, so unpublished ones are filled with an
   *indicative* number, shown muted.)
-- **All Scottish airports** — pick Edinburgh, Glasgow, Aberdeen, Inverness,
-  Prestwick, Dundee or any of the regional/island airports; the header follows.
+- **Major UK & European airports** — pick from ~680 airports (Edinburgh,
+  Heathrow, CDG, Schiphol, Frankfurt, …); the header follows your choice.
 - **Departures or Arrivals** — a toggle on every board. Real arrivals for flights
   (AeroDataBox) and trains (Darwin); buses fall back to demo arrivals.
 - **Live, no setup** — demo mode generates a plausible day of real routes
@@ -136,6 +136,7 @@ src/
   demo-data.js      # curated EDI flight timetable + deterministic generator
   trains-demo.js    # curated Edinburgh Waverley train timetable + generator
   buses-demo.js     # curated Edinburgh Bus Station coach timetable + generator
+  airports.js       # ~680 major UK & European airports (name + IATA + ICAO)
   stations.js       # all ~360 Scottish railway stations (name + CRS code)
   config.js         # airport/stations/bus station, defaults, status, storage keys
   time.js           # Europe/London time helpers & formatting

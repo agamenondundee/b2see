@@ -23,25 +23,9 @@ export const STORE = {
   refreshMs: 'edi.refreshMs',
 };
 
-// Scottish airports for the flights board (ICAO drives the AeroDataBox lookup),
-// busiest first then the regional/island airports. Default is Edinburgh.
-export const AIRPORTS = [
-  { icao: 'EGPH', iata: 'EDI', name: 'Edinburgh' },
-  { icao: 'EGPF', iata: 'GLA', name: 'Glasgow' },
-  { icao: 'EGPD', iata: 'ABZ', name: 'Aberdeen' },
-  { icao: 'EGPE', iata: 'INV', name: 'Inverness' },
-  { icao: 'EGPK', iata: 'PIK', name: 'Glasgow Prestwick' },
-  { icao: 'EGPN', iata: 'DND', name: 'Dundee' },
-  { icao: 'EGPA', iata: 'KOI', name: 'Kirkwall' },
-  { icao: 'EGPB', iata: 'LSI', name: 'Sumburgh' },
-  { icao: 'EGPO', iata: 'SYY', name: 'Stornoway' },
-  { icao: 'EGPC', iata: 'WIC', name: 'Wick John O’Groats' },
-  { icao: 'EGPL', iata: 'BEB', name: 'Benbecula' },
-  { icao: 'EGPI', iata: 'ILY', name: 'Islay' },
-  { icao: 'EGPU', iata: 'TRE', name: 'Tiree' },
-  { icao: 'EGPR', iata: 'BRR', name: 'Barra' },
-  { icao: 'EGEC', iata: 'CAL', name: 'Campbeltown' },
-];
+// Major UK & European airports for the flights board (see airports.js). The
+// ICAO drives the AeroDataBox lookup. Default is Edinburgh (EGPH).
+export { AIRPORTS } from './airports.js?v=6';
 export const FLIGHT_DEFAULTS = { airport: 'EGPH' };
 
 export const DEFAULTS = {
@@ -67,7 +51,7 @@ export const HUXLEY = {
 
 // All Scottish railway stations for the trains board (CRS codes). Default is
 // Edinburgh Waverley (EDB); see TRAIN_DEFAULTS.
-export { STATIONS } from './stations.js?v=5';
+export { STATIONS } from './stations.js?v=6';
 
 export const TRAIN_DEFAULTS = {
   provider: 'live', // live needs no key, so default the trains tab to real data

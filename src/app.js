@@ -1,7 +1,7 @@
 // Edinburgh live departures — tabbed orchestrator (Flights + Trains).
 
-import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATION, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=5';
-import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=5';
+import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATION, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=6';
+import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=6';
 import {
   demoProvider,
   makeLiveProvider,
@@ -9,8 +9,8 @@ import {
   makeTrainProvider,
   demoBusProvider,
   makeBusProvider,
-} from './providers.js?v=5';
-import { makeEmblem } from './emblems.js?v=5';
+} from './providers.js?v=6';
+import { makeEmblem } from './emblems.js?v=6';
 
 // ---- Settings (persisted) ------------------------------------------------
 
@@ -439,7 +439,12 @@ function fillAirportSelect() {
   const sel = $('flight-airport');
   sel.replaceChildren(
     ...AIRPORTS.map((a) => {
-      const o = el('option', null, `${a.name} (${a.iata})`);
+      // Prefix the city when the name doesn't already include it (helps search).
+      const label =
+        a.city && !a.name.toLowerCase().includes(a.city.toLowerCase())
+          ? `${a.city} — ${a.name} (${a.iata})`
+          : `${a.name} (${a.iata})`;
+      const o = el('option', null, label);
       o.value = a.icao;
       return o;
     }),
@@ -449,7 +454,7 @@ function fillAirportSelect() {
 // Reflect the selected airport in the header brand.
 function updateAirportHeader() {
   const a = airport(settings.flightAirport);
-  $('brand-name').textContent = `${a.name} Airport`;
+  $('brand-name').textContent = a.name;
   $('brand-codes').textContent = `${a.iata} · ${a.icao}`;
 }
 
