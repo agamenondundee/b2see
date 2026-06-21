@@ -6,8 +6,8 @@
 // board with zero configuration. Switch to the live AeroDataBox provider in
 // Settings for real data.
 
-import { londonTimeAt, minutesUntil } from './time.js?v=9';
-import { STATUS } from './config.js?v=9';
+import { londonTimeAt, minutesUntil } from './time.js?v=10';
+import { STATUS } from './config.js?v=10';
 
 const AIRLINES = {
   U2: 'easyJet',
@@ -38,6 +38,45 @@ const AIRLINES = {
   AC: 'Air Canada',
   WS: 'WestJet',
 };
+
+// Typical fleet per airline — a plausible aircraft type is picked per flight so
+// the demo board carries realistic equipment (narrowbody short-haul, widebody
+// long-haul, turboprops for the islands). Live data uses AeroDataBox's actual
+// aircraft model where published.
+const FLEET = {
+  U2: ['Airbus A320', 'Airbus A319', 'Airbus A320neo', 'Airbus A321neo'],
+  FR: ['Boeing 737-800', 'Boeing 737 MAX 8-200'],
+  LS: ['Boeing 737-800', 'Boeing 757-200', 'Airbus A321neo'],
+  BA: ['Airbus A320', 'Airbus A319', 'Airbus A321neo', 'Embraer E190'],
+  KL: ['Boeing 737-800', 'Boeing 737-700', 'Embraer E195-E2'],
+  LH: ['Airbus A320', 'Airbus A321', 'Airbus A319neo'],
+  AF: ['Airbus A320', 'Airbus A319', 'Airbus A220-300'],
+  EI: ['Airbus A320', 'ATR 72-600'],
+  EK: ['Boeing 777-300ER', 'Airbus A380-800'],
+  QR: ['Airbus A350-900', 'Boeing 787-9'],
+  UA: ['Boeing 757-200', 'Boeing 767-300ER'],
+  B6: ['Airbus A321neo', 'Airbus A321LR'],
+  DL: ['Boeing 767-300ER', 'Airbus A330-900'],
+  LM: ['ATR 72-600', 'Embraer 145', 'DHC-6 Twin Otter'],
+  W6: ['Airbus A321neo', 'Airbus A320'],
+  BY: ['Boeing 737-800', 'Boeing 787-8'],
+  SK: ['Airbus A320neo', 'Airbus A319', 'Airbus A321LR'],
+  LX: ['Airbus A320', 'Airbus A220-300'],
+  FI: ['Boeing 737 MAX 8', 'Boeing 757-200'],
+  OG: ['Airbus A320neo', 'Airbus A321neo'],
+  VY: ['Airbus A320', 'Airbus A321'],
+  TP: ['Airbus A320neo', 'Airbus A319'],
+  EW: ['Airbus A320', 'Airbus A319'],
+  AY: ['Airbus A320', 'Airbus A321', 'Embraer E190'],
+  DY: ['Boeing 737-800', 'Boeing 737 MAX 8'],
+  AC: ['Boeing 787-9', 'Boeing 767-300ER'],
+  WS: ['Boeing 787-9', 'Boeing 737-800'],
+};
+const DEFAULT_FLEET = ['Airbus A320', 'Boeing 737-800'];
+function pickAircraft(code, r) {
+  const pool = FLEET[code] || DEFAULT_FLEET;
+  return pool[Math.floor(r * pool.length)];
+}
 
 // [hour, minute, airlineCode, flightNumber, destination, iata]
 const TIMETABLE = [
@@ -153,6 +192,7 @@ function buildDay(dayOffset) {
     const r1 = rng();
     const r2 = rng();
     const r3 = rng();
+    const r4 = rng();
     // Jitter the published time by a couple of minutes for daily variety.
     const jitter = Math.round((r1 - 0.5) * 6);
     const time = londonTimeAt(dayOffset, h, m + jitter);
@@ -169,6 +209,7 @@ function buildDay(dayOffset) {
       airlineCode: code,
       dest,
       destIata: iata,
+      aircraft: pickAircraft(code, r4),
       time,
       estimated,
       gate: GATES[Math.floor(r3 * GATES.length)],

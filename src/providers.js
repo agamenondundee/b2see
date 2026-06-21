@@ -5,12 +5,12 @@
 //     time: Date, estimated: Date|null, gate: string|null,
 //     status: {key,label}, codeshare: boolean }
 
-import { AERODATABOX, HUXLEY, DBREST, STATUS } from './config.js?v=9';
-import { fmtLocalApi, parseLondonClock } from './time.js?v=9';
-import { generateDemoDepartures } from './demo-data.js?v=9';
-import { generateDemoTrains } from './trains-demo.js?v=9';
-import { generateDemoBuses } from './buses-demo.js?v=9';
-import { generateEuRail } from './eurail-demo.js?v=9';
+import { AERODATABOX, HUXLEY, DBREST, STATUS } from './config.js?v=10';
+import { fmtLocalApi, parseLondonClock } from './time.js?v=10';
+import { generateDemoDepartures } from './demo-data.js?v=10';
+import { generateDemoTrains } from './trains-demo.js?v=10';
+import { generateDemoBuses } from './buses-demo.js?v=10';
+import { generateEuRail } from './eurail-demo.js?v=10';
 
 // ---- Demo provider -------------------------------------------------------
 
@@ -127,6 +127,8 @@ function normalizeLiveFlight(f, i, arrivals) {
     // For arrivals this counterpart airport is the ORIGIN; for departures the destination.
     dest: airport.name || airport.shortName || airport.municipalityName || airport.iata || 'Unknown',
     destIata: airport.iata || airport.icao || '',
+    aircraft: (f.aircraft && f.aircraft.model) || '', // published equipment, when available
+    aircraftReg: (f.aircraft && f.aircraft.reg) || '',
     time,
     estimated: estimated && time && estimated.getTime() !== time.getTime() ? estimated : null,
     // Indicative gates only make sense for departures.

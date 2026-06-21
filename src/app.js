@@ -1,7 +1,7 @@
 // Edinburgh live departures — tabbed orchestrator (Flights, Trains, Buses, EU Rail).
 
-import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATIONS, EU_DEFAULTS, EU_STATIONS, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=9';
-import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=9';
+import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATIONS, EU_DEFAULTS, EU_STATIONS, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=10';
+import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=10';
 import {
   demoProvider,
   makeLiveProvider,
@@ -11,8 +11,8 @@ import {
   makeBusProvider,
   demoEuRailProvider,
   makeEuRailProvider,
-} from './providers.js?v=9';
-import { makeEmblem } from './emblems.js?v=9';
+} from './providers.js?v=10';
+import { makeEmblem } from './emblems.js?v=10';
 
 // ---- Settings (persisted) ------------------------------------------------
 
@@ -120,6 +120,7 @@ function buildFlightRow(f) {
   if (f.codeshare) fno.appendChild(el('span', 'cs-tag', 'codeshare'));
   const lines = [fno];
   if (f.airline) lines.push(el('span', 'flight-airline', f.airline));
+  if (f.aircraft) lines.push(el('span', 'flight-aircraft', f.aircraft));
   row.appendChild(opCell(makeEmblem({ kind: 'flight', code: f.airlineCode, name: f.airline }), lines));
 
   row.appendChild(gateCell(f.gate, BOARDING_KEYS.includes(f.status.key), f.gateIndicative));
@@ -218,7 +219,7 @@ const BUS_FILTERS = TRAIN_FILTERS;
 const FEEDS = {
   flights: {
     columns: ['Time', 'Destination', 'Flight', 'Gate', 'Status'],
-    searchPlaceholder: 'Search destination, flight or airline…',
+    searchPlaceholder: 'Search destination, flight, airline or aircraft…',
     providers: { demo: demoProvider, live: liveFlight },
     providerId: () => settings.flightProvider,
     opts: () => ({ pastWindowMin: DEFAULTS.pastWindowMin, maxRows: DEFAULTS.maxRows, direction: settings.direction, icao: settings.flightAirport }),
@@ -228,7 +229,8 @@ const FEEDS = {
       f.flightNo.toLowerCase().includes(q) ||
       f.dest.toLowerCase().includes(q) ||
       f.destIata.toLowerCase().includes(q) ||
-      f.airline.toLowerCase().includes(q),
+      f.airline.toLowerCase().includes(q) ||
+      (f.aircraft || '').toLowerCase().includes(q),
     note: (live, err) => {
       const name = airport(settings.flightAirport).name;
       const edi = settings.flightAirport === 'EGPH';

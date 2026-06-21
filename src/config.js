@@ -29,7 +29,7 @@ export const STORE = {
 
 // Major UK & European airports for the flights board (see airports.js). The
 // ICAO drives the AeroDataBox lookup. Default is Edinburgh (EGPH).
-export { AIRPORTS } from './airports.js?v=9';
+export { AIRPORTS } from './airports.js?v=10';
 export const FLIGHT_DEFAULTS = { airport: 'EGPH' };
 
 export const DEFAULTS = {
@@ -55,7 +55,7 @@ export const HUXLEY = {
 
 // All National Rail (GB) stations for the trains board (CRS codes). Default is
 // Edinburgh Waverley (EDB); see TRAIN_DEFAULTS.
-export { STATIONS } from './stations.js?v=9';
+export { STATIONS } from './stations.js?v=10';
 
 export const TRAIN_DEFAULTS = {
   provider: 'live', // live needs no key, so default the trains tab to real data
@@ -67,7 +67,7 @@ export const TRAIN_DEFAULTS = {
 // Buses: major UK bus/coach stations (see busstations.js). Live data is
 // TransportAPI via the Worker proxy (creds stay server-side); the demo board is
 // Edinburgh-only, so the tab defaults to Edinburgh + demo.
-export { BUS_STATIONS } from './busstations.js?v=9';
+export { BUS_STATIONS } from './busstations.js?v=10';
 export const BUS_DEFAULTS = {
   provider: 'demo',
   station: 'edinburgh',
@@ -84,7 +84,7 @@ export const DBREST = {
   // point at your own deployment for reliability.
   base: 'https://v6.db.transport.rest',
 };
-export { EU_STATIONS } from './eustations.js?v=9';
+export { EU_STATIONS } from './eustations.js?v=10';
 export const EU_DEFAULTS = {
   provider: 'live', // keyless live, so default to real data
   station: '8700014', // Paris Gare du Nord (Eurostar hub)
