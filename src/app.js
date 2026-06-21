@@ -1,7 +1,7 @@
 // Edinburgh live departures — tabbed orchestrator (Flights + Trains).
 
-import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATION, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=7';
-import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=7';
+import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATIONS, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=8';
+import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=8';
 import {
   demoProvider,
   makeLiveProvider,
@@ -9,8 +9,8 @@ import {
   makeTrainProvider,
   demoBusProvider,
   makeBusProvider,
-} from './providers.js?v=7';
-import { makeEmblem } from './emblems.js?v=7';
+} from './providers.js?v=8';
+import { makeEmblem } from './emblems.js?v=8';
 
 // ---- Settings (persisted) ------------------------------------------------
 
@@ -23,6 +23,7 @@ const settings = {
   trainStation: localStorage.getItem(STORE.trainStation) || TRAIN_DEFAULTS.station,
   trainBase: localStorage.getItem(STORE.trainBase) || '',
   busProvider: localStorage.getItem(STORE.busProvider) || BUS_DEFAULTS.provider,
+  busStation: localStorage.getItem(STORE.busStation) || BUS_DEFAULTS.station,
   busAtco: localStorage.getItem(STORE.busAtco) || BUS_DEFAULTS.atco,
   direction: localStorage.getItem(STORE.direction) || 'departures',
   refreshMs: Number(localStorage.getItem(STORE.refreshMs) ?? DEFAULTS.refreshMs),
@@ -30,9 +31,12 @@ const settings = {
 
 const dir = () => settings.direction;
 const dirWord = () => (settings.direction === 'arrivals' ? 'arrivals' : 'departures');
+const busStation = () => BUS_STATIONS.find((s) => s.id === settings.busStation) || BUS_STATIONS[0];
+// Live bus ATCO: an explicit override wins, else the selected station's own code.
+const busAtco = () => settings.busAtco.trim() || busStation().atco;
 const liveFlight = makeLiveProvider(() => settings.apiKey, () => settings.proxyUrl, () => settings.flightAirport, dir);
 const liveTrain = makeTrainProvider(() => settings.trainBase, () => settings.trainStation, dir);
-const liveBus = makeBusProvider(() => settings.proxyUrl, () => settings.busAtco, dir);
+const liveBus = makeBusProvider(() => settings.proxyUrl, busAtco, dir);
 
 const stationName = (crs) => (STATIONS.find((s) => s.crs === crs) || {}).name || crs;
 const airport = (icao) => AIRPORTS.find((a) => a.icao === icao) || AIRPORTS[0];
@@ -232,7 +236,7 @@ const FEEDS = {
     searchPlaceholder: 'Search destination, service or operator…',
     providers: { demo: demoBusProvider, live: liveBus },
     providerId: () => settings.busProvider,
-    opts: () => ({ pastWindowMin: BUS_DEFAULTS.pastWindowMin, maxRows: BUS_DEFAULTS.maxRows, direction: settings.direction }),
+    opts: () => ({ pastWindowMin: BUS_DEFAULTS.pastWindowMin, maxRows: BUS_DEFAULTS.maxRows, direction: settings.direction, home: settings.busStation === 'edinburgh' }),
     buildRow: buildBusRow,
     filters: BUS_FILTERS,
     match: (b, q) =>
@@ -241,9 +245,13 @@ const FEEDS = {
       (b.line || '').toLowerCase().includes(q) ||
       (b.stance || '').toLowerCase().includes(q),
     note: (live, err) => {
-      if (err) return `⚠ Live buses unavailable: ${err} Showing demo data.`;
-      if (live) return `Live departures from ${BUS_STATION.name} (TransportAPI).`;
-      return `Showing demo ${dirWord()} for ${BUS_STATION.name} (${BUS_STATION.area}).`;
+      const name = busStation().name;
+      const home = settings.busStation === 'edinburgh';
+      if (err) return `⚠ Live buses unavailable for ${name}: ${err}${home ? ' Showing demo data.' : ''}`;
+      if (live) return `Live ${dirWord()} from ${name} (TransportAPI).`;
+      return home
+        ? `Showing demo ${dirWord()} for ${name}.`
+        : `Demo is Edinburgh-only — switch to Live (set this station's ATCO) for ${name}.`;
     },
   },
 };
@@ -451,6 +459,19 @@ function fillAirportSelect() {
   );
 }
 
+function fillBusStationSelect() {
+  const sel = $('bus-station');
+  sel.replaceChildren(
+    ...BUS_STATIONS.map((s) => {
+      // Flag stations that need an ATCO before live works (all but Edinburgh's demo).
+      const needsAtco = !s.atco && s.id !== 'edinburgh';
+      const o = el('option', null, needsAtco ? `${s.name} — set ATCO` : s.name);
+      o.value = s.id;
+      return o;
+    }),
+  );
+}
+
 // Reflect the selected airport in the header brand.
 function updateAirportHeader() {
   const a = airport(settings.flightAirport);
@@ -467,6 +488,7 @@ function openSettings() {
   $('flight-airport').value = settings.flightAirport;
   $('train-station').value = settings.trainStation;
   $('train-base').value = settings.trainBase;
+  $('bus-station').value = settings.busStation;
   $('bus-atco').value = settings.busAtco;
   $('refresh').value = String(settings.refreshMs);
   modal.hidden = false;
@@ -483,6 +505,7 @@ function saveSettings() {
   settings.flightAirport = $('flight-airport').value;
   settings.trainStation = $('train-station').value;
   settings.trainBase = $('train-base').value.trim().replace(/\/+$/, '');
+  settings.busStation = $('bus-station').value;
   settings.busAtco = $('bus-atco').value.trim();
   settings.refreshMs = Number($('refresh').value);
 
@@ -493,6 +516,7 @@ function saveSettings() {
   localStorage.setItem(STORE.proxyUrl, settings.proxyUrl);
   localStorage.setItem(STORE.trainStation, settings.trainStation);
   localStorage.setItem(STORE.trainBase, settings.trainBase);
+  localStorage.setItem(STORE.busStation, settings.busStation);
   localStorage.setItem(STORE.busAtco, settings.busAtco);
   localStorage.setItem(STORE.flightAirport, settings.flightAirport);
   localStorage.setItem(STORE.refreshMs, String(settings.refreshMs));
@@ -512,6 +536,7 @@ function saveSettings() {
 function init() {
   fillStationSelect();
   fillAirportSelect();
+  fillBusStationSelect();
   updateAirportHeader();
   setActiveTabButton();
   setDirToggle();

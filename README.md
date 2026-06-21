@@ -26,6 +26,9 @@ Flights use [AeroDataBox](https://aerodatabox.com/) (free key); trains show
   *indicative* number, shown muted.)
 - **Major UK & European airports** — pick from ~680 airports (Edinburgh,
   Heathrow, CDG, Schiphol, Frankfurt, …); the header follows your choice.
+- **All GB rail stations & major UK bus stations** — ~2,600 National Rail
+  stations and ~30 bus/coach stations (Buchanan, Victoria Coach Station,
+  Digbeth, …) in the pickers.
 - **Departures or Arrivals** — a toggle on every board. Real arrivals for flights
   (AeroDataBox) and trains (Darwin); buses fall back to demo arrivals.
 - **Live, no setup** — demo mode generates a plausible day of real routes
@@ -102,11 +105,15 @@ Manchester, Cardiff, Glasgow, Inverness, …) from the station picker in
   Darwin token + a small app) and set its URL in **Settings ⚙ → Trains data URL**.
 - If trains are unreachable, the board falls back to demo data with a notice.
 
-## Buses (Edinburgh Bus Station)
+## Buses (major UK bus & coach stations)
 
-The **🚌 Buses** tab covers **Edinburgh Bus Station** (St Andrew Square) — the
-city's inter-city coach hub (Scottish Citylink, Megabus, FlixBus, National
-Express, Ember, Borders Buses, Stagecoach…).
+The **🚌 Buses** tab covers **~30 major UK bus & coach stations** — Edinburgh,
+Glasgow Buchanan, London Victoria Coach Station, Birmingham Digbeth, Manchester,
+Leeds, Newcastle, Aberdeen, Dundee, Inverness and more — picked from the station
+list in **Settings ⚙**. The default is **Edinburgh Bus Station** (St Andrew
+Square), the city's inter-city coach hub (Scottish Citylink, Megabus, FlixBus,
+National Express, Ember, Borders Buses, Stagecoach…). The full list lives in
+[`src/busstations.js`](src/busstations.js).
 
 Unlike trains, there's no free keyless live feed here, so live buses use
 **[TransportAPI](https://www.transportapi.com/) through the Worker proxy** (the
@@ -114,11 +121,18 @@ TransportAPI `app_id`/`app_key` stay server-side). To enable it:
 
 1. Deploy the [`proxy/`](proxy/) Worker with `TRANSPORTAPI_APP_ID` and
    `TRANSPORTAPI_APP_KEY` secrets (see [`proxy/README.md`](proxy/README.md)).
-2. In **Settings ⚙**, set the **Proxy URL**, choose **Buses → Live**, and enter
-   the **Bus stop ATCO code** for the stance you want.
+2. In **Settings ⚙**, set the **Proxy URL**, choose **Buses → Live** and pick a
+   station. Many big stations have a built-in ATCO code; for the rest (or to
+   target an exact stance) paste an **ATCO code override**.
 
-Until that's set up, the Buses tab shows realistic **demo** data (its default),
-and it falls back to demo if the proxy/TransportAPI is unreachable.
+> **ATCO codes are per-stance.** TransportAPI is per-stop, but a bus station has
+> many numbered stances, so the built-in code is a best-effort representative
+> one. For a specific stance, find its ATCO on
+> [bustimes.org](https://bustimes.org) and set it as the override.
+
+Until live is set up, the Buses tab shows realistic **demo** data (its default,
+Edinburgh-only), and it falls back to demo if the proxy/TransportAPI is
+unreachable.
 
 ## Deploy (GitHub Pages)
 
@@ -137,7 +151,8 @@ src/
   trains-demo.js    # curated Edinburgh Waverley train timetable + generator
   buses-demo.js     # curated Edinburgh Bus Station coach timetable + generator
   airports.js       # ~680 major UK & European airports (name + IATA + ICAO)
-  stations.js       # all ~360 Scottish railway stations (name + CRS code)
+  stations.js       # all ~2,600 GB National Rail stations (name + CRS code)
+  busstations.js    # ~30 major UK bus & coach stations (name + ATCO code)
   config.js         # airport/stations/bus station, defaults, status, storage keys
   time.js           # Europe/London time helpers & formatting
   styles.css        # FIDS board styling (dark theme, tabs, responsive cards)
