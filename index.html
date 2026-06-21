@@ -6,14 +6,39 @@
   <meta name="description" content="Live departures board for Edinburgh Airport (EDI / EGPH)." />
   <meta name="theme-color" content="#0a0e14" />
   <title>Edinburgh Airport — Live Departures</title>
-  <link rel="stylesheet" href="src/styles.css?v=2" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛫</text></svg>" />
+  <link rel="stylesheet" href="src/styles.css?v=3" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffc043' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M2 22h20'/><path d='M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z'/></svg>" />
 </head>
 <body>
+  <!-- Icon sprite (Lucide, ISC license): plane-takeoff, train-front, bus -->
+  <svg width="0" height="0" class="svg-sprite" aria-hidden="true" focusable="false">
+    <symbol id="ic-plane" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 22h20" />
+      <path d="M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z" />
+    </symbol>
+    <symbol id="ic-train" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 3.1V7a4 4 0 0 0 8 0V3.1" />
+      <path d="m9 15-1-1" />
+      <path d="m15 15 1-1" />
+      <path d="M9 19c-2.8 0-5-2.2-5-5v-4a8 8 0 0 1 16 0v4c0 2.8-2.2 5-5 5Z" />
+      <path d="m8 19-2 3" />
+      <path d="m16 19 2 3" />
+    </symbol>
+    <symbol id="ic-bus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 6v6" />
+      <path d="M15 6v6" />
+      <path d="M2 12h19.6" />
+      <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3" />
+      <circle cx="7" cy="18" r="2" />
+      <path d="M9 18h5" />
+      <circle cx="16" cy="18" r="2" />
+    </symbol>
+  </svg>
+
   <div id="app">
     <header class="board-header">
       <div class="brand">
-        <span class="brand-plane" aria-hidden="true">🛫</span>
+        <svg class="svg-ic brand-ic" aria-hidden="true"><use href="#ic-plane" /></svg>
         <div class="brand-text">
           <h1>Edinburgh Airport</h1>
           <p class="brand-codes">EDI · EGPH</p>
@@ -27,9 +52,9 @@
     </header>
 
     <nav class="tabs" id="tabs" role="tablist" aria-label="Departure type">
-      <button class="tab is-active" data-tab="flights" role="tab" aria-selected="true">🛫 Flights</button>
-      <button class="tab" data-tab="trains" role="tab" aria-selected="false">🚆 Trains</button>
-      <button class="tab" data-tab="buses" role="tab" aria-selected="false">🚌 Buses</button>
+      <button class="tab is-active" data-tab="flights" role="tab" aria-selected="true"><svg class="svg-ic tab-ic" aria-hidden="true"><use href="#ic-plane" /></svg>Flights</button>
+      <button class="tab" data-tab="trains" role="tab" aria-selected="false"><svg class="svg-ic tab-ic" aria-hidden="true"><use href="#ic-train" /></svg>Trains</button>
+      <button class="tab" data-tab="buses" role="tab" aria-selected="false"><svg class="svg-ic tab-ic" aria-hidden="true"><use href="#ic-bus" /></svg>Buses</button>
     </nav>
 
     <section class="toolbar">
@@ -182,6 +207,6 @@
     </div>
   </div>
 
-  <script type="module" src="src/app.js?v=2"></script>
+  <script type="module" src="src/app.js?v=3"></script>
 </body>
 </html>

@@ -6,8 +6,8 @@
 // board with zero configuration. Switch to the live AeroDataBox provider in
 // Settings for real data.
 
-import { londonTimeAt, minutesUntil } from './time.js?v=2';
-import { STATUS } from './config.js?v=2';
+import { londonTimeAt, minutesUntil } from './time.js?v=3';
+import { STATUS } from './config.js?v=3';
 
 const AIRLINES = {
   U2: 'easyJet',

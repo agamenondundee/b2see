@@ -44,7 +44,7 @@ export const HUXLEY = {
 
 // All Scottish railway stations for the trains board (CRS codes). Default is
 // Edinburgh Waverley (EDB); see TRAIN_DEFAULTS.
-export { STATIONS } from './stations.js?v=2';
+export { STATIONS } from './stations.js?v=3';
 
 export const TRAIN_DEFAULTS = {
   provider: 'live', // live needs no key, so default the trains tab to real data

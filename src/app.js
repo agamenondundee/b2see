@@ -1,7 +1,7 @@
 // Edinburgh live departures — tabbed orchestrator (Flights + Trains).
 
-import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATION, STATIONS } from './config.js?v=2';
-import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=2';
+import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATION, STATIONS } from './config.js?v=3';
+import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=3';
 import {
   demoProvider,
   makeLiveProvider,
@@ -9,8 +9,8 @@ import {
   makeTrainProvider,
   demoBusProvider,
   makeBusProvider,
-} from './providers.js?v=2';
-import { makeEmblem } from './emblems.js?v=2';
+} from './providers.js?v=3';
+import { makeEmblem } from './emblems.js?v=3';
 
 // ---- Settings (persisted) ------------------------------------------------
 
