@@ -5,8 +5,8 @@
 // illustrative sample shown when live data (DB transport.rest) is unavailable or
 // when Demo is chosen, so the tab always looks alive with zero setup.
 
-import { londonTimeAt, minutesUntil } from './time.js?v=10';
-import { STATUS } from './config.js?v=10';
+import { londonTimeAt, minutesUntil } from './time.js?v=11';
+import { STATUS } from './config.js?v=11';
 
 const OPERATORS = {
   DB: 'Deutsche Bahn',

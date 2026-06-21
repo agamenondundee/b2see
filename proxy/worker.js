@@ -3,16 +3,21 @@
 // Holds upstream API credentials as server-side secrets and adds CORS, so the
 // static board can show live data with no per-user key. Routes:
 //
-//   /flights/*   -> AeroDataBox (RapidAPI)   — needs RAPIDAPI_KEY
-//   /bus/*       -> TransportAPI              — needs TRANSPORTAPI_APP_ID + _APP_KEY
+//   /flights/*   -> AeroDataBox (RapidAPI)        — needs RAPIDAPI_KEY
+//   /bus/*       -> TransportAPI                   — needs TRANSPORTAPI_APP_ID + _APP_KEY
+//   /eurail/*    -> v6.db.transport.rest (DB)      — keyless; proxied for CORS + caching
 //
 // Trains don't go through here (their Huxley/Darwin feed is already CORS-enabled).
-// Deploy: see proxy/README.md.
+// EU rail's upstream is keyless too, but proxying it adds reliable CORS and an
+// edge cache shared across visitors — important because the public DB instance is
+// heavily rate-limited. Deploy: see proxy/README.md.
 
 const AERO_UPSTREAM = 'https://aerodatabox.p.rapidapi.com';
 const AERO_HOST = 'aerodatabox.p.rapidapi.com';
 const TAPI_UPSTREAM = 'https://transportapi.com/v3/uk';
+const DBREST_UPSTREAM = 'https://v6.db.transport.rest';
 const EDGE_CACHE_SECONDS = 30; // spare the free-tier quotas across visitors
+const EURAIL_CACHE_SECONDS = 60; // DB's free instance is rate-limited — cache harder
 
 export default {
   async fetch(request, env) {
@@ -32,6 +37,7 @@ export default {
           service: 'edi-departures-proxy',
           flights: !!env.RAPIDAPI_KEY,
           buses: !!(env.TRANSPORTAPI_APP_ID && env.TRANSPORTAPI_APP_KEY),
+          eurail: true, // keyless upstream — always available
         },
         200,
         cors,
@@ -40,6 +46,7 @@ export default {
 
     let target;
     let upstreamHeaders;
+    let cacheTtl = EDGE_CACHE_SECONDS;
 
     if (path.startsWith('/flights/')) {
       if (!env.RAPIDAPI_KEY) return json({ error: 'Proxy missing RAPIDAPI_KEY secret.' }, 500, cors);
@@ -54,6 +61,11 @@ export default {
       t.searchParams.set('app_key', env.TRANSPORTAPI_APP_KEY);
       target = t.toString();
       upstreamHeaders = { Accept: 'application/json' };
+    } else if (path.startsWith('/eurail/')) {
+      // Keyless DB upstream; strip the /eurail prefix and pass the rest through.
+      target = DBREST_UPSTREAM + path.slice('/eurail'.length) + url.search;
+      upstreamHeaders = { Accept: 'application/json', 'User-Agent': 'edi-departures-board (github pages)' };
+      cacheTtl = EURAIL_CACHE_SECONDS;
     } else {
       return json({ error: 'Not found' }, 404, cors);
     }
@@ -62,7 +74,7 @@ export default {
     try {
       upstream = await fetch(target, {
         headers: upstreamHeaders,
-        cf: { cacheTtl: EDGE_CACHE_SECONDS, cacheEverything: true },
+        cf: { cacheTtl, cacheEverything: true },
       });
     } catch {
       return json({ error: 'Upstream request failed.' }, 502, cors);
@@ -74,7 +86,7 @@ export default {
       headers: {
         ...cors,
         'Content-Type': upstream.headers.get('Content-Type') || 'application/json',
-        'Cache-Control': `public, max-age=${EDGE_CACHE_SECONDS}`,
+        'Cache-Control': `public, max-age=${cacheTtl}`,
       },
     });
   },
