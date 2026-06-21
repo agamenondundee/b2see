@@ -111,6 +111,7 @@ export class House {
     this.targetU = side === "left" ? STREET.leftTargetU : STREET.rightTargetU;
     this.delivered = false;
     this.resolved = false;
+    this.variant = Math.floor(Math.random() * 6); // which building tile to show
   }
 
   get target() {
@@ -119,9 +120,15 @@ export class House {
 
   draw(ctx, cameraV) {
     const hp = project(this.u, this.v, cameraV);
-    drawSprite(ctx, this.subscriber ? "house-sub" : "house-plain", hp.x, hp.y, depthScale(hp.relV), {
-      delivered: this.delivered,
-    });
+    drawSprite(
+      ctx,
+      this.subscriber ? "house-sub" : "house-plain",
+      hp.x,
+      hp.y,
+      depthScale(hp.relV),
+      { delivered: this.delivered, variant: this.variant },
+      this.variant,
+    );
     const mp = project(this.targetU, this.v, cameraV);
     drawSprite(ctx, "mailbox", mp.x, mp.y, depthScale(mp.relV), {
       subscriber: this.subscriber,

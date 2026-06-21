@@ -91,12 +91,14 @@ assets/                  # drop real sprite sheets here (see assets/README.md)
 
 ## Art
 
-The gameplay sprites (houses, vehicles, characters, props) are drawn
-**procedurally in code** (`src/procsprites.js`, `src/isoart.js`), so the game
-looks complete with zero sprite files. To swap in real artwork, drop sprite
-sheets into [`assets/`](assets/) and point the manifest at them — the renderer
-prefers a loaded PNG over the procedural fallback. See
-[`assets/README.md`](assets/README.md).
+The **houses** use real **CC0 (public-domain)** isometric building art from
+**Kenney's "Isometric Tiles — Buildings"** pack (`assets/buildings/`). The rest
+of the gameplay sprites (vehicles, characters, trees and props) are drawn
+**procedurally in code** (`src/procsprites.js`, `src/isoart.js`). The renderer
+prefers a loaded PNG over the procedural fallback, so any sprite can be replaced
+with real art by dropping a sheet into [`assets/`](assets/) and pointing the
+manifest at it. See [`assets/README.md`](assets/README.md) and
+[`assets/CREDITS.md`](assets/CREDITS.md).
 
 The **sky/horizon** uses a handful of **CC0 (public-domain)** background images
 (mountains, city skyline, clouds, stars) in [`assets/sky/`](assets/sky/),

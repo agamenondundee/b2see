@@ -23,16 +23,16 @@ export const SPRITE_MANIFEST = [
   },
   {
     key: "house-sub",
-    src: "assets/house_subscriber.png",
-    frameWidth: 96,
-    frameHeight: 96,
+    src: "assets/buildings/house_sub.png", // CC0 Kenney iso tiles (6 frames)
+    frameWidth: 148,
+    frameHeight: 148,
     placeholder: { fill: "#6ad06a", stroke: "#2f6b2f", label: "SUB" },
   },
   {
     key: "house-plain",
-    src: "assets/house_plain.png",
-    frameWidth: 96,
-    frameHeight: 96,
+    src: "assets/buildings/house_plain.png",
+    frameWidth: 148,
+    frameHeight: 148,
     placeholder: { fill: "#b6a98f", stroke: "#6b5f48", label: "HOUSE" },
   },
   {

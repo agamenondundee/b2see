@@ -71,9 +71,7 @@ export class World {
       const v = this.nextHouseV;
       const row = this.rowIndex++;
       for (const side of ["left", "right"]) {
-        const house = new House(side, v, Math.random() < SPAWN.subscriberChance);
-        house.variant = Math.floor(Math.random() * 3);
-        this.houses.push(house);
+        this.houses.push(new House(side, v, Math.random() < SPAWN.subscriberChance));
       }
       this.decorateRow(v, row);
       if (Math.random() < SPAWN.pickupChance) {

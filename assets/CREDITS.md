@@ -20,3 +20,11 @@ CC0 imposes no attribution requirement; these credits are kept as good practice.
 
 All other in-game graphics are drawn procedurally in code (`src/procsprites.js`,
 `src/isoart.js`).
+
+## Building art (`assets/buildings/`)
+
+Houses use tiles from **Kenney's "Isometric Tiles — Buildings"** pack
+(https://kenney.nl), licensed **CC0 1.0 (public domain)**. The individual tiles
+were composed into bottom-anchored sprite sheets (`house_sub.png`,
+`house_plain.png`) for this game. License text: `assets/buildings/LICENSE-CC0.txt`.
+Tiles were fetched via the mirror https://github.com/GeorgeQLe/assets-2d-isometric.

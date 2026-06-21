@@ -22,8 +22,8 @@ import {
 const NOMINAL = {
   player: [40, 56],
   paper: [16, 12],
-  "house-sub": [120, 124],
-  "house-plain": [120, 124],
+  "house-sub": [132, 132],
+  "house-plain": [132, 132],
   mailbox: [22, 34],
   car: [48, 74],
   cone: [26, 32],
