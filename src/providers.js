@@ -5,12 +5,12 @@
 //     time: Date, estimated: Date|null, gate: string|null,
 //     status: {key,label}, codeshare: boolean }
 
-import { AERODATABOX, HUXLEY, DBREST, STATUS } from './config.js?v=10';
-import { fmtLocalApi, parseLondonClock } from './time.js?v=10';
-import { generateDemoDepartures } from './demo-data.js?v=10';
-import { generateDemoTrains } from './trains-demo.js?v=10';
-import { generateDemoBuses } from './buses-demo.js?v=10';
-import { generateEuRail } from './eurail-demo.js?v=10';
+import { AERODATABOX, HUXLEY, DBREST, STATUS } from './config.js?v=11';
+import { fmtLocalApi, parseLondonClock } from './time.js?v=11';
+import { generateDemoDepartures } from './demo-data.js?v=11';
+import { generateDemoTrains } from './trains-demo.js?v=11';
+import { generateDemoBuses } from './buses-demo.js?v=11';
+import { generateEuRail } from './eurail-demo.js?v=11';
 
 // ---- Demo provider -------------------------------------------------------
 
@@ -391,12 +391,18 @@ function normalizeEuRail(d, i, arrivals) {
   };
 }
 
-export function makeEuRailProvider(getBase, getStation, getDirection = () => 'departures') {
+export function makeEuRailProvider(getProxyUrl, getBase, getStation, getDirection = () => 'departures') {
   return {
     id: 'live',
     label: 'Live (Deutsche Bahn)',
     async fetchDepartures({ pastWindowMin, maxRows }) {
-      const base = (getBase() || DBREST.base).trim().replace(/\/+$/, '');
+      // Base priority: an explicit self-hosted db-rest URL wins; else route via the
+      // Worker proxy (CORS-safe + cached, which matters given DB's tight rate
+      // limit); else call the public DB instance directly (keyless, best-effort).
+      const override = (getBase() || '').trim().replace(/\/+$/, '');
+      const proxy = (getProxyUrl() || '').trim().replace(/\/+$/, '');
+      const base = override || (proxy ? `${proxy}/eurail` : DBREST.base);
+      const viaProxy = !override && !!proxy;
       const id = (getStation() || '').trim();
       if (!id) {
         const e = new Error('Pick a European station in Settings to see live trains.');
@@ -417,8 +423,13 @@ export function makeEuRailProvider(getBase, getStation, getDirection = () => 'de
       try {
         res = await fetch(url, { headers: { Accept: 'application/json' } });
       } catch {
-        throw new Error('Could not reach the EU rail service (network/CORS). Check the data URL in Settings.');
+        throw new Error(
+          viaProxy
+            ? 'Could not reach the EU rail proxy. Check the Proxy URL in Settings.'
+            : 'the free Deutsche Bahn source is busy or rate-limited (it retries automatically).',
+        );
       }
+      if (res.status === 429) throw new Error('the free Deutsche Bahn source is rate-limited right now (it retries automatically).');
       if (!res.ok) throw new Error(`EU rail data error (HTTP ${res.status}).`);
 
       const data = await res.json();

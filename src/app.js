@@ -1,7 +1,7 @@
 // Edinburgh live departures — tabbed orchestrator (Flights, Trains, Buses, EU Rail).
 
-import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATIONS, EU_DEFAULTS, EU_STATIONS, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=10';
-import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=10';
+import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATIONS, EU_DEFAULTS, EU_STATIONS, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=11';
+import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=11';
 import {
   demoProvider,
   makeLiveProvider,
@@ -11,8 +11,8 @@ import {
   makeBusProvider,
   demoEuRailProvider,
   makeEuRailProvider,
-} from './providers.js?v=10';
-import { makeEmblem } from './emblems.js?v=10';
+} from './providers.js?v=11';
+import { makeEmblem } from './emblems.js?v=11';
 
 // ---- Settings (persisted) ------------------------------------------------
 
@@ -42,7 +42,7 @@ const busAtco = () => settings.busAtco.trim() || busStation().atco;
 const liveFlight = makeLiveProvider(() => settings.apiKey, () => settings.proxyUrl, () => settings.flightAirport, dir);
 const liveTrain = makeTrainProvider(() => settings.trainBase, () => settings.trainStation, dir);
 const liveBus = makeBusProvider(() => settings.proxyUrl, busAtco, dir);
-const liveEuRail = makeEuRailProvider(() => settings.euBase, () => settings.euStation, dir);
+const liveEuRail = makeEuRailProvider(() => settings.proxyUrl, () => settings.euBase, () => settings.euStation, dir);
 
 const stationName = (crs) => (STATIONS.find((s) => s.crs === crs) || {}).name || crs;
 const euStationName = (id) => (EU_STATIONS.find((s) => s.id === id) || {}).name || id;
@@ -302,7 +302,7 @@ const FEEDS = {
       (t.platform || '').toLowerCase().includes(q),
     note: (live, err) => {
       const name = euStationName(settings.euStation);
-      if (err) return `⚠ Live EU rail unavailable for ${name}: ${err} Showing a sample board.`;
+      if (err) return `⚠ Live EU rail for ${name}: ${err} Showing a sample board meanwhile.`;
       if (live) return `Live ${dirWord()} for ${name} (Deutsche Bahn · transport.rest).`;
       return `Showing a sample European board (demo) — switch to Live for ${name}.`;
     },

@@ -153,17 +153,26 @@ Gare du Nord**. The full list lives in [`src/eustations.js`](src/eustations.js).
 GB stations aren't repeated here — they're in the **🚆 Trains** tab.
 
 Live data comes from **[DB transport.rest](https://v6.db.transport.rest/)**, a
-keyless, CORS-enabled JSON API over **Deutsche Bahn's** HAFAS feed, so — like
-trains — it's **live out of the box with no key**. DB's data covers German plus
+keyless JSON API over **Deutsche Bahn's** open data, so — like trains — it's
+**live out of the box with no key**. DB's data covers German plus
 **international long-distance** services (ICE, EC, TGV, Eurostar, Railjet,
 Frecciarossa, …) for stations across Europe.
 
 - **No setup:** the EU Rail tab is live by default — no signup, no key.
 - **Coverage:** strongest for German and cross-border long-distance; purely
   domestic regional services in some countries may be partial.
-- **Reliability:** the public transport.rest instance is best-effort. For a
-  dependable deployment, [self-host db-rest](https://github.com/derhuerst/db-rest)
-  and set its URL in **Settings ⚙ → EU rail data URL**.
+- **Reliability:** Deutsche Bahn retired the old free HAFAS API, so the public
+  transport.rest instance now runs on a **heavily rate-limited** backend and can
+  be flaky from the browser (a failed request may surface as a CORS/network
+  error). When that happens the board shows a **sample** and keeps retrying. For
+  reliable live data, either:
+  - **Route it through the Worker proxy** (recommended) — set the **Proxy URL** in
+    **Settings ⚙**; the [`proxy/`](proxy/) Worker fetches DB server-side (no
+    browser-CORS dependency) and **edge-caches** responses, which keeps everyone
+    under the rate limit. The EU-rail upstream is keyless, so no extra secret is
+    needed; redeploy the Worker if you added it before this route existed.
+  - **Self-host [db-rest](https://github.com/derhuerst/db-rest)** and set its URL
+    in **Settings ⚙ → EU rail data URL** (this overrides the proxy).
 - If EU rail is unreachable, the board falls back to a sample demo board.
 
 ## Deploy (GitHub Pages)
