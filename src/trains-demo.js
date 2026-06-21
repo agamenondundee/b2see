@@ -5,8 +5,8 @@
 // statuses evolve in real time, so the Trains tab behaves like a live board with
 // zero setup. The live provider (Huxley/Darwin) replaces this when reachable.
 
-import { londonTimeAt, minutesUntil } from './time.js?v=6';
-import { STATUS } from './config.js?v=6';
+import { londonTimeAt, minutesUntil } from './time.js?v=7';
+import { STATUS } from './config.js?v=7';
 
 const OPERATORS = {
   SR: 'ScotRail',

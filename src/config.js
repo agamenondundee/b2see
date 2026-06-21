@@ -25,7 +25,7 @@ export const STORE = {
 
 // Major UK & European airports for the flights board (see airports.js). The
 // ICAO drives the AeroDataBox lookup. Default is Edinburgh (EGPH).
-export { AIRPORTS } from './airports.js?v=6';
+export { AIRPORTS } from './airports.js?v=7';
 export const FLIGHT_DEFAULTS = { airport: 'EGPH' };
 
 export const DEFAULTS = {
@@ -49,9 +49,9 @@ export const HUXLEY = {
   base: 'https://huxley2.azurewebsites.net',
 };
 
-// All Scottish railway stations for the trains board (CRS codes). Default is
+// All National Rail (GB) stations for the trains board (CRS codes). Default is
 // Edinburgh Waverley (EDB); see TRAIN_DEFAULTS.
-export { STATIONS } from './stations.js?v=6';
+export { STATIONS } from './stations.js?v=7';
 
 export const TRAIN_DEFAULTS = {
   provider: 'live', // live needs no key, so default the trains tab to real data

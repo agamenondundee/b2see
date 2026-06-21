@@ -92,9 +92,9 @@ The **🚆 Trains** tab shows live rail departures from National Rail's official
 **Darwin** feed, via [Huxley2](https://github.com/jpsingleton/Huxley2) — a
 CORS-enabled JSON proxy that works directly from the browser **with no API key**.
 By default it uses the public Huxley2 instance and **Edinburgh Waverley** (`EDB`);
-pick **any of the ~360 Scottish railway stations** (Glasgow, Aberdeen, Inverness,
-Thurso, Mallaig, …) from the station picker in **Settings ⚙**. The full list lives
-in [`src/stations.js`](src/stations.js).
+pick **any of the ~2,600 National Rail (GB) stations** (King's Cross, Paddington,
+Manchester, Cardiff, Glasgow, Inverness, …) from the station picker in
+**Settings ⚙**. The full list lives in [`src/stations.js`](src/stations.js).
 
 - **No setup:** the trains tab is live out of the box — no signup, no key.
 - **Reliability:** the public Huxley2 instance is best-effort. For a dependable
