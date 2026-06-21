@@ -209,6 +209,21 @@ export class Bundle {
   }
 }
 
+// A static decorative prop (tree, hedge, lamp, hydrant, flowerbed). Non-colliding.
+export class Prop {
+  constructor(kind, u, v, opts = {}) {
+    this.kind = kind;
+    this.u = u;
+    this.v = v;
+    this.opts = opts;
+  }
+
+  draw(ctx, cameraV) {
+    const p = project(this.u, this.v, cameraV);
+    drawSprite(ctx, this.kind, p.x, p.y, depthScale(p.relV), this.opts);
+  }
+}
+
 // A BMX bonus-course gate: ride between the cones to score.
 export class Gate {
   constructor(u, v) {

@@ -5,7 +5,8 @@
 import { STREET, COLORS, SPAWN, VIEW } from "./constants.js";
 import { project, groundQuad, depthScale } from "./iso.js";
 import { drawSprite } from "./procsprites.js";
-import { House, Obstacle, Hazard, Bundle, Gate } from "./entities.js";
+import { shade } from "./isoart.js";
+import { House, Obstacle, Hazard, Bundle, Gate, Prop } from "./entities.js";
 
 const SPAWN_AHEAD = 980; // world v ahead of the player where things appear
 const CULL_BEHIND = 260;
@@ -20,9 +21,35 @@ export class World {
     this.bundles = [];
     this.gates = [];
     this.ramps = [];
+    this.props = [];
     this.nextHouseV = 260;
     this.nextObstacleV = 420;
     this.nextGateV = 360;
+    this.rowIndex = 0;
+  }
+
+  decorateRow(v, row) {
+    const L = STREET;
+    // Trees along the outer lawn edges.
+    if (Math.random() < 0.85)
+      this.props.push(new Prop("tree", rand(20, 55), v + rand(-50, 50), { r: 16 + Math.random() * 8 }));
+    if (Math.random() < 0.85)
+      this.props.push(new Prop("tree", rand(545, 580), v + rand(-50, 50), { r: 16 + Math.random() * 8 }));
+    // Hedges near the sidewalk.
+    if (Math.random() < 0.5)
+      this.props.push(new Prop("hedge", L.roadLeft - 40, v + rand(-30, 30), { len: 26 }));
+    if (Math.random() < 0.5)
+      this.props.push(new Prop("hedge", L.roadRight + 40, v + rand(-30, 30), { len: 26 }));
+    // Street lamps alternate sides every couple of rows.
+    if (row % 2 === 0)
+      this.props.push(new Prop("lamp", row % 4 === 0 ? L.roadLeft - 16 : L.roadRight + 16, v + 110));
+    // Occasional hydrant and flowerbed.
+    if (Math.random() < 0.3)
+      this.props.push(new Prop("hydrant", L.roadLeft - 16, v + rand(-20, 20)));
+    if (Math.random() < 0.4)
+      this.props.push(new Prop("flowerbed", L.leftTargetU + 30, v + 36));
+    if (Math.random() < 0.4)
+      this.props.push(new Prop("flowerbed", L.rightTargetU - 30, v + 36));
   }
 
   update(dt, player) {
@@ -41,9 +68,13 @@ export class World {
   spawnStreet(horizon) {
     while (this.nextHouseV < horizon) {
       const v = this.nextHouseV;
+      const row = this.rowIndex++;
       for (const side of ["left", "right"]) {
-        this.houses.push(new House(side, v, Math.random() < SPAWN.subscriberChance));
+        const house = new House(side, v, Math.random() < SPAWN.subscriberChance);
+        house.variant = Math.floor(Math.random() * 3);
+        this.houses.push(house);
       }
+      this.decorateRow(v, row);
       if (Math.random() < SPAWN.pickupChance) {
         this.bundles.push(new Bundle(rand(STREET.roadLeft + 20, STREET.roadRight - 20), v + 80));
       }
@@ -112,6 +143,7 @@ export class World {
     this.houses = this.houses.filter((e) => e.v > minV);
     this.gates = this.gates.filter((e) => e.v > minV);
     this.ramps = this.ramps.filter((e) => e.v > minV);
+    this.props = this.props.filter((e) => e.v > minV);
   }
 
   // ---- Rendering --------------------------------------------------------
@@ -141,26 +173,51 @@ export class World {
       ctx.fill();
     }
 
-    // Sidewalks.
+    // Sidewalks with seam lines.
     ctx.fillStyle = COLORS.sidewalk;
     this.strip(ctx, STREET.roadLeft - 26, STREET.roadLeft, vNear, vFar, cameraV);
     this.strip(ctx, STREET.roadRight, STREET.roadRight + 26, vNear, vFar, cameraV);
+    ctx.fillStyle = shade(COLORS.sidewalk, 0.82);
+    const seam = 90;
+    for (let v = Math.floor(vNear / seam) * seam; v < vFar; v += seam) {
+      this.strip(ctx, STREET.roadLeft - 26, STREET.roadLeft, v, v + 3, cameraV);
+      this.strip(ctx, STREET.roadRight, STREET.roadRight + 26, v, v + 3, cameraV);
+    }
+
+    // Raised curbs (thin dark lip between sidewalk and road).
+    ctx.fillStyle = shade(COLORS.sidewalk, 0.6);
+    this.strip(ctx, STREET.roadLeft - 4, STREET.roadLeft, vNear, vFar, cameraV);
+    this.strip(ctx, STREET.roadRight, STREET.roadRight + 4, vNear, vFar, cameraV);
 
     // Road.
     ctx.fillStyle = this.mode === "bmx" ? "#9c7b40" : COLORS.road;
     this.strip(ctx, STREET.roadLeft, STREET.roadRight, vNear, vFar, cameraV);
+    // Subtle asphalt tone variation.
+    ctx.fillStyle = this.mode === "bmx" ? shade("#9c7b40", 0.93) : shade(COLORS.road, 0.92);
+    for (let v = Math.floor(vNear / 160) * 160; v < vFar; v += 320) {
+      this.strip(ctx, STREET.roadLeft, STREET.roadRight, v, v + 160, cameraV);
+    }
 
-    // Dashed centre line (street only).
+    // Lane markings (street only): solid edge lines + dashed centre.
     if (this.mode === "street") {
+      ctx.fillStyle = shade(COLORS.roadLine, 0.85);
+      this.strip(ctx, STREET.roadLeft + 8, STREET.roadLeft + 11, vNear, vFar, cameraV);
+      this.strip(ctx, STREET.roadRight - 11, STREET.roadRight - 8, vNear, vFar, cameraV);
       ctx.fillStyle = COLORS.roadLine;
       const dash = 60;
-      const gap = 60;
-      const cyc = dash + gap;
+      const cyc = dash + 60;
       const s0 = Math.floor(vNear / cyc) * cyc;
       for (let v = s0; v < vFar; v += cyc) {
         this.strip(ctx, STREET.roadMid - 4, STREET.roadMid + 4, v, v + dash, cameraV);
       }
     }
+
+    // Atmospheric haze toward the far (top) end for depth.
+    const grad = ctx.createLinearGradient(0, 0, 0, VIEW.height * 0.55);
+    grad.addColorStop(0, this.mode === "bmx" ? "rgba(225,205,160,0.55)" : "rgba(150,200,225,0.45)");
+    grad.addColorStop(1, "rgba(150,200,225,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, VIEW.width, VIEW.height * 0.55);
   }
 
   strip(ctx, uA, uB, vA, vB, cameraV) {
@@ -185,6 +242,7 @@ export class World {
       drawSprite(ctx, "ramp", p.x, p.y, depthScale(p.relV));
     }
     const list = [
+      ...this.props,
       ...this.houses,
       ...this.gates,
       ...this.bundles,

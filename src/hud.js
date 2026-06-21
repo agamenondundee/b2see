@@ -94,6 +94,25 @@ export function drawGameOver(ctx, s) {
   ctx.fillText("Press Enter / tap to ride again", VIEW.width / 2, VIEW.height / 2 + 92);
 }
 
+let vignette = null;
+export function drawVignette(ctx) {
+  if (!vignette) {
+    const g = ctx.createRadialGradient(
+      VIEW.width / 2,
+      VIEW.height / 2,
+      VIEW.height * 0.35,
+      VIEW.width / 2,
+      VIEW.height / 2,
+      VIEW.height * 0.75,
+    );
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, "rgba(0,0,0,0.34)");
+    vignette = g;
+  }
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+}
+
 function panel(ctx) {
   ctx.save();
   ctx.fillStyle = "rgba(8, 10, 20, 0.82)";

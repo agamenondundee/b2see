@@ -91,4 +91,9 @@ export const SPRITE_MANIFEST = [
     frameHeight: 34,
     placeholder: { fill: "#c0863a", stroke: "#6b4a1f", label: false },
   },
+  { key: "tree", src: "assets/tree.png", frameWidth: 60, frameHeight: 90, placeholder: {} },
+  { key: "hedge", src: "assets/hedge.png", frameWidth: 70, frameHeight: 40, placeholder: {} },
+  { key: "lamp", src: "assets/lamp.png", frameWidth: 24, frameHeight: 80, placeholder: {} },
+  { key: "hydrant", src: "assets/hydrant.png", frameWidth: 20, frameHeight: 30, placeholder: {} },
+  { key: "flowerbed", src: "assets/flowerbed.png", frameWidth: 50, frameHeight: 24, placeholder: {} },
 ];

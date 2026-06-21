@@ -4,9 +4,11 @@
 import { PLAYER, SCORING, ROUTE, STREET } from "./constants.js";
 import { input } from "./input.js";
 import { audio } from "./audio.js";
+import { effects } from "./effects.js";
+import { project } from "./iso.js";
 import { World } from "./world.js";
 import { Player, Paper, hit } from "./entities.js";
-import { drawHud, drawFloatingText, drawTally, drawGameOver } from "./hud.js";
+import { drawHud, drawFloatingText, drawTally, drawGameOver, drawVignette } from "./hud.js";
 
 export const Phase = {
   MENU: "menu",
@@ -86,7 +88,22 @@ export class Game {
     this.handleCollisions();
     this.handlePickups();
     this.updatePopups(dt);
+    this.emitTrail(dt);
+    effects.update(dt);
     this.checkSegmentEnd();
+  }
+
+  // Screen position of a world point, for spawning effects.
+  screenAt(u, v) {
+    return project(u, v, this.cameraV);
+  }
+
+  emitTrail(dt) {
+    const p = this.player;
+    if (p.speed > PLAYER.baseSpeed * 1.05 && Math.random() < p.speed / 600) {
+      const sp = this.screenAt(p.u, p.v);
+      effects.dust(sp.x, sp.y + 4);
+    }
   }
 
   handleThrows() {
@@ -125,10 +142,14 @@ export class Game {
           const points = SCORING.delivery + (this.streak - 1) * SCORING.perfectStreak;
           this.score += points;
           this.addPopup(house.targetU, house.v, `+${points}`, "#6ee06e");
+          const sp = this.screenAt(house.targetU, house.v);
+          effects.sparkle(sp.x, sp.y - 20, ["#6ee06e", "#b6ff9e", "#ffffff"]);
           audio.deliver();
         } else {
           this.score += SCORING.smashWindow;
           this.addPopup(house.targetU, house.v, `+${SCORING.smashWindow}`, "#ffd23f");
+          const sp = this.screenAt(house.u, house.v);
+          effects.shards(sp.x, sp.y - 40, ["#bfe6ff", "#ffffff", "#9fb9c4"]);
           audio.smash();
         }
         break;
@@ -153,6 +174,8 @@ export class Game {
           this.gatesPassed++;
           this.score += SCORING.bmxGate;
           this.addPopup(gate.u, gate.v, `+${SCORING.bmxGate}`, "#6ee06e");
+          const sp = this.screenAt(gate.u, gate.v);
+          effects.sparkle(sp.x, sp.y - 16, ["#6ee06e", "#ffd23f", "#ffffff"]);
           audio.gate();
         }
       }
@@ -166,6 +189,8 @@ export class Game {
       if (hit(p.box, ob.box) && p.crash()) {
         this.streak = 0;
         this.addPopup(p.u, p.v, "CRASH!", "#ff6b6b");
+        const sp = this.screenAt(p.u, p.v);
+        effects.stars(sp.x, sp.y - 24);
         audio.crash();
         if (p.lives <= 0) this.gameOver();
         break;
@@ -180,6 +205,8 @@ export class Game {
         b.dead = true;
         p.papers += b.amount;
         this.addPopup(b.u, b.v, `+${b.amount} papers`, "#e8c46a");
+        const sp = this.screenAt(b.u, b.v);
+        effects.sparkle(sp.x, sp.y - 10, ["#ffd23f", "#e8c46a", "#ffffff"]);
         audio.pickup();
       }
     }
@@ -253,11 +280,29 @@ export class Game {
   draw() {
     const ctx = this.ctx;
     const cam = this.cameraV;
+
+    // World layer is offset by the screen-shake.
+    const sh = effects.shakeOffset();
+    ctx.save();
+    ctx.translate(Math.round(sh.x), Math.round(sh.y));
     this.world.drawGround(ctx, cam);
     this.world.drawEntities(ctx, cam);
     for (const paper of this.papers) paper.draw(ctx, cam);
     this.player.draw(ctx, cam);
     drawFloatingText(ctx, this.popups, cam);
+    effects.draw(ctx);
+    ctx.restore();
+
+    // Damage flash.
+    if (effects.flash > 0) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(0.4, effects.flash);
+      ctx.fillStyle = effects.flashColor;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.restore();
+    }
+
+    drawVignette(ctx);
 
     if (this.phase !== Phase.MENU) drawHud(ctx, this.hudState);
     if (this.phase === Phase.TALLY) drawTally(ctx, this.tally);
