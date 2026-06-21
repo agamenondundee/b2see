@@ -19,6 +19,7 @@ export const STORE = {
   busAtco: 'edi.busAtco', // TransportAPI ATCO code for the bus station
   flightAirport: 'edi.flightAirport', // selected airport ICAO
   tab: 'edi.tab', // active tab: 'flights' | 'trains' | 'buses'
+  direction: 'edi.direction', // 'departures' | 'arrivals'
   refreshMs: 'edi.refreshMs',
 };
 
@@ -66,7 +67,7 @@ export const HUXLEY = {
 
 // All Scottish railway stations for the trains board (CRS codes). Default is
 // Edinburgh Waverley (EDB); see TRAIN_DEFAULTS.
-export { STATIONS } from './stations.js?v=4';
+export { STATIONS } from './stations.js?v=5';
 
 export const TRAIN_DEFAULTS = {
   provider: 'live', // live needs no key, so default the trains tab to real data
@@ -90,6 +91,8 @@ export const BUS_DEFAULTS = {
 // Each maps to a CSS modifier class (status--<key>).
 export const STATUS = {
   ON_TIME: { key: 'ontime', label: 'On time' },
+  EXPECTED: { key: 'checkin', label: 'Expected' }, // arrivals (reuses cyan style)
+  ARRIVED: { key: 'departed', label: 'Arrived' }, // arrivals (reuses dim style)
   SCHEDULED: { key: 'scheduled', label: 'Scheduled' },
   CHECKIN: { key: 'checkin', label: 'Check-in' },
   BOARDING: { key: 'boarding', label: 'Boarding' },

@@ -6,8 +6,8 @@
 // behaves like a live board with zero setup. The live provider (TransportAPI
 // via the Worker proxy) replaces this when configured.
 
-import { londonTimeAt, minutesUntil } from './time.js?v=4';
-import { STATUS } from './config.js?v=4';
+import { londonTimeAt, minutesUntil } from './time.js?v=5';
+import { STATUS } from './config.js?v=5';
 
 const OPERATORS = {
   SC: 'Scottish Citylink',
@@ -105,6 +105,13 @@ function demoBusStatus(mins, cancelled, delayed) {
   return STATUS.ON_TIME;
 }
 
+function arrBusStatus(mins, cancelled, delayed) {
+  if (cancelled) return STATUS.CANCELLED;
+  if (delayed && mins > 0) return STATUS.DELAYED;
+  if (mins <= -3) return STATUS.ARRIVED;
+  return STATUS.ON_TIME;
+}
+
 function buildDay(dayOffset) {
   const dayKey = new Date(londonTimeAt(dayOffset, 12, 0)).toDateString();
   return TIMETABLE.map(([h, m, code, dest, line, via]) => {
@@ -136,7 +143,8 @@ function buildDay(dayOffset) {
   });
 }
 
-export function generateDemoBuses({ pastWindowMin, maxRows }) {
+export function generateDemoBuses({ pastWindowMin, maxRows }, direction = 'departures') {
+  const arrivals = direction === 'arrivals';
   const all = [...buildDay(0), ...buildDay(1)];
   const now = Date.now();
   const earliest = now - pastWindowMin * 60000;
@@ -144,7 +152,10 @@ export function generateDemoBuses({ pastWindowMin, maxRows }) {
   return all
     .map((b) => {
       const ref = b.estimated || b.time;
-      const status = demoBusStatus(minutesUntil(ref, now), b.cancelled, b.delayed);
+      const mins = minutesUntil(ref, now);
+      const status = arrivals
+        ? arrBusStatus(mins, b.cancelled, b.delayed)
+        : demoBusStatus(mins, b.cancelled, b.delayed);
       return { ...b, status, stance: status === STATUS.CANCELLED ? null : b.stance };
     })
     .filter((b) => (b.estimated || b.time).getTime() >= earliest)

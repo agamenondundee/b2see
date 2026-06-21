@@ -5,39 +5,41 @@
 //     time: Date, estimated: Date|null, gate: string|null,
 //     status: {key,label}, codeshare: boolean }
 
-import { AERODATABOX, HUXLEY, STATUS } from './config.js?v=4';
-import { fmtLocalApi, parseLondonClock } from './time.js?v=4';
-import { generateDemoDepartures } from './demo-data.js?v=4';
-import { generateDemoTrains } from './trains-demo.js?v=4';
-import { generateDemoBuses } from './buses-demo.js?v=4';
+import { AERODATABOX, HUXLEY, STATUS } from './config.js?v=5';
+import { fmtLocalApi, parseLondonClock } from './time.js?v=5';
+import { generateDemoDepartures } from './demo-data.js?v=5';
+import { generateDemoTrains } from './trains-demo.js?v=5';
+import { generateDemoBuses } from './buses-demo.js?v=5';
 
 // ---- Demo provider -------------------------------------------------------
 
 export const demoProvider = {
   id: 'demo',
   label: 'Demo data',
-  async fetchDepartures({ pastWindowMin, maxRows }) {
+  async fetchDepartures({ pastWindowMin, maxRows, direction, icao }) {
     // Tiny delay so the UI's loading state is exercised like a real fetch.
     await new Promise((r) => setTimeout(r, 150));
-    return generateDemoDepartures({ pastWindowMin, maxRows });
+    if (icao && icao !== 'EGPH') return []; // demo flights are Edinburgh-only
+    return generateDemoDepartures({ pastWindowMin, maxRows }, direction);
   },
 };
 
 export const demoTrainProvider = {
   id: 'demo',
   label: 'Demo data',
-  async fetchDepartures({ pastWindowMin, maxRows }) {
+  async fetchDepartures({ pastWindowMin, maxRows, direction, crs }) {
     await new Promise((r) => setTimeout(r, 150));
-    return generateDemoTrains({ pastWindowMin, maxRows });
+    if (crs && crs !== 'EDB') return []; // demo trains are Edinburgh Waverley-only
+    return generateDemoTrains({ pastWindowMin, maxRows }, direction);
   },
 };
 
 export const demoBusProvider = {
   id: 'demo',
   label: 'Demo data',
-  async fetchDepartures({ pastWindowMin, maxRows }) {
+  async fetchDepartures({ pastWindowMin, maxRows, direction }) {
     await new Promise((r) => setTimeout(r, 150));
-    return generateDemoBuses({ pastWindowMin, maxRows });
+    return generateDemoBuses({ pastWindowMin, maxRows }, direction);
   },
 };
 
@@ -69,6 +71,17 @@ function mapLiveStatus(raw) {
   return STATUS.SCHEDULED; // expected / scheduled / ontime / unknown-but-present
 }
 
+function mapArrivalStatus(raw) {
+  const s = String(raw || '').toLowerCase().replace(/[^a-z]/g, '');
+  if (!s) return STATUS.SCHEDULED;
+  if (s.includes('cancel')) return STATUS.CANCELLED;
+  if (s.includes('divert')) return STATUS.DIVERTED;
+  if (s.includes('arrived') || s.includes('landed')) return STATUS.ARRIVED;
+  if (s.includes('approach') || s.includes('enroute') || s.includes('airborne') || s.includes('expected')) return STATUS.EXPECTED;
+  if (s.includes('delay')) return STATUS.DELAYED;
+  return STATUS.SCHEDULED;
+}
+
 // AeroDataBox rarely publishes gates on the free tier, so fill a stable,
 // plausible "indicative" gate (flagged) when the feed doesn't provide one.
 const GATE_POOL = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '15', '16', '18', '20', '21', '24', '26'];
@@ -78,16 +91,16 @@ function indicativeGate(seed) {
   return GATE_POOL[Math.abs(h) % GATE_POOL.length];
 }
 
-function normalizeLiveFlight(f, i) {
-  const mv = f.movement || f.departure || {};
+function normalizeLiveFlight(f, i, arrivals) {
+  const mv = f.movement || f.departure || f.arrival || {};
   const airport = mv.airport || {};
   const time = parseApiTime(mv.scheduledTime) || parseApiTime(mv.scheduledTimeLocal);
   const estimated =
     parseApiTime(mv.revisedTime) || parseApiTime(mv.predictedTime) || parseApiTime(mv.actualTime);
 
-  let status = mapLiveStatus(f.status);
-  // Promote to "Delayed" if the airline pushed the time back materially.
-  if (time && estimated && status !== STATUS.CANCELLED && status !== STATUS.DEPARTED) {
+  let status = arrivals ? mapArrivalStatus(f.status) : mapLiveStatus(f.status);
+  // Promote to "Delayed" if the time was pushed back materially.
+  if (time && estimated && status !== STATUS.CANCELLED && status !== STATUS.DEPARTED && status !== STATUS.ARRIVED) {
     if (estimated.getTime() - time.getTime() >= 15 * 60000) status = STATUS.DELAYED;
   }
 
@@ -98,18 +111,20 @@ function normalizeLiveFlight(f, i) {
     flightNo,
     airline: (f.airline && f.airline.name) || '',
     airlineCode: (f.airline && (f.airline.iata || f.airline.icao)) || '',
+    // For arrivals this counterpart airport is the ORIGIN; for departures the destination.
     dest: airport.name || airport.shortName || airport.municipalityName || airport.iata || 'Unknown',
     destIata: airport.iata || airport.icao || '',
     time,
     estimated: estimated && time && estimated.getTime() !== time.getTime() ? estimated : null,
-    gate: realGate || indicativeGate(flightNo),
-    gateIndicative: !realGate,
+    // Indicative gates only make sense for departures.
+    gate: realGate || (arrivals ? null : indicativeGate(flightNo)),
+    gateIndicative: !realGate && !arrivals,
     status,
     codeshare: !!(f.codeshareStatus && /codeshare/i.test(f.codeshareStatus)),
   };
 }
 
-export function makeLiveProvider(getApiKey, getProxyUrl = () => '', getIcao = () => 'EGPH') {
+export function makeLiveProvider(getApiKey, getProxyUrl = () => '', getIcao = () => 'EGPH', getDirection = () => 'departures') {
   return {
     id: 'live',
     label: 'Live (AeroDataBox)',
@@ -123,11 +138,12 @@ export function makeLiveProvider(getApiKey, getProxyUrl = () => '', getIcao = ()
         throw err;
       }
 
+      const arrivals = getDirection() === 'arrivals';
       const now = Date.now();
       const from = fmtLocalApi(new Date(now - pastWindowMin * 60000));
       const to = fmtLocalApi(new Date(now + 11 * 3600 * 1000)); // <12h window
       const qs = new URLSearchParams({
-        direction: 'Departure',
+        direction: arrivals ? 'Arrival' : 'Departure',
         withLeg: 'false',
         withCancelled: 'true',
         withCodeshared: 'false',
@@ -161,11 +177,11 @@ export function makeLiveProvider(getApiKey, getProxyUrl = () => '', getIcao = ()
       }
 
       const data = await res.json();
-      const list = Array.isArray(data) ? data : data.departures || data.flights || [];
+      const list = Array.isArray(data) ? data : data.arrivals || data.departures || data.flights || [];
       const earliest = now - pastWindowMin * 60000;
 
       return list
-        .map(normalizeLiveFlight)
+        .map((f, i) => normalizeLiveFlight(f, i, arrivals))
         .filter((f) => f.time && (f.estimated || f.time).getTime() >= earliest)
         .sort((a, b) => a.time - b.time)
         .slice(0, maxRows);
@@ -183,13 +199,16 @@ function mapTrainStatus(etd, isCancelled) {
   return STATUS.ON_TIME; // "On time", "Starts here", "No report", etc.
 }
 
-function normalizeTrain(s, i) {
-  const time = parseLondonClock(s.std) || parseLondonClock(s.etd);
-  const status = mapTrainStatus(s.etd, s.isCancelled);
-  const est = status === STATUS.DELAYED ? parseLondonClock(s.etd) : null;
-  const d = (s.destination && s.destination[0]) || {};
+function normalizeTrain(s, i, arrivals) {
+  // Arrivals carry sta/eta + origin; departures carry std/etd + destination.
+  const schedStr = arrivals ? s.sta : s.std;
+  const expStr = arrivals ? s.eta : s.etd;
+  const time = parseLondonClock(schedStr) || parseLondonClock(expStr);
+  const status = mapTrainStatus(expStr, s.isCancelled);
+  const est = status === STATUS.DELAYED ? parseLondonClock(expStr) : null;
+  const d = ((arrivals ? s.origin : s.destination) || [])[0] || {};
   return {
-    id: s.serviceID || `${s.std}|${d.locationName || ''}|${i}`,
+    id: s.serviceID || `${schedStr}|${d.locationName || ''}|${i}`,
     operator: s.operator || '',
     operatorCode: s.operatorCode || '',
     dest: d.locationName || 'Unknown',
@@ -202,14 +221,15 @@ function normalizeTrain(s, i) {
   };
 }
 
-export function makeTrainProvider(getBase, getStation) {
+export function makeTrainProvider(getBase, getStation, getDirection = () => 'departures') {
   return {
     id: 'live',
     label: 'Live (National Rail)',
     async fetchDepartures({ maxRows }) {
       const base = (getBase() || HUXLEY.base).trim().replace(/\/+$/, '');
       const crs = (getStation() || 'EDB').trim().toUpperCase();
-      const url = `${base}/departures/${crs}/${Math.min(maxRows, 50)}`;
+      const arrivals = getDirection() === 'arrivals';
+      const url = `${base}/${arrivals ? 'arrivals' : 'departures'}/${crs}/${Math.min(maxRows, 50)}`;
 
       let res;
       try {
@@ -222,7 +242,7 @@ export function makeTrainProvider(getBase, getStation) {
       const data = await res.json();
       const list = data.trainServices || [];
       return list
-        .map(normalizeTrain)
+        .map((s, i) => normalizeTrain(s, i, arrivals))
         .filter((t) => t.time)
         .sort((a, b) => a.time - b.time)
         .slice(0, maxRows);
@@ -266,11 +286,17 @@ function normalizeBus(d, i) {
   };
 }
 
-export function makeBusProvider(getBase, getAtco) {
+export function makeBusProvider(getBase, getAtco, getDirection = () => 'departures') {
   return {
     id: 'live',
     label: 'Live (TransportAPI)',
     async fetchDepartures({ maxRows }) {
+      if (getDirection() === 'arrivals') {
+        // TransportAPI has no per-stop arrivals feed — fall back to demo.
+        const e = new Error('Live bus arrivals aren’t available for this stop.');
+        e.code = 'NO_ARRIVALS';
+        throw e;
+      }
       const base = (getBase() || '').trim().replace(/\/+$/, '');
       if (!base) {
         const e = new Error('Buses need the Worker proxy — set a Proxy URL in Settings.');

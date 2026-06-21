@@ -184,6 +184,12 @@ body {
 .tab:hover { color: var(--ink); }
 .tab.is-active { background: var(--amber); color: #1a1206; }
 
+/* Departures / Arrivals toggle */
+.dir-toggle { display: inline-flex; gap: 2px; padding: 3px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; flex: none; }
+.dir-toggle button { font: inherit; font-size: 13px; font-weight: 600; padding: 6px 13px; border: none; border-radius: 7px; background: transparent; color: var(--ink-dim); cursor: pointer; transition: background .15s, color .15s; }
+.dir-toggle button:hover { color: var(--ink); }
+.dir-toggle button.is-active { background: var(--amber); color: #1a1206; }
+
 /* ---- Board ---- */
 
 .board {

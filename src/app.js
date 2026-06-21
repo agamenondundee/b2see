@@ -1,7 +1,7 @@
 // Edinburgh live departures — tabbed orchestrator (Flights + Trains).
 
-import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATION, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=4';
-import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=4';
+import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATION, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=5';
+import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=5';
 import {
   demoProvider,
   makeLiveProvider,
@@ -9,8 +9,8 @@ import {
   makeTrainProvider,
   demoBusProvider,
   makeBusProvider,
-} from './providers.js?v=4';
-import { makeEmblem } from './emblems.js?v=4';
+} from './providers.js?v=5';
+import { makeEmblem } from './emblems.js?v=5';
 
 // ---- Settings (persisted) ------------------------------------------------
 
@@ -24,12 +24,15 @@ const settings = {
   trainBase: localStorage.getItem(STORE.trainBase) || '',
   busProvider: localStorage.getItem(STORE.busProvider) || BUS_DEFAULTS.provider,
   busAtco: localStorage.getItem(STORE.busAtco) || BUS_DEFAULTS.atco,
+  direction: localStorage.getItem(STORE.direction) || 'departures',
   refreshMs: Number(localStorage.getItem(STORE.refreshMs) ?? DEFAULTS.refreshMs),
 };
 
-const liveFlight = makeLiveProvider(() => settings.apiKey, () => settings.proxyUrl, () => settings.flightAirport);
-const liveTrain = makeTrainProvider(() => settings.trainBase, () => settings.trainStation);
-const liveBus = makeBusProvider(() => settings.proxyUrl, () => settings.busAtco);
+const dir = () => settings.direction;
+const dirWord = () => (settings.direction === 'arrivals' ? 'arrivals' : 'departures');
+const liveFlight = makeLiveProvider(() => settings.apiKey, () => settings.proxyUrl, () => settings.flightAirport, dir);
+const liveTrain = makeTrainProvider(() => settings.trainBase, () => settings.trainStation, dir);
+const liveBus = makeBusProvider(() => settings.proxyUrl, () => settings.busAtco, dir);
 
 const stationName = (crs) => (STATIONS.find((s) => s.crs === crs) || {}).name || crs;
 const airport = (icao) => AIRPORTS.find((a) => a.icao === icao) || AIRPORTS[0];
@@ -53,6 +56,7 @@ const searchEl = $('search');
 const filtersEl = $('filters');
 const boardEl = $('board');
 const tabsEl = $('tabs');
+const dirToggle = $('dir-toggle');
 const headCols = ['col-time', 'col-dest', 'col-flight', 'col-gate', 'col-status'].map(
   (c) => boardEl.querySelector('.board-head .' + c),
 );
@@ -182,7 +186,7 @@ const FEEDS = {
     searchPlaceholder: 'Search destination, flight or airline…',
     providers: { demo: demoProvider, live: liveFlight },
     providerId: () => settings.flightProvider,
-    opts: () => ({ pastWindowMin: DEFAULTS.pastWindowMin, maxRows: DEFAULTS.maxRows }),
+    opts: () => ({ pastWindowMin: DEFAULTS.pastWindowMin, maxRows: DEFAULTS.maxRows, direction: settings.direction, icao: settings.flightAirport }),
     buildRow: buildFlightRow,
     filters: FLIGHT_FILTERS,
     match: (f, q) =>
@@ -190,19 +194,22 @@ const FEEDS = {
       f.dest.toLowerCase().includes(q) ||
       f.destIata.toLowerCase().includes(q) ||
       f.airline.toLowerCase().includes(q),
-    note: (live, err) =>
-      err
-        ? `⚠ Live flights unavailable for ${airport(settings.flightAirport).name}: ${err} Showing demo data.`
-        : live
-          ? `Live departures from ${airport(settings.flightAirport).name} Airport (AeroDataBox) · gates indicative where unpublished.`
-          : 'Showing demo flights — add an API key in Settings ⚙ for live data.',
+    note: (live, err) => {
+      const name = airport(settings.flightAirport).name;
+      const edi = settings.flightAirport === 'EGPH';
+      if (err) return `⚠ Live ${dirWord()} unavailable for ${name}: ${err}${edi ? ' Showing demo data.' : ''}`;
+      if (live) return `Live ${dirWord()} for ${name} Airport (AeroDataBox)${settings.direction === 'arrivals' ? '.' : ' · gates indicative where unpublished.'}`;
+      return edi
+        ? `Showing demo ${dirWord()} — add an API key in Settings ⚙ for live data.`
+        : `Demo is Edinburgh-only — switch to Live in Settings ⚙ for ${name}.`;
+    },
   },
   trains: {
     columns: ['Time', 'Destination', 'Operator', 'Plat', 'Status'],
     searchPlaceholder: 'Search destination, operator or platform…',
     providers: { demo: demoTrainProvider, live: liveTrain },
     providerId: () => settings.trainProvider,
-    opts: () => ({ pastWindowMin: TRAIN_DEFAULTS.pastWindowMin, maxRows: TRAIN_DEFAULTS.maxRows }),
+    opts: () => ({ pastWindowMin: TRAIN_DEFAULTS.pastWindowMin, maxRows: TRAIN_DEFAULTS.maxRows, direction: settings.direction, crs: settings.trainStation }),
     buildRow: buildTrainRow,
     filters: TRAIN_FILTERS,
     match: (t, q) =>
@@ -210,19 +217,22 @@ const FEEDS = {
       t.operator.toLowerCase().includes(q) ||
       (t.platform || '').toLowerCase().includes(q) ||
       (t.via || '').toLowerCase().includes(q),
-    note: (live, err) =>
-      err
-        ? `⚠ Live trains unavailable for ${stationName(settings.trainStation)}: ${err} Showing demo data.`
-        : live
-          ? `Live departures from ${stationName(settings.trainStation)} (National Rail).`
-          : `Showing demo trains for ${stationName(settings.trainStation)}.`,
+    note: (live, err) => {
+      const name = stationName(settings.trainStation);
+      const edb = settings.trainStation === 'EDB';
+      if (err) return `⚠ Live ${dirWord()} unavailable for ${name}: ${err}${edb ? ' Showing demo data.' : ''}`;
+      if (live) return `Live ${dirWord()} for ${name} (National Rail).`;
+      return edb
+        ? `Showing demo ${dirWord()} for ${name}.`
+        : `Demo is Edinburgh Waverley-only — switch to Live for ${name}.`;
+    },
   },
   buses: {
     columns: ['Time', 'Destination', 'Service', 'Stance', 'Status'],
     searchPlaceholder: 'Search destination, service or operator…',
     providers: { demo: demoBusProvider, live: liveBus },
     providerId: () => settings.busProvider,
-    opts: () => ({ pastWindowMin: BUS_DEFAULTS.pastWindowMin, maxRows: BUS_DEFAULTS.maxRows }),
+    opts: () => ({ pastWindowMin: BUS_DEFAULTS.pastWindowMin, maxRows: BUS_DEFAULTS.maxRows, direction: settings.direction }),
     buildRow: buildBusRow,
     filters: BUS_FILTERS,
     match: (b, q) =>
@@ -230,12 +240,11 @@ const FEEDS = {
       b.operator.toLowerCase().includes(q) ||
       (b.line || '').toLowerCase().includes(q) ||
       (b.stance || '').toLowerCase().includes(q),
-    note: (live, err) =>
-      err
-        ? `⚠ Live buses unavailable: ${err} Showing demo data.`
-        : live
-          ? `Live departures from ${BUS_STATION.name} (TransportAPI).`
-          : `Showing demo buses for ${BUS_STATION.name} (${BUS_STATION.area}).`,
+    note: (live, err) => {
+      if (err) return `⚠ Live buses unavailable: ${err} Showing demo data.`;
+      if (live) return `Live departures from ${BUS_STATION.name} (TransportAPI).`;
+      return `Showing demo ${dirWord()} for ${BUS_STATION.name} (${BUS_STATION.area}).`;
+    },
   },
 };
 
@@ -258,7 +267,10 @@ function render() {
   const feed = FEEDS[activeTab];
   const st = state[activeTab];
 
-  feed.columns.forEach((label, i) => { if (headCols[i]) headCols[i].textContent = label; });
+  const arrivals = settings.direction === 'arrivals';
+  feed.columns.forEach((label, i) => {
+    if (headCols[i]) headCols[i].textContent = arrivals && label === 'Destination' ? 'Origin' : label;
+  });
   boardEl.classList.remove('feed-flights', 'feed-trains', 'feed-buses');
   boardEl.classList.add('feed-' + activeTab);
 
@@ -379,6 +391,27 @@ function switchTab(tabId) {
   if (!st.loaded || stale) refresh(tabId);
 }
 
+function setDirToggle() {
+  for (const b of dirToggle.children) {
+    const on = b.dataset.dir === settings.direction;
+    b.classList.toggle('is-active', on);
+    b.setAttribute('aria-pressed', String(on));
+  }
+  $('header-title').textContent = settings.direction === 'arrivals' ? 'ARRIVALS' : 'DEPARTURES';
+}
+
+function setDirection(d) {
+  if (d === settings.direction || (d !== 'departures' && d !== 'arrivals')) return;
+  settings.direction = d;
+  localStorage.setItem(STORE.direction, d);
+  setDirToggle();
+  state.flights.loaded = false;
+  state.trains.loaded = false;
+  state.buses.loaded = false;
+  render();
+  refresh(activeTab);
+}
+
 // ---- Header clock --------------------------------------------------------
 
 function tickClock() {
@@ -476,6 +509,7 @@ function init() {
   fillAirportSelect();
   updateAirportHeader();
   setActiveTabButton();
+  setDirToggle();
   searchEl.value = state[activeTab].search;
   searchEl.placeholder = FEEDS[activeTab].searchPlaceholder;
   buildFilters();
@@ -483,6 +517,7 @@ function init() {
   setInterval(tickClock, 1000);
 
   for (const b of tabsEl.children) b.addEventListener('click', () => switchTab(b.dataset.tab));
+  for (const b of dirToggle.children) b.addEventListener('click', () => setDirection(b.dataset.dir));
   searchEl.addEventListener('input', (e) => {
     state[activeTab].search = e.target.value;
     render();
