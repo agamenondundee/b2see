@@ -6,7 +6,7 @@
   <meta name="description" content="Live departures board for Edinburgh Airport (EDI / EGPH)." />
   <meta name="theme-color" content="#0a0e14" />
   <title>Edinburgh Airport — Live Departures</title>
-  <link rel="stylesheet" href="src/styles.css?v=7" />
+  <link rel="stylesheet" href="src/styles.css?v=8" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffc043' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M2 22h20'/><path d='M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z'/></svg>" />
 </head>
 <body>
@@ -174,7 +174,7 @@
 
         <h3 class="settings-group"><svg class="svg-ic group-ic" aria-hidden="true"><use href="#ic-bus" /></svg> Buses</h3>
         <fieldset class="field">
-          <legend>Data source — Edinburgh Bus Station (St Andrew Square)</legend>
+          <legend>Data source</legend>
           <label class="radio">
             <input type="radio" name="busProvider" value="demo" />
             <span><strong>Demo</strong> — realistic generated board, no setup</span>
@@ -186,12 +186,25 @@
         </fieldset>
 
         <div class="field">
-          <label for="bus-atco">Bus stop ATCO code <span class="label-opt">(for live)</span></label>
+          <label for="bus-station">Bus / coach station</label>
+          <select id="bus-station"></select>
+          <p class="hint">
+            Edinburgh has the built-in <strong>demo</strong> board. Other stations need an
+            ATCO code for <strong>live</strong> data; many big ones are pre-filled, the rest
+            show “set ATCO” until you add one below.
+          </p>
+        </div>
+
+        <div class="field">
+          <label for="bus-atco">ATCO code override <span class="label-opt">(for live)</span></label>
           <input id="bus-atco" type="text" placeholder="e.g. 6200247601" autocomplete="off" spellcheck="false" />
           <p class="hint">
             Live buses go through your <a href="https://github.com/agamenondundee/b2see/tree/main/proxy" target="_blank" rel="noopener">Worker proxy</a>
             (add <code>TRANSPORTAPI_APP_ID</code> / <code>TRANSPORTAPI_APP_KEY</code> secrets, set the Proxy URL above).
-            Find a stance’s ATCO code with <a href="https://developer.transportapi.com/docs" target="_blank" rel="noopener">TransportAPI</a>.
+            Leave blank to use the selected station’s built-in code. A bus station has many
+            stances, so override with the exact stance’s code — find it on
+            <a href="https://bustimes.org" target="_blank" rel="noopener">bustimes.org</a>
+            or <a href="https://developer.transportapi.com/docs" target="_blank" rel="noopener">TransportAPI</a>.
             Falls back to demo data.
           </p>
         </div>
@@ -216,6 +229,6 @@
     </div>
   </div>
 
-  <script type="module" src="src/app.js?v=7"></script>
+  <script type="module" src="src/app.js?v=8"></script>
 </body>
 </html>

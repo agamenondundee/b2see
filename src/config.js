@@ -16,7 +16,8 @@ export const STORE = {
   trainStation: 'edi.trainStation', // CRS code
   trainBase: 'edi.trainBase', // Huxley base URL
   busProvider: 'edi.busProvider', // buses: 'demo' | 'live'
-  busAtco: 'edi.busAtco', // TransportAPI ATCO code for the bus station
+  busStation: 'edi.busStation', // selected bus station id
+  busAtco: 'edi.busAtco', // ATCO override (else the station's own code)
   flightAirport: 'edi.flightAirport', // selected airport ICAO
   tab: 'edi.tab', // active tab: 'flights' | 'trains' | 'buses'
   direction: 'edi.direction', // 'departures' | 'arrivals'
@@ -25,7 +26,7 @@ export const STORE = {
 
 // Major UK & European airports for the flights board (see airports.js). The
 // ICAO drives the AeroDataBox lookup. Default is Edinburgh (EGPH).
-export { AIRPORTS } from './airports.js?v=7';
+export { AIRPORTS } from './airports.js?v=8';
 export const FLIGHT_DEFAULTS = { airport: 'EGPH' };
 
 export const DEFAULTS = {
@@ -51,7 +52,7 @@ export const HUXLEY = {
 
 // All National Rail (GB) stations for the trains board (CRS codes). Default is
 // Edinburgh Waverley (EDB); see TRAIN_DEFAULTS.
-export { STATIONS } from './stations.js?v=7';
+export { STATIONS } from './stations.js?v=8';
 
 export const TRAIN_DEFAULTS = {
   provider: 'live', // live needs no key, so default the trains tab to real data
@@ -60,12 +61,13 @@ export const TRAIN_DEFAULTS = {
   pastWindowMin: 15,
 };
 
-// Buses: Edinburgh Bus Station (St Andrew Square). Live data is TransportAPI,
-// reached only through the Worker proxy (creds stay server-side), so the tab
-// defaults to demo until the proxy is configured.
-export const BUS_STATION = { name: 'Edinburgh Bus Station', area: 'St Andrew Square' };
+// Buses: major UK bus/coach stations (see busstations.js). Live data is
+// TransportAPI via the Worker proxy (creds stay server-side); the demo board is
+// Edinburgh-only, so the tab defaults to Edinburgh + demo.
+export { BUS_STATIONS } from './busstations.js?v=8';
 export const BUS_DEFAULTS = {
   provider: 'demo',
+  station: 'edinburgh',
   atco: '',
   maxRows: 30,
   pastWindowMin: 15,

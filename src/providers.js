@@ -5,11 +5,11 @@
 //     time: Date, estimated: Date|null, gate: string|null,
 //     status: {key,label}, codeshare: boolean }
 
-import { AERODATABOX, HUXLEY, STATUS } from './config.js?v=7';
-import { fmtLocalApi, parseLondonClock } from './time.js?v=7';
-import { generateDemoDepartures } from './demo-data.js?v=7';
-import { generateDemoTrains } from './trains-demo.js?v=7';
-import { generateDemoBuses } from './buses-demo.js?v=7';
+import { AERODATABOX, HUXLEY, STATUS } from './config.js?v=8';
+import { fmtLocalApi, parseLondonClock } from './time.js?v=8';
+import { generateDemoDepartures } from './demo-data.js?v=8';
+import { generateDemoTrains } from './trains-demo.js?v=8';
+import { generateDemoBuses } from './buses-demo.js?v=8';
 
 // ---- Demo provider -------------------------------------------------------
 
@@ -37,8 +37,9 @@ export const demoTrainProvider = {
 export const demoBusProvider = {
   id: 'demo',
   label: 'Demo data',
-  async fetchDepartures({ pastWindowMin, maxRows, direction }) {
+  async fetchDepartures({ pastWindowMin, maxRows, direction, home }) {
     await new Promise((r) => setTimeout(r, 150));
+    if (home === false) return []; // demo buses are Edinburgh-only
     return generateDemoBuses({ pastWindowMin, maxRows }, direction);
   },
 };
