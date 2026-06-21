@@ -63,4 +63,32 @@ export const SPRITE_MANIFEST = [
     frameHeight: 24,
     placeholder: { fill: "#e8c46a", stroke: "#6b5210", radius: 3, label: "+P" },
   },
+  {
+    key: "dog",
+    src: "assets/dog.png",
+    frameWidth: 40,
+    frameHeight: 28,
+    placeholder: { fill: "#8a5a2b", stroke: "#4a2f12", label: "DOG" },
+  },
+  {
+    key: "pedestrian",
+    src: "assets/pedestrian.png",
+    frameWidth: 26,
+    frameHeight: 52,
+    placeholder: { fill: "#3a8d6d", stroke: "#1f4f3a", label: false },
+  },
+  {
+    key: "reaper",
+    src: "assets/reaper.png",
+    frameWidth: 40,
+    frameHeight: 60,
+    placeholder: { fill: "#1c1c24", stroke: "#3a0a0a", label: false },
+  },
+  {
+    key: "ramp",
+    src: "assets/ramp.png",
+    frameWidth: 70,
+    frameHeight: 34,
+    placeholder: { fill: "#c0863a", stroke: "#6b4a1f", label: false },
+  },
 ];

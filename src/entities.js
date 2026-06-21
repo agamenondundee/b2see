@@ -1,46 +1,46 @@
-// Game entities. Everything lives in screen space: the world scrolls downward
-// each frame, so non-player entities simply move down by the current speed and
-// are culled once they leave the bottom of the view.
+// Entities in world space (u = lateral, v = forward). Projection to the screen
+// happens at draw time via iso.js, so all gameplay/collision logic stays in
+// simple axis-aligned (u, v) space.
 
-import { assets } from "./assets.js";
-import { VIEW, ROAD, LAWN, PLAYER, PAPER } from "./constants.js";
+import { project, depthScale } from "./iso.js";
+import { drawSprite } from "./procsprites.js";
+import { STREET, PLAYER, PAPER } from "./constants.js";
 
 export class Player {
   constructor() {
-    this.w = PLAYER.width;
-    this.h = PLAYER.height;
-    this.x = (ROAD.left + ROAD.right) / 2;
-    this.y = PLAYER.startY;
+    this.u = STREET.roadMid;
+    this.v = 0;
+    this.halfU = 16;
+    this.halfV = 16;
     this.speed = PLAYER.baseSpeed;
-    this.targetSpeed = PLAYER.baseSpeed;
     this.papers = PLAYER.startPapers;
     this.lives = PLAYER.startLives;
-    this.invuln = 0; // seconds of post-crash invulnerability
+    this.invuln = 0;
     this.facing = "right";
+    this.anim = 0;
   }
 
-  get hitbox() {
-    return { x: this.x - this.w / 2, y: this.y - this.h / 2, w: this.w, h: this.h };
+  get box() {
+    return { u: this.u, v: this.v, hu: this.halfU, hv: this.halfV };
   }
 
-  update(dt, input) {
-    // Speed control.
-    if (input.held("up")) this.targetSpeed = PLAYER.maxSpeed;
-    else if (input.held("down")) this.targetSpeed = PLAYER.minSpeed;
-    else this.targetSpeed = PLAYER.baseSpeed;
+  update(dt, input, bounds = STREET) {
+    if (input.held("up")) this.target = PLAYER.maxSpeed;
+    else if (input.held("down")) this.target = PLAYER.minSpeed;
+    else this.target = PLAYER.baseSpeed;
     const ds = PLAYER.accel * dt;
-    this.speed += clamp(this.targetSpeed - this.speed, -ds, ds);
+    this.speed += clamp(this.target - this.speed, -ds, ds);
+    this.v += this.speed * dt;
 
-    // Steering.
     let dir = 0;
     if (input.held("left")) dir -= 1;
     if (input.held("right")) dir += 1;
     if (dir < 0) this.facing = "left";
     if (dir > 0) this.facing = "right";
-    this.x += dir * PLAYER.steerSpeed * dt;
-    const half = this.w / 2;
-    this.x = clamp(this.x, ROAD.left + half, ROAD.right - half);
+    this.u += dir * PLAYER.steerSpeed * dt;
+    this.u = clamp(this.u, bounds.roadLeft + 12, bounds.roadRight - 12);
 
+    this.anim += dt * (this.speed / 40);
     if (this.invuln > 0) this.invuln -= dt;
   }
 
@@ -52,140 +52,178 @@ export class Player {
     return true;
   }
 
-  draw(ctx) {
-    // Flash while invulnerable.
+  draw(ctx, cameraV) {
     if (this.invuln > 0 && Math.floor(this.invuln * 12) % 2 === 0) return;
-    const frame = this.facing === "left" ? 1 : 0;
-    assets.draw(ctx, "player", this.x, this.y, this.w, this.h, frame);
+    const p = project(this.u, this.v, cameraV);
+    const frame = Math.floor(this.anim) % 2;
+    drawSprite(ctx, "player", p.x, p.y, depthScale(p.relV), { facing: this.facing }, frame);
   }
 }
 
 export class Paper {
-  constructor(x, y, side) {
-    this.x = x;
-    this.y = y;
-    this.side = side; // "left" | "right"
-    this.w = PAPER.width;
-    this.h = PAPER.height;
-    this.vx = (side === "left" ? -1 : 1) * PAPER.lateralSpeed;
+  constructor(u, v, side) {
+    this.u = u;
+    this.v = v;
+    this.side = side;
+    this.vu = (side === "left" ? -1 : 1) * PAPER.lateralSpeed;
     this.life = PAPER.flightTime;
     this.maxLife = PAPER.flightTime;
     this.dead = false;
   }
 
-  update(dt, worldSpeed) {
-    // Travel laterally toward the lawn while staying level with the scrolling
-    // houses (so a paper thrown beside a house arrives at that house).
-    this.x += this.vx * dt;
-    this.y += worldSpeed * dt;
+  get box() {
+    return { u: this.u, v: this.v, hu: 10, hv: 8 };
+  }
+
+  update(dt) {
+    this.u += this.vu * dt;
     this.life -= dt;
-    if (this.life <= 0 || this.x < -20 || this.x > VIEW.width + 20) {
-      this.dead = true;
-    }
+    if (this.life <= 0 || this.u < -20 || this.u > STREET.width + 20) this.dead = true;
   }
 
-  get hitbox() {
-    return { x: this.x - this.w / 2, y: this.y - this.h / 2, w: this.w, h: this.h };
-  }
-
-  draw(ctx) {
-    // A little hop arc for flavour.
-    const p = 1 - this.life / this.maxLife;
-    const hop = Math.sin(p * Math.PI) * 14;
-    assets.draw(ctx, "paper", this.x, this.y - hop, this.w, this.h);
+  draw(ctx, cameraV) {
+    const p = project(this.u, this.v, cameraV);
+    const hop = Math.sin((1 - this.life / this.maxLife) * Math.PI) * 16;
+    drawSprite(ctx, "paper", p.x, p.y - hop, depthScale(p.relV));
   }
 }
 
 export class House {
-  constructor(side, screenY, subscriber) {
+  constructor(side, v, subscriber) {
     this.side = side;
-    this.y = screenY;
+    this.v = v;
     this.subscriber = subscriber;
-    this.w = 92;
-    this.h = 92;
-    this.x = side === "left" ? LAWN.leftTargetX - 6 : LAWN.rightTargetX + 6;
-    // Mailbox / delivery target sits at the road-facing edge of the lawn.
-    this.targetX = side === "left" ? LAWN.leftTargetX + 70 : LAWN.rightTargetX - 70;
+    this.u = side === "left" ? STREET.leftHouseU : STREET.rightHouseU;
+    this.targetU = side === "left" ? STREET.leftTargetU : STREET.rightTargetU;
     this.delivered = false;
-    this.resolved = false; // scored (delivered or smashed) — stops re-triggering
+    this.resolved = false;
   }
 
   get target() {
-    return { x: this.targetX - 16, y: this.y - 14, w: 32, h: 28 };
+    return { u: this.targetU, v: this.v, hu: 26, hv: 30 };
   }
 
-  update(dt, worldSpeed) {
-    this.y += worldSpeed * dt;
-  }
-
-  draw(ctx) {
-    assets.draw(
-      ctx,
-      this.subscriber ? "house-sub" : "house-plain",
-      this.x,
-      this.y - 30,
-      this.w,
-      this.h,
-    );
-    if (this.subscriber && !this.delivered) {
-      const t = this.target;
-      assets.draw(ctx, "mailbox", t.x + t.w / 2, t.y + t.h / 2, 22, 22);
-    }
+  draw(ctx, cameraV) {
+    const hp = project(this.u, this.v, cameraV);
+    drawSprite(ctx, this.subscriber ? "house-sub" : "house-plain", hp.x, hp.y, depthScale(hp.relV), {
+      delivered: this.delivered,
+    });
+    const mp = project(this.targetU, this.v, cameraV);
+    drawSprite(ctx, "mailbox", mp.x, mp.y, depthScale(mp.relV), {
+      subscriber: this.subscriber,
+      flagUp: this.subscriber && !this.delivered,
+    });
   }
 }
 
 export class Obstacle {
-  constructor(kind, x, screenY) {
-    this.kind = kind; // "car" | "cone"
-    this.x = x;
-    this.y = screenY;
+  constructor(kind, u, v, opts = {}) {
+    this.kind = kind; // car | cone
+    this.u = u;
+    this.v = v;
+    this.vv = opts.vv ?? 0; // forward velocity (cars can roll toward you)
+    this.color = opts.color;
     if (kind === "car") {
-      this.w = 46;
-      this.h = 78;
+      this.hu = 19;
+      this.hv = 30;
     } else {
-      this.w = 26;
-      this.h = 30;
+      this.hu = 11;
+      this.hv = 11;
     }
   }
 
-  get hitbox() {
-    return {
-      x: this.x - this.w / 2 + 4,
-      y: this.y - this.h / 2 + 4,
-      w: this.w - 8,
-      h: this.h - 8,
-    };
+  get box() {
+    return { u: this.u, v: this.v, hu: this.hu, hv: this.hv };
   }
 
-  update(dt, worldSpeed) {
-    this.y += worldSpeed * dt;
+  update(dt) {
+    this.v += this.vv * dt;
   }
 
-  draw(ctx) {
-    assets.draw(ctx, this.kind === "car" ? "car" : "cone", this.x, this.y, this.w, this.h);
+  draw(ctx, cameraV) {
+    const p = project(this.u, this.v, cameraV);
+    drawSprite(ctx, this.kind, p.x, p.y, depthScale(p.relV), { color: this.color });
+  }
+}
+
+// Moving hazards: dog (chases), pedestrian (crosses), reaper (homes in).
+export class Hazard {
+  constructor(kind, u, v, opts = {}) {
+    this.kind = kind;
+    this.u = u;
+    this.v = v;
+    this.vu = opts.vu ?? 0;
+    this.vv = opts.vv ?? 0;
+    this.anim = 0;
+    this.facing = "right";
+    this.hu = kind === "dog" ? 16 : 13;
+    this.hv = kind === "dog" ? 12 : 13;
+    this.spriteKey = kind; // dog | pedestrian | reaper
+  }
+
+  get box() {
+    return { u: this.u, v: this.v, hu: this.hu, hv: this.hv };
+  }
+
+  update(dt, player) {
+    this.anim += dt * 6;
+    if (this.kind === "dog") {
+      // Trot across toward the road, then chase the player's lane briefly.
+      const dir = Math.sign(player.u - this.u) || 1;
+      this.u += dir * 70 * dt;
+      this.v += this.vv * dt;
+      this.facing = dir < 0 ? "left" : "right";
+    } else if (this.kind === "pedestrian") {
+      this.u += this.vu * dt;
+    } else if (this.kind === "reaper") {
+      // Homes in slowly — unsettling but out-runnable at top speed.
+      this.u += Math.sign(player.u - this.u) * 40 * dt;
+      this.v -= 50 * dt; // drifts toward the player
+    }
+  }
+
+  draw(ctx, cameraV) {
+    const p = project(this.u, this.v, cameraV);
+    const frame = Math.floor(this.anim) % 2;
+    drawSprite(ctx, this.spriteKey, p.x, p.y, depthScale(p.relV), { facing: this.facing }, frame);
   }
 }
 
 export class Bundle {
-  constructor(x, screenY) {
-    this.x = x;
-    this.y = screenY;
-    this.w = 28;
-    this.h = 24;
+  constructor(u, v) {
+    this.u = u;
+    this.v = v;
+    this.hu = 15;
+    this.hv = 13;
     this.amount = 5;
     this.dead = false;
   }
 
-  get hitbox() {
-    return { x: this.x - this.w / 2, y: this.y - this.h / 2, w: this.w, h: this.h };
+  get box() {
+    return { u: this.u, v: this.v, hu: this.hu, hv: this.hv };
   }
 
-  update(dt, worldSpeed) {
-    this.y += worldSpeed * dt;
+  draw(ctx, cameraV) {
+    const p = project(this.u, this.v, cameraV);
+    drawSprite(ctx, "bundle", p.x, p.y, depthScale(p.relV));
+  }
+}
+
+// A BMX bonus-course gate: ride between the cones to score.
+export class Gate {
+  constructor(u, v) {
+    this.u = u;
+    this.v = v;
+    this.hu = 11;
+    this.hv = 11;
+    this.passed = false;
   }
 
-  draw(ctx) {
-    assets.draw(ctx, "bundle", this.x, this.y, this.w, this.h);
+  draw(ctx, cameraV) {
+    for (const du of [-46, 46]) {
+      const p = project(this.u + du, this.v, cameraV);
+      drawSprite(ctx, "cone", p.x, p.y, depthScale(p.relV));
+    }
   }
 }
 
@@ -193,6 +231,9 @@ export function clamp(v, lo, hi) {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
-export function aabb(a, b) {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+// AABB overlap in (u, v) space.
+export function hit(a, b) {
+  return (
+    Math.abs(a.u - b.u) < a.hu + b.hu && Math.abs(a.v - b.v) < a.hv + b.hv
+  );
 }

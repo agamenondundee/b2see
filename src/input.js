@@ -12,6 +12,9 @@ const KEYMAP = {
   KeyZ: "throwLeft",
   KeyX: "throwRight",
   Space: "throwRight",
+  Enter: "confirm",
+  NumpadEnter: "confirm",
+  KeyM: "mute",
 };
 
 class Input {
@@ -39,6 +42,20 @@ class Input {
 
   held(action) {
     return this.down.has(action);
+  }
+
+  // Programmatic injection used by on-screen touch controls.
+  setHeld(action, isDown) {
+    if (isDown) {
+      if (!this.down.has(action)) this.pressed.add(action);
+      this.down.add(action);
+    } else {
+      this.down.delete(action);
+    }
+  }
+
+  trigger(action) {
+    this.pressed.add(action);
   }
 
   // True exactly once per physical key press.

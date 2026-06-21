@@ -1,82 +1,112 @@
-// Core game state machine: orchestrates the player, world and scoring.
+// Core game state machine. Phases: MENU -> STREET -> TALLY -> BMX -> TALLY ->
+// (next) STREET ... and OVER when lives run out.
 
-import { VIEW, SCORING } from "./constants.js";
+import { PLAYER, SCORING, ROUTE, STREET } from "./constants.js";
 import { input } from "./input.js";
+import { audio } from "./audio.js";
 import { World } from "./world.js";
-import { Player, Paper, aabb } from "./entities.js";
-import { drawHud, drawFloatingText, drawGameOver } from "./hud.js";
+import { Player, Paper, hit } from "./entities.js";
+import { drawHud, drawFloatingText, drawTally, drawGameOver } from "./hud.js";
 
-export const GameState = { MENU: "menu", PLAYING: "playing", OVER: "over" };
+export const Phase = {
+  MENU: "menu",
+  STREET: "street",
+  TALLY: "tally",
+  BMX: "bmx",
+  OVER: "over",
+};
 
 export class Game {
   constructor(ctx) {
     this.ctx = ctx;
-    this.state = GameState.MENU;
-    this.onStateChange = null;
-    this.reset();
-  }
-
-  reset() {
-    this.world = new World();
+    this.phase = Phase.MENU;
+    this.onPhaseChange = null;
+    this.score = 0;
     this.player = new Player();
+    this.world = new World();
     this.papers = [];
     this.popups = [];
+  }
+
+  get cameraV() {
+    return this.player.v - PLAYER.relV;
+  }
+
+  setPhase(p) {
+    this.phase = p;
+    this.onPhaseChange?.(p);
+  }
+
+  newGame() {
     this.score = 0;
     this.deliveries = 0;
+    this.streetNumber = 1;
+    this.beginSegment("street", PLAYER.startLives);
+    audio.startMusic();
+  }
+
+  beginSegment(mode, lives) {
+    this.mode = mode;
+    this.player = new Player();
+    this.player.lives = lives;
+    if (mode === "bmx") this.player.papers = 0;
+    this.world = new World(mode);
+    this.papers = [];
+    this.popups = [];
+    this.gatesPassed = 0;
     this.streak = 0;
-  }
-
-  start() {
-    this.reset();
-    this.setState(GameState.PLAYING);
-  }
-
-  setState(s) {
-    this.state = s;
-    this.onStateChange?.(s);
+    this.setPhase(mode === "bmx" ? Phase.BMX : Phase.STREET);
   }
 
   update(dt) {
-    // Restart from the game-over screen.
-    if (this.state === GameState.OVER && input.consume("up")) {
-      this.start();
+    if (this.phase === Phase.TALLY && input.consume("confirm")) {
+      if (this.tally.next === "bmx") this.beginSegment("bmx", this.player.lives);
+      else {
+        this.streetNumber++;
+        this.beginSegment("street", this.player.lives);
+      }
       return;
     }
-    if (this.state !== GameState.PLAYING) return;
+    if (this.phase === Phase.OVER && input.consume("confirm")) {
+      this.newGame();
+      return;
+    }
+    if (this.phase !== Phase.STREET && this.phase !== Phase.BMX) return;
 
-    const p = this.player;
-    p.update(dt, input);
-    const speed = p.speed;
-
-    this.world.update(dt, speed);
-    this.handleThrows();
-    this.updatePapers(dt, speed);
-    this.handleDeliveries();
+    this.player.update(dt, input, STREET);
+    this.world.update(dt, this.player);
+    this.updatePapers(dt);
+    if (this.phase === Phase.STREET) {
+      this.handleThrows();
+      this.handleDeliveries();
+      this.scoreMissedSubscribers();
+    } else {
+      this.handleGates();
+    }
     this.handleCollisions();
     this.handlePickups();
-    this.scoreMissedSubscribers();
     this.updatePopups(dt);
+    this.checkSegmentEnd();
   }
 
   handleThrows() {
     const p = this.player;
-    // Throw at most one paper per frame; if both keys land together the second
-    // stays queued for the next frame rather than being wasted.
-    const throwLeft = input.consume("throwLeft");
-    const throwRight = throwLeft ? false : input.consume("throwRight");
-    if (!throwLeft && !throwRight) return;
+    const left = input.consume("throwLeft");
+    const right = left ? false : input.consume("throwRight");
+    if (!left && !right) return;
     if (p.papers <= 0) {
-      this.addPopup(p.x, p.y - 40, "EMPTY!", "#ff6b6b");
+      this.addPopup(p.u, p.v, "EMPTY!", "#ff6b6b");
       return;
     }
-    const side = throwLeft ? "left" : "right";
+    const side = left ? "left" : "right";
     p.facing = side;
     p.papers -= 1;
-    this.papers.push(new Paper(p.x, p.y - 10, side));
+    this.papers.push(new Paper(p.u, p.v, side));
+    audio.throw();
   }
 
-  updatePapers(dt, speed) {
-    for (const paper of this.papers) paper.update(dt, speed);
+  updatePapers(dt) {
+    for (const paper of this.papers) paper.update(dt);
     this.papers = this.papers.filter((p) => !p.dead);
   }
 
@@ -85,35 +115,59 @@ export class Game {
       if (paper.dead) continue;
       for (const house of this.world.houses) {
         if (house.resolved || house.side !== paper.side) continue;
-        if (!aabb(paper.hitbox, house.target)) continue;
-
+        if (!hit(paper.box, house.target)) continue;
         paper.dead = true;
         house.resolved = true;
         if (house.subscriber) {
           house.delivered = true;
           this.streak += 1;
           this.deliveries += 1;
-          const bonus = (this.streak - 1) * SCORING.perfectStreak;
-          const points = SCORING.delivery + bonus;
+          const points = SCORING.delivery + (this.streak - 1) * SCORING.perfectStreak;
           this.score += points;
-          this.addPopup(house.targetX, house.y - 20, `+${points}`, "#6ee06e");
+          this.addPopup(house.targetU, house.v, `+${points}`, "#6ee06e");
+          audio.deliver();
         } else {
-          // Smashing a non-subscriber's window — classic mischief points.
           this.score += SCORING.smashWindow;
-          this.addPopup(house.targetX, house.y - 20, `+${SCORING.smashWindow}`, "#ffd23f");
+          this.addPopup(house.targetU, house.v, `+${SCORING.smashWindow}`, "#ffd23f");
+          audio.smash();
         }
         break;
       }
     }
   }
 
+  scoreMissedSubscribers() {
+    for (const house of this.world.houses) {
+      if (house.v < this.player.v - 60 && house.subscriber && !house.resolved) {
+        house.resolved = true;
+        this.streak = 0;
+      }
+    }
+  }
+
+  handleGates() {
+    for (const gate of this.world.gates) {
+      if (!gate.passed && this.player.v > gate.v) {
+        gate.passed = true;
+        if (Math.abs(this.player.u - gate.u) < 40) {
+          this.gatesPassed++;
+          this.score += SCORING.bmxGate;
+          this.addPopup(gate.u, gate.v, `+${SCORING.bmxGate}`, "#6ee06e");
+          audio.gate();
+        }
+      }
+    }
+  }
+
   handleCollisions() {
     const p = this.player;
-    for (const ob of this.world.obstacles) {
-      if (aabb(p.hitbox, ob.hitbox) && p.crash()) {
+    const solids = [...this.world.obstacles, ...this.world.hazards];
+    for (const ob of solids) {
+      if (hit(p.box, ob.box) && p.crash()) {
         this.streak = 0;
-        this.addPopup(p.x, p.y - 40, "CRASH!", "#ff6b6b");
-        if (p.lives <= 0) this.setState(GameState.OVER);
+        this.addPopup(p.u, p.v, "CRASH!", "#ff6b6b");
+        audio.crash();
+        if (p.lives <= 0) this.gameOver();
         break;
       }
     }
@@ -121,35 +175,62 @@ export class Game {
 
   handlePickups() {
     const p = this.player;
-    for (const bundle of this.world.bundles) {
-      if (bundle.dead) continue;
-      if (aabb(p.hitbox, bundle.hitbox)) {
-        bundle.dead = true;
-        p.papers += bundle.amount;
-        this.addPopup(bundle.x, bundle.y - 20, `+${bundle.amount} papers`, "#e8c46a");
+    for (const b of this.world.bundles) {
+      if (!b.dead && hit(p.box, b.box)) {
+        b.dead = true;
+        p.papers += b.amount;
+        this.addPopup(b.u, b.v, `+${b.amount} papers`, "#e8c46a");
+        audio.pickup();
       }
     }
   }
 
-  // A subscriber house that scrolls off the bottom undelivered breaks the streak.
-  scoreMissedSubscribers() {
-    for (const house of this.world.houses) {
-      if (house.y > VIEW.height + 80 && house.subscriber && !house.resolved) {
-        house.resolved = true;
-        this.streak = 0;
-      }
+  checkSegmentEnd() {
+    if (this.phase === Phase.STREET && this.player.v >= ROUTE.length) {
+      const bonus = SCORING.routeBonus;
+      this.score += bonus;
+      audio.fanfare();
+      this.tally = {
+        title: `STREET ${this.streetNumber} COMPLETE`,
+        lines: [
+          `Papers delivered: ${this.deliveries}`,
+          `Route bonus: ${bonus}`,
+          `Total score: ${this.score}`,
+        ],
+        prompt: "Next up: BMX bonus course",
+        next: "bmx",
+      };
+      this.setPhase(Phase.TALLY);
+    } else if (this.phase === Phase.BMX && this.player.v >= ROUTE.bmxLength) {
+      const bonus = SCORING.bmxFinish;
+      this.score += bonus;
+      audio.fanfare();
+      this.tally = {
+        title: "BMX COURSE CLEARED",
+        lines: [
+          `Gates: ${this.gatesPassed} (+${this.gatesPassed * SCORING.bmxGate})`,
+          `Finish bonus: ${bonus}`,
+          `Total score: ${this.score}`,
+        ],
+        prompt: "Back on the route!",
+        next: "street",
+      };
+      this.setPhase(Phase.TALLY);
     }
   }
 
-  addPopup(x, y, text, color) {
-    this.popups.push({ x, y, text, color, life: 0.9, maxLife: 0.9 });
+  gameOver() {
+    audio.stopMusic();
+    this.tally = null;
+    this.setPhase(Phase.OVER);
+  }
+
+  addPopup(u, v, text, color) {
+    this.popups.push({ u, v, text, color, life: 1.0, maxLife: 1.0 });
   }
 
   updatePopups(dt) {
-    for (const pop of this.popups) {
-      pop.life -= dt;
-      pop.y -= 30 * dt;
-    }
+    for (const pop of this.popups) pop.life -= dt;
     this.popups = this.popups.filter((p) => p.life > 0);
   }
 
@@ -158,28 +239,28 @@ export class Game {
       score: this.score,
       papers: this.player.papers,
       lives: this.player.lives,
-      streak: this.streak,
-      deliveries: this.deliveries,
+      streak: this.streak ?? 0,
+      mode: this.mode,
+      progress:
+        this.mode === "bmx"
+          ? this.player.v / ROUTE.bmxLength
+          : this.player.v / ROUTE.length,
+      deliveries: this.deliveries ?? 0,
+      gates: this.gatesPassed ?? 0,
     };
   }
 
   draw() {
     const ctx = this.ctx;
-    this.world.draw(ctx);
+    const cam = this.cameraV;
+    this.world.drawGround(ctx, cam);
+    this.world.drawEntities(ctx, cam);
+    for (const paper of this.papers) paper.draw(ctx, cam);
+    this.player.draw(ctx, cam);
+    drawFloatingText(ctx, this.popups, cam);
 
-    // Draw far-to-near so nearer entities overlap correctly.
-    const drawables = [
-      ...this.world.houses,
-      ...this.world.bundles,
-      ...this.world.obstacles,
-      ...this.papers,
-    ].sort((a, b) => a.y - b.y);
-    for (const d of drawables) d.draw(ctx);
-
-    this.player.draw(ctx);
-    drawFloatingText(ctx, this.popups);
-    drawHud(ctx, this.hudState);
-
-    if (this.state === GameState.OVER) drawGameOver(ctx, this.hudState);
+    if (this.phase !== Phase.MENU) drawHud(ctx, this.hudState);
+    if (this.phase === Phase.TALLY) drawTally(ctx, this.tally);
+    if (this.phase === Phase.OVER) drawGameOver(ctx, this.hudState);
   }
 }

@@ -3,9 +3,10 @@
 A modern, browser-based take on the 1984 arcade classic **Paperboy**, built
 with plain HTML5 Canvas and ES modules — no build step, no dependencies.
 
-Ride your route down a scrolling suburban street, deliver papers to your
+Ride your route down a **isometric** scrolling street, deliver papers to your
 subscribers' mailboxes, rack up smashed windows on the houses that *didn't*
-subscribe, and dodge the traffic.
+subscribe, dodge traffic, dogs, pedestrians and the Grim Reaper — then clear
+the **BMX bonus course** at the end of the street.
 
 ## Play
 
@@ -18,6 +19,8 @@ python3 -m http.server 8000
 # then open http://localhost:8000/
 ```
 
+On phones/tablets, on-screen touch controls appear automatically.
+
 ## Controls
 
 | Key            | Action               |
@@ -26,17 +29,30 @@ python3 -m http.server 8000
 | `↑` / `↓`      | Pedal faster / brake |
 | `Z`            | Throw paper left     |
 | `X` / `Space`  | Throw paper right    |
-| `Enter`        | Start / restart      |
+| `Enter`        | Start / continue / restart |
+| `M`            | Mute / unmute        |
 
 ## Gameplay
 
-- **Deliver** to the glowing mailboxes of **subscriber** houses for points.
+- **Deliver** to the glowing mailboxes (flag up) of **subscriber** houses —
+  red roofs, lit windows — for points.
 - Consecutive deliveries build a **streak** that increases the bonus.
 - Hitting a **non-subscriber** house scores classic mischief points.
-- Missing a subscriber (it scrolls off-screen) breaks your streak.
+- Missing a subscriber (it scrolls past undelivered) breaks your streak.
 - Run over **paper bundles** on the road to refill your supply.
-- Crashing into a **car** or **cone** costs a life and some papers. Three
-  crashes ends the route.
+- Dodge **cars**, **cones**, **dogs**, **pedestrians**, and the homing
+  **Grim Reaper**. A crash costs a life and some papers; three ends the route.
+- Finish the street for a **route bonus**, then ride the **BMX bonus course** —
+  thread the cone gates and reach the finish for big points before the route
+  loops to the next, tougher street.
+
+## How it works
+
+The world is modelled in 2D ground coordinates (`u` = lateral, `v` = forward),
+and an **isometric projection** (`src/iso.js`) maps them to the screen for the
+diagonal Paperboy look. All gameplay and collisions stay in clean `(u, v)`
+space. Audio is **synthesized at runtime** with the Web Audio API (no sound
+files), and all graphics are drawn **procedurally** — see "Art" below.
 
 ## Project layout
 
@@ -44,19 +60,25 @@ python3 -m http.server 8000
 index.html               # shell + start screen
 src/
   main.js                # boot + game loop
-  game.js                # state machine, scoring, collisions
-  world.js               # scrolling street, spawning
-  entities.js            # player, paper, house, obstacle, bundle
-  assets.js              # sprite loader with placeholder fallback
+  game.js                # state machine, phases, scoring, collisions
+  world.js               # isometric ground + spawning (street & BMX)
+  iso.js                 # world -> screen isometric projection
+  entities.js            # player, paper, house, obstacle, hazard, bundle, gate
+  procsprites.js         # procedural artwork for every sprite
+  assets.js              # sprite loader (prefers real PNGs if present)
   sprites.manifest.js    # maps sprite keys -> art (edit to add real sprites)
+  audio.js               # Web Audio SFX + music
   input.js               # keyboard input
-  hud.js                 # score / lives / popups
+  touch.js               # on-screen mobile controls
+  hud.js                 # score / lives / tally / game-over
   constants.js           # all tuning values
 assets/                  # drop real sprite sheets here (see assets/README.md)
 ```
 
 ## Art
 
-The game is fully playable with **placeholder graphics**. To add real artwork,
-drop sprite sheets into [`assets/`](assets/) and point the manifest at them —
-see [`assets/README.md`](assets/README.md).
+Every sprite is drawn **procedurally in code** (`src/procsprites.js`), so the
+game looks complete with zero image files. To swap in real artwork, drop sprite
+sheets into [`assets/`](assets/) and point the manifest at them — the renderer
+prefers a loaded PNG over the procedural fallback. See
+[`assets/README.md`](assets/README.md).
