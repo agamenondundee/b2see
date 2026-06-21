@@ -1,7 +1,7 @@
-// Edinburgh live departures — tabbed orchestrator (Flights + Trains).
+// Edinburgh live departures — tabbed orchestrator (Flights, Trains, Buses, EU Rail).
 
-import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATIONS, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=8';
-import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=8';
+import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATIONS, EU_DEFAULTS, EU_STATIONS, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=9';
+import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=9';
 import {
   demoProvider,
   makeLiveProvider,
@@ -9,8 +9,10 @@ import {
   makeTrainProvider,
   demoBusProvider,
   makeBusProvider,
-} from './providers.js?v=8';
-import { makeEmblem } from './emblems.js?v=8';
+  demoEuRailProvider,
+  makeEuRailProvider,
+} from './providers.js?v=9';
+import { makeEmblem } from './emblems.js?v=9';
 
 // ---- Settings (persisted) ------------------------------------------------
 
@@ -25,6 +27,9 @@ const settings = {
   busProvider: localStorage.getItem(STORE.busProvider) || BUS_DEFAULTS.provider,
   busStation: localStorage.getItem(STORE.busStation) || BUS_DEFAULTS.station,
   busAtco: localStorage.getItem(STORE.busAtco) || BUS_DEFAULTS.atco,
+  euProvider: localStorage.getItem(STORE.euProvider) || EU_DEFAULTS.provider,
+  euStation: localStorage.getItem(STORE.euStation) || EU_DEFAULTS.station,
+  euBase: localStorage.getItem(STORE.euBase) || '',
   direction: localStorage.getItem(STORE.direction) || 'departures',
   refreshMs: Number(localStorage.getItem(STORE.refreshMs) ?? DEFAULTS.refreshMs),
 };
@@ -37,8 +42,10 @@ const busAtco = () => settings.busAtco.trim() || busStation().atco;
 const liveFlight = makeLiveProvider(() => settings.apiKey, () => settings.proxyUrl, () => settings.flightAirport, dir);
 const liveTrain = makeTrainProvider(() => settings.trainBase, () => settings.trainStation, dir);
 const liveBus = makeBusProvider(() => settings.proxyUrl, busAtco, dir);
+const liveEuRail = makeEuRailProvider(() => settings.euBase, () => settings.euStation, dir);
 
 const stationName = (crs) => (STATIONS.find((s) => s.crs === crs) || {}).name || crs;
+const euStationName = (id) => (EU_STATIONS.find((s) => s.id === id) || {}).name || id;
 const airport = (icao) => AIRPORTS.find((a) => a.icao === icao) || AIRPORTS[0];
 
 // ---- DOM helpers ---------------------------------------------------------
@@ -166,6 +173,30 @@ function buildBusRow(b) {
   return row;
 }
 
+// EU rail row: service number + operator (like a flight), platform, status.
+function buildEuRailRow(t) {
+  const row = el('div', `row status--${t.status.key}`);
+  row.setAttribute('role', 'row');
+  row.appendChild(timeCell(t));
+
+  const dest = el('span', 'col-dest');
+  dest.appendChild(el('span', 'dest-name', t.dest));
+  if (t.via) dest.appendChild(el('span', 'dest-iata', `via ${t.via}`));
+  row.appendChild(dest);
+
+  const line = el('span', 'flight-no', t.line || '—');
+  const lines = [line];
+  if (t.operator) lines.push(el('span', 'flight-airline', t.operator));
+  row.appendChild(opCell(makeEmblem({ kind: 'op', name: t.operator }), lines));
+
+  row.appendChild(el('span', 'col-gate', t.platform || '—'));
+
+  const status = el('span', 'col-status');
+  status.appendChild(el('span', `badge badge--${t.status.key}`, t.status.label));
+  row.appendChild(status);
+  return row;
+}
+
 // ---- Feed definitions ----------------------------------------------------
 
 const FLIGHT_FILTERS = [
@@ -254,12 +285,32 @@ const FEEDS = {
         : `Demo is Edinburgh-only — switch to Live (set this station's ATCO) for ${name}.`;
     },
   },
+  eurail: {
+    columns: ['Time', 'Destination', 'Service', 'Plat', 'Status'],
+    searchPlaceholder: 'Search destination, service or operator…',
+    providers: { demo: demoEuRailProvider, live: liveEuRail },
+    providerId: () => settings.euProvider,
+    opts: () => ({ pastWindowMin: EU_DEFAULTS.pastWindowMin, maxRows: EU_DEFAULTS.maxRows, direction: settings.direction }),
+    buildRow: buildEuRailRow,
+    filters: TRAIN_FILTERS,
+    match: (t, q) =>
+      t.dest.toLowerCase().includes(q) ||
+      t.operator.toLowerCase().includes(q) ||
+      (t.line || '').toLowerCase().includes(q) ||
+      (t.platform || '').toLowerCase().includes(q),
+    note: (live, err) => {
+      const name = euStationName(settings.euStation);
+      if (err) return `⚠ Live EU rail unavailable for ${name}: ${err} Showing a sample board.`;
+      if (live) return `Live ${dirWord()} for ${name} (Deutsche Bahn · transport.rest).`;
+      return `Showing a sample European board (demo) — switch to Live for ${name}.`;
+    },
+  },
 };
 
 // ---- Runtime state -------------------------------------------------------
 
 const mkState = () => ({ rows: [], search: '', filter: 'all', error: null, loading: false, loaded: false, updated: null });
-const state = { flights: mkState(), trains: mkState(), buses: mkState() };
+const state = { flights: mkState(), trains: mkState(), buses: mkState(), eurail: mkState() };
 let activeTab = localStorage.getItem(STORE.tab) || 'flights';
 let refreshTimer = null;
 
@@ -279,7 +330,7 @@ function render() {
   feed.columns.forEach((label, i) => {
     if (headCols[i]) headCols[i].textContent = arrivals && label === 'Destination' ? 'Origin' : label;
   });
-  boardEl.classList.remove('feed-flights', 'feed-trains', 'feed-buses');
+  boardEl.classList.remove('feed-flights', 'feed-trains', 'feed-buses', 'feed-eurail');
   boardEl.classList.add('feed-' + activeTab);
 
   const q = st.search.trim().toLowerCase();
@@ -416,6 +467,7 @@ function setDirection(d) {
   state.flights.loaded = false;
   state.trains.loaded = false;
   state.buses.loaded = false;
+  state.eurail.loaded = false;
   render();
   refresh(activeTab);
 }
@@ -472,6 +524,17 @@ function fillBusStationSelect() {
   );
 }
 
+function fillEuStationSelect() {
+  const sel = $('eu-station');
+  sel.replaceChildren(
+    ...EU_STATIONS.map((s) => {
+      const o = el('option', null, `${s.name} — ${s.country}`);
+      o.value = s.id;
+      return o;
+    }),
+  );
+}
+
 // Reflect the selected airport in the header brand.
 function updateAirportHeader() {
   const a = airport(settings.flightAirport);
@@ -483,6 +546,7 @@ function openSettings() {
   for (const r of document.querySelectorAll('input[name="provider"]')) r.checked = r.value === settings.flightProvider;
   for (const r of document.querySelectorAll('input[name="trainProvider"]')) r.checked = r.value === settings.trainProvider;
   for (const r of document.querySelectorAll('input[name="busProvider"]')) r.checked = r.value === settings.busProvider;
+  for (const r of document.querySelectorAll('input[name="euProvider"]')) r.checked = r.value === settings.euProvider;
   $('api-key').value = settings.apiKey;
   $('proxy-url').value = settings.proxyUrl;
   $('flight-airport').value = settings.flightAirport;
@@ -490,6 +554,8 @@ function openSettings() {
   $('train-base').value = settings.trainBase;
   $('bus-station').value = settings.busStation;
   $('bus-atco').value = settings.busAtco;
+  $('eu-station').value = settings.euStation;
+  $('eu-base').value = settings.euBase;
   $('refresh').value = String(settings.refreshMs);
   modal.hidden = false;
 }
@@ -500,6 +566,7 @@ function saveSettings() {
   settings.flightProvider = document.querySelector('input[name="provider"]:checked')?.value || 'demo';
   settings.trainProvider = document.querySelector('input[name="trainProvider"]:checked')?.value || 'live';
   settings.busProvider = document.querySelector('input[name="busProvider"]:checked')?.value || 'demo';
+  settings.euProvider = document.querySelector('input[name="euProvider"]:checked')?.value || 'live';
   settings.apiKey = $('api-key').value.trim();
   settings.proxyUrl = $('proxy-url').value.trim().replace(/\/+$/, '');
   settings.flightAirport = $('flight-airport').value;
@@ -507,17 +574,22 @@ function saveSettings() {
   settings.trainBase = $('train-base').value.trim().replace(/\/+$/, '');
   settings.busStation = $('bus-station').value;
   settings.busAtco = $('bus-atco').value.trim();
+  settings.euStation = $('eu-station').value;
+  settings.euBase = $('eu-base').value.trim().replace(/\/+$/, '');
   settings.refreshMs = Number($('refresh').value);
 
   localStorage.setItem(STORE.provider, settings.flightProvider);
   localStorage.setItem(STORE.trainProvider, settings.trainProvider);
   localStorage.setItem(STORE.busProvider, settings.busProvider);
+  localStorage.setItem(STORE.euProvider, settings.euProvider);
   localStorage.setItem(STORE.apiKey, settings.apiKey);
   localStorage.setItem(STORE.proxyUrl, settings.proxyUrl);
   localStorage.setItem(STORE.trainStation, settings.trainStation);
   localStorage.setItem(STORE.trainBase, settings.trainBase);
   localStorage.setItem(STORE.busStation, settings.busStation);
   localStorage.setItem(STORE.busAtco, settings.busAtco);
+  localStorage.setItem(STORE.euStation, settings.euStation);
+  localStorage.setItem(STORE.euBase, settings.euBase);
   localStorage.setItem(STORE.flightAirport, settings.flightAirport);
   localStorage.setItem(STORE.refreshMs, String(settings.refreshMs));
 
@@ -527,6 +599,7 @@ function saveSettings() {
   state.flights.loaded = false;
   state.trains.loaded = false;
   state.buses.loaded = false;
+  state.eurail.loaded = false;
   scheduleAutoRefresh();
   refresh(activeTab);
 }
@@ -537,6 +610,7 @@ function init() {
   fillStationSelect();
   fillAirportSelect();
   fillBusStationSelect();
+  fillEuStationSelect();
   updateAirportHeader();
   setActiveTabButton();
   setDirToggle();

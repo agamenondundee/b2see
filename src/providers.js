@@ -5,11 +5,12 @@
 //     time: Date, estimated: Date|null, gate: string|null,
 //     status: {key,label}, codeshare: boolean }
 
-import { AERODATABOX, HUXLEY, STATUS } from './config.js?v=8';
-import { fmtLocalApi, parseLondonClock } from './time.js?v=8';
-import { generateDemoDepartures } from './demo-data.js?v=8';
-import { generateDemoTrains } from './trains-demo.js?v=8';
-import { generateDemoBuses } from './buses-demo.js?v=8';
+import { AERODATABOX, HUXLEY, DBREST, STATUS } from './config.js?v=9';
+import { fmtLocalApi, parseLondonClock } from './time.js?v=9';
+import { generateDemoDepartures } from './demo-data.js?v=9';
+import { generateDemoTrains } from './trains-demo.js?v=9';
+import { generateDemoBuses } from './buses-demo.js?v=9';
+import { generateEuRail } from './eurail-demo.js?v=9';
 
 // ---- Demo provider -------------------------------------------------------
 
@@ -41,6 +42,17 @@ export const demoBusProvider = {
     await new Promise((r) => setTimeout(r, 150));
     if (home === false) return []; // demo buses are Edinburgh-only
     return generateDemoBuses({ pastWindowMin, maxRows }, direction);
+  },
+};
+
+export const demoEuRailProvider = {
+  id: 'demo',
+  label: 'Demo data',
+  // EU rail has no single "home" station, so the demo is an illustrative
+  // pan-European board shown for any selection (and on live fallback).
+  async fetchDepartures({ pastWindowMin, maxRows, direction }) {
+    await new Promise((r) => setTimeout(r, 150));
+    return generateEuRail({ pastWindowMin, maxRows }, direction);
   },
 };
 
@@ -325,6 +337,94 @@ export function makeBusProvider(getBase, getAtco, getDirection = () => 'departur
       return list
         .map(normalizeBus)
         .filter((b) => b.time)
+        .sort((a, b) => a.time - b.time)
+        .slice(0, maxRows);
+    },
+  };
+}
+
+// ---- EU Rail: Deutsche Bahn HAFAS via transport.rest ---------------------
+
+// DB transport.rest returns ISO 8601 instants with a zone offset, so the native
+// Date parser yields the correct absolute time (rendered in Edinburgh time, like
+// the rest of the board).
+function parseIso(s) {
+  if (!s) return null;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function normalizeEuRail(d, i, arrivals) {
+  const planned = parseIso(d.plannedWhen) || parseIso(d.when);
+  const actual = parseIso(d.when) || planned;
+  const cancelled = d.cancelled === true;
+  const delaySec = typeof d.delay === 'number' ? d.delay : 0;
+
+  let status;
+  if (cancelled) status = STATUS.CANCELLED;
+  else if (delaySec >= 300) status = STATUS.DELAYED;
+  else if (actual && actual.getTime() < Date.now() - 60000) status = arrivals ? STATUS.ARRIVED : STATUS.DEPARTED;
+  else status = STATUS.ON_TIME;
+
+  const line = d.line || {};
+  // Arrivals carry provenance/origin; departures carry direction/destination.
+  const place = arrivals
+    ? d.provenance || (d.origin && d.origin.name)
+    : d.direction || (d.destination && d.destination.name);
+  const estimated =
+    actual && planned && actual.getTime() !== planned.getTime() ? actual : null;
+
+  return {
+    id: d.tripId || `${line.name || ''}|${d.plannedWhen || d.when || ''}|${i}`,
+    line: line.name || line.productName || '',
+    operator: (line.operator && line.operator.name) || line.productName || '',
+    operatorCode: line.productName || '',
+    dest: place || 'Unknown',
+    via: '',
+    time: planned,
+    estimated: status === STATUS.CANCELLED ? null : estimated,
+    platform: d.platform || d.plannedPlatform || null,
+    status,
+    cancelled,
+  };
+}
+
+export function makeEuRailProvider(getBase, getStation, getDirection = () => 'departures') {
+  return {
+    id: 'live',
+    label: 'Live (Deutsche Bahn)',
+    async fetchDepartures({ pastWindowMin, maxRows }) {
+      const base = (getBase() || DBREST.base).trim().replace(/\/+$/, '');
+      const id = (getStation() || '').trim();
+      if (!id) {
+        const e = new Error('Pick a European station in Settings to see live trains.');
+        e.code = 'NO_STATION';
+        throw e;
+      }
+      const arrivals = getDirection() === 'arrivals';
+      const qs = new URLSearchParams({
+        duration: '180',
+        results: String(Math.min(maxRows * 2, 80)),
+        linesOfStops: 'false',
+        remarks: 'false',
+        language: 'en',
+      });
+      const url = `${base}/stops/${encodeURIComponent(id)}/${arrivals ? 'arrivals' : 'departures'}?${qs}`;
+
+      let res;
+      try {
+        res = await fetch(url, { headers: { Accept: 'application/json' } });
+      } catch {
+        throw new Error('Could not reach the EU rail service (network/CORS). Check the data URL in Settings.');
+      }
+      if (!res.ok) throw new Error(`EU rail data error (HTTP ${res.status}).`);
+
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : data.departures || data.arrivals || [];
+      const earliest = Date.now() - pastWindowMin * 60000;
+      return list
+        .map((s, i) => normalizeEuRail(s, i, arrivals))
+        .filter((t) => t.time && (t.estimated || t.time).getTime() >= earliest)
         .sort((a, b) => a.time - b.time)
         .slice(0, maxRows);
     },
