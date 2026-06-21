@@ -59,10 +59,16 @@ the board falls back to demo data and shows a notice, so it's never blank.
 
 > **Why a key?** This is a purely static site with no backend, so the browser
 > calls the flight API directly. AeroDataBox's RapidAPI gateway supports
-> browser (CORS) requests. For a shared deployment where you don't want a
-> per-user key, put a tiny serverless proxy (e.g. a Cloudflare Worker) in front
-> of the API that injects the key server-side, and point the live provider's
-> base URL at it.
+> browser (CORS) requests.
+
+### No per-user key (Cloudflare Worker proxy)
+
+For a shared deployment where you don't want every visitor to need their own
+key, deploy the small **Cloudflare Worker** in [`proxy/`](proxy/). It holds one
+key as a server-side secret, injects it into upstream requests and adds CORS.
+Then in **Settings ⚙** paste the Worker URL into **Proxy URL** and leave the key
+blank — the browser calls your Worker and never sees the key. See
+[`proxy/README.md`](proxy/README.md) for the (short) deploy steps.
 
 ## Deploy (GitHub Pages)
 
@@ -81,6 +87,10 @@ src/
   config.js         # airport, defaults, status buckets, storage keys
   time.js           # Europe/London time helpers & formatting
   styles.css        # FIDS board styling (dark theme, responsive cards)
+proxy/              # optional Cloudflare Worker: live data with no per-user key
+  worker.js         # CORS + injects the RapidAPI key server-side
+  wrangler.toml     # Worker config
+  README.md         # deploy steps
 ```
 
 ## Notes & limitations

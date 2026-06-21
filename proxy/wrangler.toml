@@ -1,0 +1,11 @@
+name = "edi-departures-proxy"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# The RapidAPI key is a SECRET, not a var. Set it after first deploy:
+#   wrangler secret put RAPIDAPI_KEY
+#
+# Optionally lock CORS to your site instead of allowing any origin ("*").
+# Uncomment and set to your Pages origin (no trailing slash):
+# [vars]
+# ALLOWED_ORIGIN = "https://agamenondundee.github.io"

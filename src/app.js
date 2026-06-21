@@ -9,10 +9,11 @@ import { demoProvider, makeLiveProvider } from './providers.js';
 const settings = {
   provider: localStorage.getItem(STORE.provider) || DEFAULTS.provider,
   apiKey: localStorage.getItem(STORE.apiKey) || '',
+  proxyUrl: localStorage.getItem(STORE.proxyUrl) || '',
   refreshMs: Number(localStorage.getItem(STORE.refreshMs) ?? DEFAULTS.refreshMs),
 };
 
-const liveProvider = makeLiveProvider(() => settings.apiKey);
+const liveProvider = makeLiveProvider(() => settings.apiKey, () => settings.proxyUrl);
 const providerFor = (id) => (id === 'live' ? liveProvider : demoProvider);
 
 // ---- Runtime state -------------------------------------------------------
@@ -225,6 +226,7 @@ function openSettings() {
     r.checked = r.value === settings.provider;
   }
   $('api-key').value = settings.apiKey;
+  $('proxy-url').value = settings.proxyUrl;
   $('refresh').value = String(settings.refreshMs);
   modal.hidden = false;
 }
@@ -237,10 +239,12 @@ function saveSettings() {
   const provider = document.querySelector('input[name="provider"]:checked')?.value || 'demo';
   settings.provider = provider;
   settings.apiKey = $('api-key').value.trim();
+  settings.proxyUrl = $('proxy-url').value.trim().replace(/\/+$/, '');
   settings.refreshMs = Number($('refresh').value);
 
   localStorage.setItem(STORE.provider, settings.provider);
   localStorage.setItem(STORE.apiKey, settings.apiKey);
+  localStorage.setItem(STORE.proxyUrl, settings.proxyUrl);
   localStorage.setItem(STORE.refreshMs, String(settings.refreshMs));
 
   closeSettings();
