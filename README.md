@@ -82,8 +82,9 @@ The **🚆 Trains** tab shows live rail departures from National Rail's official
 **Darwin** feed, via [Huxley2](https://github.com/jpsingleton/Huxley2) — a
 CORS-enabled JSON proxy that works directly from the browser **with no API key**.
 By default it uses the public Huxley2 instance and **Edinburgh Waverley** (`EDB`);
-pick another station (Haymarket, Edinburgh Gateway, Edinburgh Park) in
-**Settings ⚙**.
+pick **any of the ~360 Scottish railway stations** (Glasgow, Aberdeen, Inverness,
+Thurso, Mallaig, …) from the station picker in **Settings ⚙**. The full list lives
+in [`src/stations.js`](src/stations.js).
 
 - **No setup:** the trains tab is live out of the box — no signup, no key.
 - **Reliability:** the public Huxley2 instance is best-effort. For a dependable
@@ -125,6 +126,7 @@ src/
   demo-data.js      # curated EDI flight timetable + deterministic generator
   trains-demo.js    # curated Edinburgh Waverley train timetable + generator
   buses-demo.js     # curated Edinburgh Bus Station coach timetable + generator
+  stations.js       # all ~360 Scottish railway stations (name + CRS code)
   config.js         # airport/stations/bus station, defaults, status, storage keys
   time.js           # Europe/London time helpers & formatting
   styles.css        # FIDS board styling (dark theme, tabs, responsive cards)
@@ -132,6 +134,18 @@ proxy/              # optional Cloudflare Worker: live data with no per-user key
   worker.js         # CORS + injects creds for AeroDataBox (flights) & TransportAPI (buses)
   wrangler.toml     # Worker config
   README.md         # deploy steps
+scripts/
+  bump-cache-version.py  # version-tags module imports for cache-busting on deploy
+```
+
+## Updating / cache-busting
+
+GitHub Pages caches the `src/*.js` modules in the browser (~10 min), so after a
+deploy an old script can linger. To force fresh loads, the module imports are
+tagged with a `?v=N` query. After changing anything under `src/`, bump it:
+
+```bash
+python3 scripts/bump-cache-version.py 2   # use the next number, then commit
 ```
 
 ## Notes & limitations

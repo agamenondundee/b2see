@@ -1,7 +1,7 @@
 // Edinburgh live departures — tabbed orchestrator (Flights + Trains).
 
-import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATION, STATIONS } from './config.js';
-import { fmtClockSeconds, fmtClock, fmtDate } from './time.js';
+import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATION, STATIONS } from './config.js?v=1';
+import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=1';
 import {
   demoProvider,
   makeLiveProvider,
@@ -9,7 +9,7 @@ import {
   makeTrainProvider,
   demoBusProvider,
   makeBusProvider,
-} from './providers.js';
+} from './providers.js?v=1';
 
 // ---- Settings (persisted) ------------------------------------------------
 
@@ -190,7 +190,7 @@ const FEEDS = {
       (t.via || '').toLowerCase().includes(q),
     note: (live, err) =>
       err
-        ? `⚠ Live trains unavailable: ${err} Showing demo data.`
+        ? `⚠ Live trains unavailable for ${stationName(settings.trainStation)}: ${err} Showing demo data.`
         : live
           ? `Live departures from ${stationName(settings.trainStation)} (National Rail).`
           : `Showing demo trains for ${stationName(settings.trainStation)}.`,

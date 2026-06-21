@@ -42,13 +42,9 @@ export const HUXLEY = {
   base: 'https://huxley2.azurewebsites.net',
 };
 
-// Edinburgh-area stations (CRS codes) for the trains board.
-export const STATIONS = [
-  { crs: 'EDB', name: 'Edinburgh Waverley' },
-  { crs: 'HYM', name: 'Haymarket' },
-  { crs: 'EGY', name: 'Edinburgh Gateway' },
-  { crs: 'EDP', name: 'Edinburgh Park' },
-];
+// All Scottish railway stations for the trains board (CRS codes). Default is
+// Edinburgh Waverley (EDB); see TRAIN_DEFAULTS.
+export { STATIONS } from './stations.js?v=1';
 
 export const TRAIN_DEFAULTS = {
   provider: 'live', // live needs no key, so default the trains tab to real data
