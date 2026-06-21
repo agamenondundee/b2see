@@ -8,7 +8,7 @@ needs. Three routes:
 ```
 Browser ──GET /flights/…──▶ Worker ──+ X-RapidAPI-Key──────▶ AeroDataBox        (flights)
 Browser ──GET /bus/…─────▶ Worker ──+ app_id & app_key────▶ TransportAPI        (buses)
-Browser ──GET /eurail/…──▶ Worker ──(keyless)─────────────▶ DB transport.rest   (EU rail)
+Browser ──GET /eurail/…──▶ Worker ──(keyless)─────────────▶ Transitous (MOTIS)   (EU rail)
         ◀──── JSON + CORS ──         ◀──── JSON ────────────
 ```
 
@@ -17,10 +17,10 @@ open relay — and edge-caches responses (30s; 60s for EU rail) to spare the
 upstream quotas. (Trains don't use this proxy; their National Rail/Darwin feed
 via Huxley is already CORS-enabled.)
 
-**EU rail** needs **no secret** — Deutsche Bahn's transport.rest upstream is
-keyless. Proxying it just gives the browser reliable CORS and a shared edge cache,
-which matters because DB's public instance is heavily rate-limited. So the proxy
-is worth deploying for EU rail alone, even with no flight/bus credentials.
+**EU rail** needs **no secret** — the [Transitous](https://transitous.org/) (MOTIS)
+upstream is keyless and already CORS-enabled, so the proxy is *optional* here; it
+just adds a shared edge cache to be gentle on the community service. EU rail works
+without it (the board calls Transitous directly).
 
 ## Deploy
 

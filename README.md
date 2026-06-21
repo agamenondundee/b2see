@@ -12,7 +12,7 @@ ship with a realistic, auto-updating **demo board** so they work the moment you
 open them. Flights use [AeroDataBox](https://aerodatabox.com/) (free key); trains
 show **real live data with no key** via National Rail's Darwin feed; buses use
 [TransportAPI](https://www.transportapi.com/) through the Worker proxy; EU rail
-uses **keyless** [DB transport.rest](https://v6.db.transport.rest/).
+uses **keyless** [Transitous](https://transitous.org/) (MOTIS).
 
 ## Features
 
@@ -37,7 +37,7 @@ uses **keyless** [DB transport.rest](https://v6.db.transport.rest/).
   Digbeth, …) in the pickers.
 - **Major European train stations** — ~200 hubs across 24 countries (Paris,
   Berlin, Amsterdam, Milano, Madrid, Wien, Praha, …) with **keyless** live data
-  via Deutsche Bahn's open API.
+  via Transitous (the community MOTIS service).
 - **Departures or Arrivals** — a toggle on every board. Real arrivals for flights
   (AeroDataBox) and trains (Darwin); buses fall back to demo arrivals.
 - **Live, no setup** — demo mode generates a plausible day of real routes
@@ -152,30 +152,26 @@ Warszawa, Stockholm and more — picked in **Settings ⚙**. The default is **Pa
 Gare du Nord**. The full list lives in [`src/eustations.js`](src/eustations.js).
 GB stations aren't repeated here — they're in the **🚆 Trains** tab.
 
-Live data comes from **[DB transport.rest](https://v6.db.transport.rest/)**, a
-keyless JSON API over **Deutsche Bahn's** open data, so — like trains — it's
-**live out of the box with no key**. DB's data covers German plus
-**international long-distance** services (ICE, EC, TGV, Eurostar, Railjet,
-Frecciarossa, …) for stations across Europe.
+Live data comes from **[Transitous](https://transitous.org/)**, a community-run
+service built on **[MOTIS](https://github.com/motis-project/motis)** that
+aggregates public-transport schedules (GTFS / GTFS-RT) from across Europe. It's
+**keyless and CORS-enabled**, so — like trains — EU Rail is **live out of the box
+with no key and no self-hosting**. Each station is resolved to a MOTIS stop via the
+geocoder (biased by the station's coordinates), then the board reads its next
+departures/arrivals; only rail services are shown.
 
-- **No setup:** the EU Rail tab is live by default — no signup, no key.
-- **Coverage:** strongest for German and cross-border long-distance; purely
-  domestic regional services in some countries may be partial.
-- **Reliability:** Deutsche Bahn retired the old free HAFAS API, so the public
-  transport.rest instance now runs on a **heavily rate-limited** backend and can
-  be flaky from the browser (a failed request may surface as a CORS/network
-  error). When that happens the board shows a **sample** and keeps retrying. For
-  reliable live data, either:
-  - **Route it through the Worker proxy** (recommended) — set the **Proxy URL** in
-    **Settings ⚙**; the [`proxy/`](proxy/) Worker fetches DB server-side (no
-    browser-CORS dependency) and **edge-caches** responses, which keeps everyone
-    under the rate limit. The EU-rail upstream is keyless, so no extra secret is
-    needed; redeploy the Worker if you added it before this route existed.
-  - **Run your own [db-rest](https://github.com/derhuerst/db-rest)** for an
-    independent rate budget, and set its URL in **Settings ⚙ → EU rail data URL**
-    (this overrides the proxy). Turnkey deploy (Render / Fly / Docker) in
-    [`eurail-server/`](eurail-server/).
-- If EU rail is unreachable, the board falls back to a sample demo board.
+- **No setup, no rate-limit hassle:** the EU Rail tab is live by default — no
+  signup, no key, no Deutsche Bahn rate limits.
+- **Coverage:** depends on the GTFS feeds Transitous has imported (broad and
+  growing across Europe); some regions may be more complete than others.
+- **Reliability:** if Transitous is briefly unreachable, the board shows a
+  **sample** and keeps retrying. Optionally route it through the [`proxy/`](proxy/)
+  Worker (set **Proxy URL** in **Settings ⚙**) to add a shared **edge cache**
+  (gentler on the community service); the EU-rail route is keyless, so no secret is
+  needed — redeploy the Worker if you added it before this route existed.
+- **Your own instance (optional):** run your own
+  [MOTIS](https://github.com/motis-project/motis) and set its base URL in
+  **Settings ⚙ → EU rail data URL** (this overrides the proxy).
 
 ## Deploy (GitHub Pages)
 
@@ -197,13 +193,13 @@ src/
   airports.js       # ~680 major UK & European airports (name + IATA + ICAO)
   stations.js       # all ~2,600 GB National Rail stations (name + CRS code)
   busstations.js    # ~30 major UK bus & coach stations (name + ATCO code)
-  eustations.js     # ~200 major European train stations (name + DB EVA id)
+  eustations.js     # ~200 major European train stations (name + country + lat/lon)
   config.js         # airport/stations/bus & EU station, defaults, status, storage keys
   time.js           # Europe/London time helpers & formatting
   styles.css        # FIDS board styling (dark theme, tabs, responsive cards)
 proxy/              # optional Cloudflare Worker: live data with no per-user key
   worker.js         # CORS + injects creds for AeroDataBox (flights) & TransportAPI (buses)
-                    # (trains via Huxley & EU rail via transport.rest are keyless — no proxy)
+                    # (trains via Huxley & EU rail via Transitous are keyless — no proxy)
   wrangler.toml     # Worker config
   README.md         # deploy steps
 scripts/
@@ -226,9 +222,9 @@ python3 scripts/bump-cache-version.py 2   # use the next number, then commit
 - The free RapidAPI tier is rate-limited; the default auto-refresh is 1 minute.
 - Train data comes from National Rail's Darwin feed via a public Huxley2 proxy
   (best-effort uptime); self-host Huxley2 for reliability.
-- EU rail data comes from the public DB transport.rest instance (best-effort,
-  rate-limited); DB's coverage is best for German & international long-distance.
-  Self-host db-rest for reliability.
+- EU rail data comes from the public Transitous (MOTIS) service (keyless,
+  community-run); coverage depends on the GTFS feeds it has imported. Route it
+  through the Worker proxy for a shared cache, or run your own MOTIS.
 - Demo data is **Edinburgh-only** for flights/trains/buses: for other airports or
   stations, switch to **Live** — the demo board stays empty rather than show the
   wrong place's services. (EU Rail's demo is an illustrative pan-European sample.)

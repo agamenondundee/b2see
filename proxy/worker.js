@@ -5,19 +5,19 @@
 //
 //   /flights/*   -> AeroDataBox (RapidAPI)        — needs RAPIDAPI_KEY
 //   /bus/*       -> TransportAPI                   — needs TRANSPORTAPI_APP_ID + _APP_KEY
-//   /eurail/*    -> v6.db.transport.rest (DB)      — keyless; proxied for CORS + caching
+//   /eurail/*    -> api.transitous.org (MOTIS)     — keyless; proxied for CORS + caching
 //
 // Trains don't go through here (their Huxley/Darwin feed is already CORS-enabled).
-// EU rail's upstream is keyless too, but proxying it adds reliable CORS and an
-// edge cache shared across visitors — important because the public DB instance is
-// heavily rate-limited. Deploy: see proxy/README.md.
+// EU rail's upstream (Transitous) is keyless too, but proxying it adds an edge
+// cache shared across visitors (gentler on the community service) and a CORS-safe
+// path. Deploy: see proxy/README.md.
 
 const AERO_UPSTREAM = 'https://aerodatabox.p.rapidapi.com';
 const AERO_HOST = 'aerodatabox.p.rapidapi.com';
 const TAPI_UPSTREAM = 'https://transportapi.com/v3/uk';
-const DBREST_UPSTREAM = 'https://v6.db.transport.rest';
+const TRANSITOUS_UPSTREAM = 'https://api.transitous.org';
 const EDGE_CACHE_SECONDS = 30; // spare the free-tier quotas across visitors
-const EURAIL_CACHE_SECONDS = 60; // DB's free instance is rate-limited — cache harder
+const EURAIL_CACHE_SECONDS = 60; // be gentle on the community Transitous service
 
 export default {
   async fetch(request, env) {
@@ -62,8 +62,8 @@ export default {
       target = t.toString();
       upstreamHeaders = { Accept: 'application/json' };
     } else if (path.startsWith('/eurail/')) {
-      // Keyless DB upstream; strip the /eurail prefix and pass the rest through.
-      target = DBREST_UPSTREAM + path.slice('/eurail'.length) + url.search;
+      // Keyless Transitous (MOTIS) upstream; strip /eurail and pass the rest through.
+      target = TRANSITOUS_UPSTREAM + path.slice('/eurail'.length) + url.search;
       upstreamHeaders = { Accept: 'application/json', 'User-Agent': 'edi-departures-board (github pages)' };
       cacheTtl = EURAIL_CACHE_SECONDS;
     } else {

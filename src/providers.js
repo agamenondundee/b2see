@@ -5,12 +5,12 @@
 //     time: Date, estimated: Date|null, gate: string|null,
 //     status: {key,label}, codeshare: boolean }
 
-import { AERODATABOX, HUXLEY, DBREST, STATUS } from './config.js?v=11';
-import { fmtLocalApi, parseLondonClock } from './time.js?v=11';
-import { generateDemoDepartures } from './demo-data.js?v=11';
-import { generateDemoTrains } from './trains-demo.js?v=11';
-import { generateDemoBuses } from './buses-demo.js?v=11';
-import { generateEuRail } from './eurail-demo.js?v=11';
+import { AERODATABOX, HUXLEY, TRANSITOUS, STATUS } from './config.js?v=12';
+import { fmtLocalApi, parseLondonClock } from './time.js?v=12';
+import { generateDemoDepartures } from './demo-data.js?v=12';
+import { generateDemoTrains } from './trains-demo.js?v=12';
+import { generateDemoBuses } from './buses-demo.js?v=12';
+import { generateEuRail } from './eurail-demo.js?v=12';
 
 // ---- Demo provider -------------------------------------------------------
 
@@ -345,99 +345,154 @@ export function makeBusProvider(getBase, getAtco, getDirection = () => 'departur
   };
 }
 
-// ---- EU Rail: Deutsche Bahn HAFAS via transport.rest ---------------------
+// ---- EU Rail: Transitous (MOTIS) — keyless, pan-European -----------------
 
-// DB transport.rest returns ISO 8601 instants with a zone offset, so the native
-// Date parser yields the correct absolute time (rendered in Edinburgh time, like
-// the rest of the board).
+// MOTIS returns ISO 8601 instants with a zone offset, so the native Date parser
+// yields the correct absolute time (rendered in Edinburgh time, like the rest of
+// the board).
 function parseIso(s) {
   if (!s) return null;
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 }
 
-function normalizeEuRail(d, i, arrivals) {
-  const planned = parseIso(d.plannedWhen) || parseIso(d.when);
-  const actual = parseIso(d.when) || planned;
-  const cancelled = d.cancelled === true;
-  const delaySec = typeof d.delay === 'number' ? d.delay : 0;
+// Keep mainline / regional / suburban rail; drop bus, coach, ferry, tram, metro.
+function isRailMode(m) {
+  return !m || /RAIL/.test(m) || m === 'LONG_DISTANCE' || m === 'SUBURBAN';
+}
+
+function haversineKm(aLat, aLon, bLat, bLon) {
+  const R = 6371;
+  const toRad = (x) => (x * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLon = toRad(bLon - aLon);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+function normalizeTransitous(st, i, arrivals) {
+  const p = st.place || {};
+  const schedStr = arrivals ? p.scheduledArrival : p.scheduledDeparture;
+  const realStr = arrivals ? p.arrival : p.departure;
+  const planned = parseIso(schedStr) || parseIso(realStr);
+  const actual = parseIso(realStr) || planned;
+  const cancelled = st.cancelled === true || st.tripCancelled === true;
 
   let status;
   if (cancelled) status = STATUS.CANCELLED;
-  else if (delaySec >= 300) status = STATUS.DELAYED;
+  else if (actual && planned && actual.getTime() - planned.getTime() >= 300000) status = STATUS.DELAYED;
   else if (actual && actual.getTime() < Date.now() - 60000) status = arrivals ? STATUS.ARRIVED : STATUS.DEPARTED;
   else status = STATUS.ON_TIME;
 
-  const line = d.line || {};
-  // Arrivals carry provenance/origin; departures carry direction/destination.
-  const place = arrivals
-    ? d.provenance || (d.origin && d.origin.name)
-    : d.direction || (d.destination && d.destination.name);
-  const estimated =
-    actual && planned && actual.getTime() !== planned.getTime() ? actual : null;
-
+  // displayName is the friendly label (v4+); fall back for older MOTIS versions.
+  const line = st.displayName || st.routeShortName || st.tripShortName || st.routeLongName || '';
   return {
-    id: d.tripId || `${line.name || ''}|${d.plannedWhen || d.when || ''}|${i}`,
-    line: line.name || line.productName || '',
-    operator: (line.operator && line.operator.name) || line.productName || '',
-    operatorCode: line.productName || '',
-    dest: place || 'Unknown',
+    id: st.tripId || `${line}|${schedStr || realStr || ''}|${i}`,
+    line,
+    operator: st.agencyName || '',
+    operatorCode: st.routeShortName || '',
+    dest: st.headsign || p.name || 'Unknown',
     via: '',
     time: planned,
-    estimated: status === STATUS.CANCELLED ? null : estimated,
-    platform: d.platform || d.plannedPlatform || null,
+    estimated: !cancelled && actual && planned && actual.getTime() !== planned.getTime() ? actual : null,
+    platform: p.track || p.scheduledTrack || null,
     status,
     cancelled,
+    mode: st.mode || '',
   };
+}
+
+// MOTIS stop IDs are GTFS-derived, not our EVA numbers, so resolve each station
+// to its stop via the geocoder (biased by its coordinates) and cache the result.
+const euStopCache = new Map();
+async function resolveStopId(base, station) {
+  if (euStopCache.has(station.id)) return euStopCache.get(station.id);
+  const lsKey = `edi.eu.stop.${station.id}`;
+  try {
+    const saved = localStorage.getItem(lsKey);
+    if (saved) {
+      euStopCache.set(station.id, saved);
+      return saved;
+    }
+  } catch {}
+
+  const qs = new URLSearchParams({ text: station.name, type: 'STOP', numResults: '7' });
+  if (station.lat && station.lon) qs.set('place', `${station.lat},${station.lon}`);
+  const res = await fetch(`${base}/api/v1/geocode?${qs}`, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`station lookup failed (HTTP ${res.status}).`);
+  const matches = await res.json();
+  const stops = (Array.isArray(matches) ? matches : []).filter((m) => m.type === 'STOP' && m.id);
+  // Pick the stop nearest the station's known coordinates (robust disambiguation).
+  if (station.lat && station.lon) {
+    stops.sort(
+      (a, b) =>
+        haversineKm(station.lat, station.lon, a.lat, a.lon) - haversineKm(station.lat, station.lon, b.lat, b.lon),
+    );
+  }
+  const stop = stops[0];
+  if (!stop) throw new Error('couldn’t find this station in the European data.');
+  euStopCache.set(station.id, stop.id);
+  try {
+    localStorage.setItem(lsKey, stop.id);
+  } catch {}
+  return stop.id;
 }
 
 export function makeEuRailProvider(getProxyUrl, getBase, getStation, getDirection = () => 'departures') {
   return {
     id: 'live',
-    label: 'Live (Deutsche Bahn)',
-    async fetchDepartures({ pastWindowMin, maxRows }) {
-      // Base priority: an explicit self-hosted db-rest URL wins; else route via the
-      // Worker proxy (CORS-safe + cached, which matters given DB's tight rate
-      // limit); else call the public DB instance directly (keyless, best-effort).
+    label: 'Live (Transitous)',
+    async fetchDepartures({ maxRows }) {
+      // Base priority: an explicit MOTIS URL override wins; else route via the
+      // Worker proxy (CORS-safe + cached); else call public Transitous directly.
       const override = (getBase() || '').trim().replace(/\/+$/, '');
       const proxy = (getProxyUrl() || '').trim().replace(/\/+$/, '');
-      const base = override || (proxy ? `${proxy}/eurail` : DBREST.base);
+      const base = override || (proxy ? `${proxy}/eurail` : TRANSITOUS.base);
       const viaProxy = !override && !!proxy;
-      const id = (getStation() || '').trim();
-      if (!id) {
+      const station = getStation();
+      if (!station || !station.id) {
         const e = new Error('Pick a European station in Settings to see live trains.');
         e.code = 'NO_STATION';
         throw e;
       }
       const arrivals = getDirection() === 'arrivals';
-      const qs = new URLSearchParams({
-        duration: '180',
-        results: String(Math.min(maxRows * 2, 80)),
-        linesOfStops: 'false',
-        remarks: 'false',
-        language: 'en',
-      });
-      const url = `${base}/stops/${encodeURIComponent(id)}/${arrivals ? 'arrivals' : 'departures'}?${qs}`;
-
-      let res;
-      try {
-        res = await fetch(url, { headers: { Accept: 'application/json' } });
-      } catch {
+      const unreachable = () => {
         throw new Error(
           viaProxy
             ? 'Could not reach the EU rail proxy. Check the Proxy URL in Settings.'
-            : 'the free Deutsche Bahn source is busy or rate-limited (it retries automatically).',
+            : 'couldn’t reach Transitous (the European rail data service).',
         );
+      };
+
+      // 1) Resolve the MOTIS stop id (cached after the first lookup).
+      let stopId;
+      try {
+        stopId = await resolveStopId(base, station);
+      } catch (e) {
+        if (e.message && /HTTP|find|lookup/.test(e.message)) throw e;
+        unreachable();
       }
-      if (res.status === 429) throw new Error('the free Deutsche Bahn source is rate-limited right now (it retries automatically).');
+
+      // 2) Fetch the next departures / arrivals at that stop.
+      const qs = new URLSearchParams({
+        stopId,
+        n: String(Math.min(maxRows * 2, 60)),
+        arriveBy: String(arrivals),
+      });
+      let res;
+      try {
+        res = await fetch(`${base}/api/v1/stoptimes?${qs}`, { headers: { Accept: 'application/json' } });
+      } catch {
+        unreachable();
+      }
+      if (res.status === 429) throw new Error('Transitous is busy right now (it retries automatically).');
       if (!res.ok) throw new Error(`EU rail data error (HTTP ${res.status}).`);
 
       const data = await res.json();
-      const list = Array.isArray(data) ? data : data.departures || data.arrivals || [];
-      const earliest = Date.now() - pastWindowMin * 60000;
+      const list = data.stopTimes || data.stoptimes || [];
       return list
-        .map((s, i) => normalizeEuRail(s, i, arrivals))
-        .filter((t) => t.time && (t.estimated || t.time).getTime() >= earliest)
+        .map((s, i) => normalizeTransitous(s, i, arrivals))
+        .filter((t) => t.time && isRailMode(t.mode))
         .sort((a, b) => a.time - b.time)
         .slice(0, maxRows);
     },
