@@ -171,8 +171,10 @@ Frecciarossa, …) for stations across Europe.
     browser-CORS dependency) and **edge-caches** responses, which keeps everyone
     under the rate limit. The EU-rail upstream is keyless, so no extra secret is
     needed; redeploy the Worker if you added it before this route existed.
-  - **Self-host [db-rest](https://github.com/derhuerst/db-rest)** and set its URL
-    in **Settings ⚙ → EU rail data URL** (this overrides the proxy).
+  - **Run your own [db-rest](https://github.com/derhuerst/db-rest)** for an
+    independent rate budget, and set its URL in **Settings ⚙ → EU rail data URL**
+    (this overrides the proxy). Turnkey deploy (Render / Fly / Docker) in
+    [`eurail-server/`](eurail-server/).
 - If EU rail is unreachable, the board falls back to a sample demo board.
 
 ## Deploy (GitHub Pages)
