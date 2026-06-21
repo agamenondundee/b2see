@@ -1,8 +1,15 @@
 // Edinburgh live departures — tabbed orchestrator (Flights + Trains).
 
-import { STORE, DEFAULTS, TRAIN_DEFAULTS, STATIONS } from './config.js';
+import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATION, STATIONS } from './config.js';
 import { fmtClockSeconds, fmtClock, fmtDate } from './time.js';
-import { demoProvider, makeLiveProvider, demoTrainProvider, makeTrainProvider } from './providers.js';
+import {
+  demoProvider,
+  makeLiveProvider,
+  demoTrainProvider,
+  makeTrainProvider,
+  demoBusProvider,
+  makeBusProvider,
+} from './providers.js';
 
 // ---- Settings (persisted) ------------------------------------------------
 
@@ -13,11 +20,14 @@ const settings = {
   trainProvider: localStorage.getItem(STORE.trainProvider) || TRAIN_DEFAULTS.provider,
   trainStation: localStorage.getItem(STORE.trainStation) || TRAIN_DEFAULTS.station,
   trainBase: localStorage.getItem(STORE.trainBase) || '',
+  busProvider: localStorage.getItem(STORE.busProvider) || BUS_DEFAULTS.provider,
+  busAtco: localStorage.getItem(STORE.busAtco) || BUS_DEFAULTS.atco,
   refreshMs: Number(localStorage.getItem(STORE.refreshMs) ?? DEFAULTS.refreshMs),
 };
 
 const liveFlight = makeLiveProvider(() => settings.apiKey, () => settings.proxyUrl);
 const liveTrain = makeTrainProvider(() => settings.trainBase, () => settings.trainStation);
+const liveBus = makeBusProvider(() => settings.proxyUrl, () => settings.busAtco);
 
 const stationName = (crs) => (STATIONS.find((s) => s.crs === crs) || {}).name || crs;
 
@@ -102,6 +112,30 @@ function buildTrainRow(t) {
   return row;
 }
 
+function buildBusRow(b) {
+  const row = el('div', `row status--${b.status.key}`);
+  row.setAttribute('role', 'row');
+  row.appendChild(timeCell(b));
+
+  const dest = el('span', 'col-dest');
+  dest.appendChild(el('span', 'dest-name', b.dest));
+  if (b.via) dest.appendChild(el('span', 'dest-iata', `via ${b.via}`));
+  row.appendChild(dest);
+
+  const svc = el('span', 'col-flight');
+  const line = el('span', 'flight-no', b.line || '—');
+  svc.appendChild(line);
+  if (b.operator) svc.appendChild(el('span', 'flight-airline', b.operator));
+  row.appendChild(svc);
+
+  row.appendChild(el('span', 'col-gate', b.stance || '—'));
+
+  const status = el('span', 'col-status');
+  status.appendChild(el('span', `badge badge--${b.status.key}`, b.status.label));
+  row.appendChild(status);
+  return row;
+}
+
 // ---- Feed definitions ----------------------------------------------------
 
 const FLIGHT_FILTERS = [
@@ -118,6 +152,7 @@ const TRAIN_FILTERS = [
   { id: 'departed', label: 'Departed', test: (k) => k === 'departed' },
   { id: 'cancelled', label: 'Cancelled', test: (k) => k === 'cancelled' },
 ];
+const BUS_FILTERS = TRAIN_FILTERS;
 
 const FEEDS = {
   flights: {
@@ -160,12 +195,32 @@ const FEEDS = {
           ? `Live departures from ${stationName(settings.trainStation)} (National Rail).`
           : `Showing demo trains for ${stationName(settings.trainStation)}.`,
   },
+  buses: {
+    columns: ['Time', 'Destination', 'Service', 'Stance', 'Status'],
+    searchPlaceholder: 'Search destination, service or operator…',
+    providers: { demo: demoBusProvider, live: liveBus },
+    providerId: () => settings.busProvider,
+    opts: () => ({ pastWindowMin: BUS_DEFAULTS.pastWindowMin, maxRows: BUS_DEFAULTS.maxRows }),
+    buildRow: buildBusRow,
+    filters: BUS_FILTERS,
+    match: (b, q) =>
+      b.dest.toLowerCase().includes(q) ||
+      b.operator.toLowerCase().includes(q) ||
+      (b.line || '').toLowerCase().includes(q) ||
+      (b.stance || '').toLowerCase().includes(q),
+    note: (live, err) =>
+      err
+        ? `⚠ Live buses unavailable: ${err} Showing demo data.`
+        : live
+          ? `Live departures from ${BUS_STATION.name} (TransportAPI).`
+          : `Showing demo buses for ${BUS_STATION.name} (${BUS_STATION.area}).`,
+  },
 };
 
 // ---- Runtime state -------------------------------------------------------
 
 const mkState = () => ({ rows: [], search: '', filter: 'all', error: null, loading: false, loaded: false, updated: null });
-const state = { flights: mkState(), trains: mkState() };
+const state = { flights: mkState(), trains: mkState(), buses: mkState() };
 let activeTab = localStorage.getItem(STORE.tab) || 'flights';
 let refreshTimer = null;
 
@@ -182,7 +237,8 @@ function render() {
   const st = state[activeTab];
 
   feed.columns.forEach((label, i) => { if (headCols[i]) headCols[i].textContent = label; });
-  boardEl.classList.toggle('feed-trains', activeTab === 'trains');
+  boardEl.classList.remove('feed-flights', 'feed-trains', 'feed-buses');
+  boardEl.classList.add('feed-' + activeTab);
 
   const q = st.search.trim().toLowerCase();
   const filt = feed.filters.find((f) => f.id === st.filter) || feed.filters[0];
@@ -327,10 +383,12 @@ function fillStationSelect() {
 function openSettings() {
   for (const r of document.querySelectorAll('input[name="provider"]')) r.checked = r.value === settings.flightProvider;
   for (const r of document.querySelectorAll('input[name="trainProvider"]')) r.checked = r.value === settings.trainProvider;
+  for (const r of document.querySelectorAll('input[name="busProvider"]')) r.checked = r.value === settings.busProvider;
   $('api-key').value = settings.apiKey;
   $('proxy-url').value = settings.proxyUrl;
   $('train-station').value = settings.trainStation;
   $('train-base').value = settings.trainBase;
+  $('bus-atco').value = settings.busAtco;
   $('refresh').value = String(settings.refreshMs);
   modal.hidden = false;
 }
@@ -340,24 +398,29 @@ const closeSettings = () => { modal.hidden = true; };
 function saveSettings() {
   settings.flightProvider = document.querySelector('input[name="provider"]:checked')?.value || 'demo';
   settings.trainProvider = document.querySelector('input[name="trainProvider"]:checked')?.value || 'live';
+  settings.busProvider = document.querySelector('input[name="busProvider"]:checked')?.value || 'demo';
   settings.apiKey = $('api-key').value.trim();
   settings.proxyUrl = $('proxy-url').value.trim().replace(/\/+$/, '');
   settings.trainStation = $('train-station').value;
   settings.trainBase = $('train-base').value.trim().replace(/\/+$/, '');
+  settings.busAtco = $('bus-atco').value.trim();
   settings.refreshMs = Number($('refresh').value);
 
   localStorage.setItem(STORE.provider, settings.flightProvider);
   localStorage.setItem(STORE.trainProvider, settings.trainProvider);
+  localStorage.setItem(STORE.busProvider, settings.busProvider);
   localStorage.setItem(STORE.apiKey, settings.apiKey);
   localStorage.setItem(STORE.proxyUrl, settings.proxyUrl);
   localStorage.setItem(STORE.trainStation, settings.trainStation);
   localStorage.setItem(STORE.trainBase, settings.trainBase);
+  localStorage.setItem(STORE.busAtco, settings.busAtco);
   localStorage.setItem(STORE.refreshMs, String(settings.refreshMs));
 
   closeSettings();
-  // Settings may have changed providers/station for either feed — reload both.
+  // Settings may have changed providers/station for any feed — reload all.
   state.flights.loaded = false;
   state.trains.loaded = false;
+  state.buses.loaded = false;
   scheduleAutoRefresh();
   refresh(activeTab);
 }

@@ -15,7 +15,9 @@ export const STORE = {
   trainProvider: 'edi.trainProvider', // trains: 'demo' | 'live'
   trainStation: 'edi.trainStation', // CRS code
   trainBase: 'edi.trainBase', // Huxley base URL
-  tab: 'edi.tab', // active tab: 'flights' | 'trains'
+  busProvider: 'edi.busProvider', // buses: 'demo' | 'live'
+  busAtco: 'edi.busAtco', // TransportAPI ATCO code for the bus station
+  tab: 'edi.tab', // active tab: 'flights' | 'trains' | 'buses'
   refreshMs: 'edi.refreshMs',
 };
 
@@ -51,6 +53,17 @@ export const STATIONS = [
 export const TRAIN_DEFAULTS = {
   provider: 'live', // live needs no key, so default the trains tab to real data
   station: 'EDB',
+  maxRows: 30,
+  pastWindowMin: 15,
+};
+
+// Buses: Edinburgh Bus Station (St Andrew Square). Live data is TransportAPI,
+// reached only through the Worker proxy (creds stay server-side), so the tab
+// defaults to demo until the proxy is configured.
+export const BUS_STATION = { name: 'Edinburgh Bus Station', area: 'St Andrew Square' };
+export const BUS_DEFAULTS = {
+  provider: 'demo',
+  atco: '',
   maxRows: 30,
   pastWindowMin: 15,
 };

@@ -1,26 +1,28 @@
-# Edinburgh — Live Departures (Flights & Trains)
+# Edinburgh — Live Departures (Flights, Trains & Buses)
 
 A clean, mobile-friendly **departures board** for **Edinburgh Airport**
-(`EDI` / `EGPH`) and **Edinburgh's railway stations** (Waverley & co.), built
-with plain HTML, CSS and ES modules — no build step, no framework, no
-dependencies. It deploys as a static site (e.g. GitHub Pages).
+(`EDI` / `EGPH`), **Edinburgh's railway stations** (Waverley & co.) and
+**Edinburgh Bus Station** (St Andrew Square), built with plain HTML, CSS and ES
+modules — no build step, no framework, no dependencies. It deploys as a static
+site (e.g. GitHub Pages).
 
-Two tabs: **🛫 Flights** and **🚆 Trains**. Both ship with a realistic,
-auto-updating **demo board** so they work the moment you open them. Flights
-switch to real data via the [AeroDataBox](https://aerodatabox.com/) API (free
-key); trains show **real live data with no key** via National Rail's Darwin feed.
+Three tabs: **🛫 Flights**, **🚆 Trains** and **🚌 Buses**. All ship with a
+realistic, auto-updating **demo board** so they work the moment you open them.
+Flights use [AeroDataBox](https://aerodatabox.com/) (free key); trains show
+**real live data with no key** via National Rail's Darwin feed; buses use
+[TransportAPI](https://www.transportapi.com/) through the Worker proxy.
 
 ## Features
 
-- **Two boards in one** — switch between airport flights and rail departures.
-- **FIDS-style board** — time, destination, flight/operator, gate/platform and a
-  colour-coded status (Scheduled, Boarding, Gate Closing, Departed, Delayed,
-  Cancelled; On time for trains). Delays show the revised time.
+- **Three boards in one** — switch between airport flights, rail and coach/bus.
+- **FIDS-style board** — time, destination, flight/operator, gate/platform/stance
+  and a colour-coded status (Scheduled, Boarding, Gate Closing, Departed,
+  Delayed, Cancelled; On time for trains/buses). Delays show the revised time.
 - **Live, no setup** — demo mode generates a plausible day of real routes
-  (airlines / train operators), with statuses that progress in real time.
+  (airlines / train & coach operators), with statuses that progress in real time.
 - **Real data** — AeroDataBox for flights; National Rail (Darwin via Huxley) for
-  trains, with a station picker (Waverley, Haymarket, Edinburgh Gateway, …).
-- **Search & filter** — by destination, flight/operator, etc., plus status chips.
+  trains; TransportAPI for buses. Station picker for trains.
+- **Search & filter** — by destination, flight/operator/service, plus status chips.
 - **Auto-refresh** (30s–5min, or off) and a manual refresh.
 - **Edinburgh local time** everywhere, regardless of where you're viewing from.
 - **Responsive** — a wide board on desktop, tidy cards on phones.
@@ -89,6 +91,24 @@ pick another station (Haymarket, Edinburgh Gateway, Edinburgh Park) in
   Darwin token + a small app) and set its URL in **Settings ⚙ → Trains data URL**.
 - If trains are unreachable, the board falls back to demo data with a notice.
 
+## Buses (Edinburgh Bus Station)
+
+The **🚌 Buses** tab covers **Edinburgh Bus Station** (St Andrew Square) — the
+city's inter-city coach hub (Scottish Citylink, Megabus, FlixBus, National
+Express, Ember, Borders Buses, Stagecoach…).
+
+Unlike trains, there's no free keyless live feed here, so live buses use
+**[TransportAPI](https://www.transportapi.com/) through the Worker proxy** (the
+TransportAPI `app_id`/`app_key` stay server-side). To enable it:
+
+1. Deploy the [`proxy/`](proxy/) Worker with `TRANSPORTAPI_APP_ID` and
+   `TRANSPORTAPI_APP_KEY` secrets (see [`proxy/README.md`](proxy/README.md)).
+2. In **Settings ⚙**, set the **Proxy URL**, choose **Buses → Live**, and enter
+   the **Bus stop ATCO code** for the stance you want.
+
+Until that's set up, the Buses tab shows realistic **demo** data (its default),
+and it falls back to demo if the proxy/TransportAPI is unreachable.
+
 ## Deploy (GitHub Pages)
 
 This repo is a static site. Enable **Settings → Pages → Deploy from branch** and
@@ -101,14 +121,15 @@ as-is. No build step is required.
 index.html          # app shell: header, toolbar, board, settings modal
 src/
   app.js            # tabbed orchestrator: feeds, rendering, refresh, settings
-  providers.js      # demo + live providers (AeroDataBox flights, Huxley trains)
+  providers.js      # demo + live providers (AeroDataBox, Huxley, TransportAPI)
   demo-data.js      # curated EDI flight timetable + deterministic generator
   trains-demo.js    # curated Edinburgh Waverley train timetable + generator
-  config.js         # airport/stations, defaults, status buckets, storage keys
+  buses-demo.js     # curated Edinburgh Bus Station coach timetable + generator
+  config.js         # airport/stations/bus station, defaults, status, storage keys
   time.js           # Europe/London time helpers & formatting
   styles.css        # FIDS board styling (dark theme, tabs, responsive cards)
 proxy/              # optional Cloudflare Worker: live data with no per-user key
-  worker.js         # CORS + injects the RapidAPI key server-side
+  worker.js         # CORS + injects creds for AeroDataBox (flights) & TransportAPI (buses)
   wrangler.toml     # Worker config
   README.md         # deploy steps
 ```

@@ -9,6 +9,7 @@ import { AERODATABOX, HUXLEY, STATUS } from './config.js';
 import { fmtLocalApi, parseLondonClock } from './time.js';
 import { generateDemoDepartures } from './demo-data.js';
 import { generateDemoTrains } from './trains-demo.js';
+import { generateDemoBuses } from './buses-demo.js';
 
 // ---- Demo provider -------------------------------------------------------
 
@@ -28,6 +29,15 @@ export const demoTrainProvider = {
   async fetchDepartures({ pastWindowMin, maxRows }) {
     await new Promise((r) => setTimeout(r, 150));
     return generateDemoTrains({ pastWindowMin, maxRows });
+  },
+};
+
+export const demoBusProvider = {
+  id: 'demo',
+  label: 'Demo data',
+  async fetchDepartures({ pastWindowMin, maxRows }) {
+    await new Promise((r) => setTimeout(r, 150));
+    return generateDemoBuses({ pastWindowMin, maxRows });
   },
 };
 
@@ -202,6 +212,80 @@ export function makeTrainProvider(getBase, getStation) {
       return list
         .map(normalizeTrain)
         .filter((t) => t.time)
+        .sort((a, b) => a.time - b.time)
+        .slice(0, maxRows);
+    },
+  };
+}
+
+// ---- Buses: TransportAPI via the Worker proxy ----------------------------
+
+function normalizeBus(d, i) {
+  const time =
+    parseLondonClock(d.aimed_departure_time) ||
+    parseLondonClock(d.best_departure_estimate) ||
+    parseLondonClock(d.expected_departure_time);
+  const exp = (d.expected_departure_time || '').trim();
+
+  let status = STATUS.ON_TIME;
+  let estimated = null;
+  if (/cancel/i.test(exp) || d.cancelled) {
+    status = STATUS.CANCELLED;
+  } else if (/^\d{1,2}:\d{2}$/.test(exp)) {
+    const e = parseLondonClock(exp);
+    if (time && e && e.getTime() - time.getTime() >= 60000) {
+      status = STATUS.DELAYED;
+      estimated = e;
+    }
+  }
+
+  return {
+    id: `${d.line || ''}|${d.aimed_departure_time || ''}|${i}`,
+    operator: d.operator_name || d.operator || '',
+    operatorCode: d.operator || '',
+    dest: d.destination_name || d.direction || 'Unknown',
+    via: '',
+    line: d.line_name || d.line || '',
+    time,
+    estimated,
+    stance: d.stand || d.bay || null,
+    status,
+    cancelled: status === STATUS.CANCELLED,
+  };
+}
+
+export function makeBusProvider(getBase, getAtco) {
+  return {
+    id: 'live',
+    label: 'Live (TransportAPI)',
+    async fetchDepartures({ maxRows }) {
+      const base = (getBase() || '').trim().replace(/\/+$/, '');
+      if (!base) {
+        const e = new Error('Buses need the Worker proxy — set a Proxy URL in Settings.');
+        e.code = 'NO_PROXY';
+        throw e;
+      }
+      const atco = (getAtco() || '').trim();
+      if (!atco) {
+        const e = new Error('Set the bus-station ATCO code in Settings to see live buses.');
+        e.code = 'NO_ATCO';
+        throw e;
+      }
+
+      const url = `${base}/bus/stop/${encodeURIComponent(atco)}/live.json?group=no&nextbuses=yes`;
+      let res;
+      try {
+        res = await fetch(url, { headers: { Accept: 'application/json' } });
+      } catch {
+        throw new Error('Could not reach the bus proxy. Check the Proxy URL in Settings.');
+      }
+      if (!res.ok) throw new Error(`Bus data error (HTTP ${res.status}).`);
+
+      const data = await res.json();
+      const list = (data.departures && (data.departures.all || data.departures.bus)) || [];
+      return list
+        .map(normalizeBus)
+        .filter((b) => b.time)
         .sort((a, b) => a.time - b.time)
         .slice(0, maxRows);
     },

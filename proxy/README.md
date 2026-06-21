@@ -1,29 +1,40 @@
-# AeroDataBox proxy (Cloudflare Worker)
+# Departures proxy (Cloudflare Worker)
 
-A tiny Cloudflare Worker that lets the deployed departures board show **live
-data without giving every visitor an API key**. It holds one AeroDataBox
-RapidAPI key as a server-side **secret**, injects it into upstream requests, and
-adds the CORS headers a browser needs.
+A tiny Cloudflare Worker that lets the deployed board show **live data without
+giving every visitor an API key**. It holds upstream credentials as server-side
+**secrets**, injects them into requests, and adds the CORS headers a browser
+needs. Two routes:
 
 ```
-Browser ──GET /flights/...──▶ Worker ──+ X-RapidAPI-Key──▶ AeroDataBox
-        ◀──── JSON + CORS ────         ◀──── JSON ────────
+Browser ──GET /flights/…──▶ Worker ──+ X-RapidAPI-Key──────▶ AeroDataBox   (flights)
+Browser ──GET /bus/…─────▶ Worker ──+ app_id & app_key────▶ TransportAPI   (buses)
+        ◀──── JSON + CORS ──         ◀──── JSON ────────────
 ```
 
-The Worker only forwards `GET /flights/...` requests (the airport FIDS
-endpoints) to `aerodatabox.p.rapidapi.com` — it is not an open relay — and
-caches responses at the edge for 30s to spare the free-tier quota.
+It only forwards `GET /flights/…` and `GET /bus/…` — it is not an open relay —
+and edge-caches responses for 30s to spare the free-tier quotas. (Trains don't
+use this proxy; their National Rail/Darwin feed via Huxley is already
+CORS-enabled.)
 
 ## Deploy
 
-Prerequisites: a (free) Cloudflare account and an AeroDataBox RapidAPI key.
+Prerequisites: a (free) Cloudflare account, plus credentials for whichever feeds
+you want live:
+
+- **Flights:** an AeroDataBox RapidAPI key (`X-RapidAPI-Key`).
+- **Buses:** a TransportAPI `app_id` + `app_key` (free signup at
+  [developer.transportapi.com](https://developer.transportapi.com/)).
 
 ```bash
 npm install -g wrangler          # or: npx wrangler ...
 cd proxy
 wrangler login                   # opens a browser to authorise
 wrangler deploy                  # publishes the Worker, prints its URL
-wrangler secret put RAPIDAPI_KEY # paste your X-RapidAPI-Key when prompted
+
+# Set only the secrets for the feeds you want live:
+wrangler secret put RAPIDAPI_KEY          # flights
+wrangler secret put TRANSPORTAPI_APP_ID   # buses
+wrangler secret put TRANSPORTAPI_APP_KEY  # buses
 ```
 
 `wrangler deploy` prints a URL like
@@ -31,24 +42,28 @@ wrangler secret put RAPIDAPI_KEY # paste your X-RapidAPI-Key when prompted
 
 ## Point the app at it
 
-In the board: **Settings ⚙ → Live**, paste the Worker URL into **Proxy URL**,
-leave the API key blank, **Save**. The browser then calls your Worker (no key
-client-side) and the Worker adds the key.
+In the board: **Settings ⚙**, paste the Worker URL into **Proxy URL**.
 
-Quick check — this should return `{"ok":true,...,"hasKey":true}`:
+- **Flights:** choose **Live** (leave the API key blank — the Worker adds it).
+- **Buses:** choose **Live** and set the **Bus stop ATCO code** for the stance you
+  want (find it via [TransportAPI](https://developer.transportapi.com/docs)).
+
+Quick check — should report which feeds have credentials:
 
 ```bash
 curl https://edi-departures-proxy.<your-subdomain>.workers.dev/health
+# {"ok":true,"service":"edi-departures-proxy","flights":true,"buses":true}
 ```
 
 ## Lock it down (optional but recommended)
 
-By default the Worker allows any origin (`*`). To restrict it to your site,
-set `ALLOWED_ORIGIN` in `wrangler.toml` to your Pages origin (e.g.
+By default the Worker allows any origin (`*`). To restrict it to your site, set
+`ALLOWED_ORIGIN` in `wrangler.toml` to your Pages origin (e.g.
 `https://agamenondundee.github.io`) and `wrangler deploy` again.
 
 ## Notes
 
-- Rotate the key any time with `wrangler secret put RAPIDAPI_KEY` (no redeploy).
+- Rotate any secret with `wrangler secret put <NAME>` (no redeploy needed).
 - Free Worker tier is ~100k requests/day — far beyond what this board needs.
-- The key never reaches the browser; only the Worker can see it.
+- Credentials never reach the browser; only the Worker can see them.
+- TransportAPI's own free tier is rate-limited, so keep auto-refresh modest.
