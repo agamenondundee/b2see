@@ -1,0 +1,41 @@
+name: Deploy to GitHub Pages
+
+# Publishes the static game so it can be opened in a browser at
+# https://<owner>.github.io/b2see/. Runs on pushes to the dev branch and can be
+# triggered manually. `configure-pages` enables Pages automatically.
+
+on:
+  push:
+    branches: ["claude/gifted-volta-ovurup"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble site (only the game files)
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp -r src assets _site/
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
