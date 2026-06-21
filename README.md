@@ -27,6 +27,9 @@ uses **keyless** [DB transport.rest](https://v6.db.transport.rest/).
 - **Go-to-gate cue** — a flight's gate number lights up while it's boarding.
   (AeroDataBox rarely publishes gates, so unpublished ones are filled with an
   *indicative* number, shown muted.)
+- **Aircraft type** — each flight shows its equipment (e.g. Airbus A320neo,
+  Boeing 787-9): the real type from AeroDataBox where published, and a realistic
+  per-airline type in demo (widebodies long-haul, turboprops to the isles).
 - **Major UK & European airports** — pick from ~680 airports (Edinburgh,
   Heathrow, CDG, Schiphol, Frankfurt, …); the header follows your choice.
 - **All GB rail stations & major UK bus stations** — ~2,600 National Rail
@@ -41,7 +44,7 @@ uses **keyless** [DB transport.rest](https://v6.db.transport.rest/).
   (airlines / train & coach operators), with statuses that progress in real time.
 - **Real data** — AeroDataBox for flights; National Rail (Darwin via Huxley) for
   trains; TransportAPI for buses. Airport & station pickers.
-- **Search & filter** — by destination, flight/operator/service, plus status chips.
+- **Search & filter** — by destination, flight/operator/service, aircraft, plus status chips.
 - **Auto-refresh** (30s–5min, or off) and a manual refresh.
 - **Edinburgh local time** everywhere, regardless of where you're viewing from.
 - **Responsive** — a wide board on desktop, tidy cards on phones.
