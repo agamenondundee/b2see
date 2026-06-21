@@ -5,11 +5,11 @@
 //     time: Date, estimated: Date|null, gate: string|null,
 //     status: {key,label}, codeshare: boolean }
 
-import { AERODATABOX, HUXLEY, STATUS } from './config.js?v=1';
-import { fmtLocalApi, parseLondonClock } from './time.js?v=1';
-import { generateDemoDepartures } from './demo-data.js?v=1';
-import { generateDemoTrains } from './trains-demo.js?v=1';
-import { generateDemoBuses } from './buses-demo.js?v=1';
+import { AERODATABOX, HUXLEY, STATUS } from './config.js?v=3';
+import { fmtLocalApi, parseLondonClock } from './time.js?v=3';
+import { generateDemoDepartures } from './demo-data.js?v=3';
+import { generateDemoTrains } from './trains-demo.js?v=3';
+import { generateDemoBuses } from './buses-demo.js?v=3';
 
 // ---- Demo provider -------------------------------------------------------
 
