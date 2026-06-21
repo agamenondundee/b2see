@@ -1,20 +1,23 @@
-# Edinburgh — Live Departures (Flights, Trains & Buses)
+# Edinburgh — Live Departures (Flights, Trains, Buses & EU Rail)
 
 A clean, mobile-friendly **departures board** for **Edinburgh Airport**
 (`EDI` / `EGPH`), **Edinburgh's railway stations** (Waverley & co.) and
-**Edinburgh Bus Station** (St Andrew Square), built with plain HTML, CSS and ES
-modules — no build step, no framework, no dependencies. It deploys as a static
-site (e.g. GitHub Pages).
+**Edinburgh Bus Station** (St Andrew Square) — plus pickers spanning major UK &
+European airports, all GB rail stations, major UK bus stations and major European
+train stations. Built with plain HTML, CSS and ES modules — no build step, no
+framework, no dependencies. It deploys as a static site (e.g. GitHub Pages).
 
-Three tabs: **🛫 Flights**, **🚆 Trains** and **🚌 Buses**. All ship with a
-realistic, auto-updating **demo board** so they work the moment you open them.
-Flights use [AeroDataBox](https://aerodatabox.com/) (free key); trains show
-**real live data with no key** via National Rail's Darwin feed; buses use
-[TransportAPI](https://www.transportapi.com/) through the Worker proxy.
+Four tabs: **🛫 Flights**, **🚆 Trains**, **🚌 Buses** and **🚊 EU Rail**. All
+ship with a realistic, auto-updating **demo board** so they work the moment you
+open them. Flights use [AeroDataBox](https://aerodatabox.com/) (free key); trains
+show **real live data with no key** via National Rail's Darwin feed; buses use
+[TransportAPI](https://www.transportapi.com/) through the Worker proxy; EU rail
+uses **keyless** [DB transport.rest](https://v6.db.transport.rest/).
 
 ## Features
 
-- **Three boards in one** — switch between airport flights, rail and coach/bus.
+- **Four boards in one** — switch between airport flights, GB rail, UK coach/bus
+  and European rail.
 - **FIDS-style board** — time, destination, flight/operator, gate/platform/stance
   and a colour-coded status (Scheduled, Boarding, Gate Closing, Departed,
   Delayed, Cancelled; On time for trains/buses). Delays show the revised time.
@@ -29,6 +32,9 @@ Flights use [AeroDataBox](https://aerodatabox.com/) (free key); trains show
 - **All GB rail stations & major UK bus stations** — ~2,600 National Rail
   stations and ~30 bus/coach stations (Buchanan, Victoria Coach Station,
   Digbeth, …) in the pickers.
+- **Major European train stations** — ~200 hubs across 24 countries (Paris,
+  Berlin, Amsterdam, Milano, Madrid, Wien, Praha, …) with **keyless** live data
+  via Deutsche Bahn's open API.
 - **Departures or Arrivals** — a toggle on every board. Real arrivals for flights
   (AeroDataBox) and trains (Darwin); buses fall back to demo arrivals.
 - **Live, no setup** — demo mode generates a plausible day of real routes
@@ -134,6 +140,29 @@ Until live is set up, the Buses tab shows realistic **demo** data (its default,
 Edinburgh-only), and it falls back to demo if the proxy/TransportAPI is
 unreachable.
 
+## EU Rail (major European train stations)
+
+The **🚊 EU Rail** tab shows live departures/arrivals for **~200 major European
+train stations across 24 countries** — Paris, Berlin, Amsterdam, Bruxelles,
+Milano, Roma, Madrid, Barcelona, Zürich, Wien, Praha, München, Köln, Lisboa,
+Warszawa, Stockholm and more — picked in **Settings ⚙**. The default is **Paris
+Gare du Nord**. The full list lives in [`src/eustations.js`](src/eustations.js).
+GB stations aren't repeated here — they're in the **🚆 Trains** tab.
+
+Live data comes from **[DB transport.rest](https://v6.db.transport.rest/)**, a
+keyless, CORS-enabled JSON API over **Deutsche Bahn's** HAFAS feed, so — like
+trains — it's **live out of the box with no key**. DB's data covers German plus
+**international long-distance** services (ICE, EC, TGV, Eurostar, Railjet,
+Frecciarossa, …) for stations across Europe.
+
+- **No setup:** the EU Rail tab is live by default — no signup, no key.
+- **Coverage:** strongest for German and cross-border long-distance; purely
+  domestic regional services in some countries may be partial.
+- **Reliability:** the public transport.rest instance is best-effort. For a
+  dependable deployment, [self-host db-rest](https://github.com/derhuerst/db-rest)
+  and set its URL in **Settings ⚙ → EU rail data URL**.
+- If EU rail is unreachable, the board falls back to a sample demo board.
+
 ## Deploy (GitHub Pages)
 
 This repo is a static site. Enable **Settings → Pages → Deploy from branch** and
@@ -150,14 +179,17 @@ src/
   demo-data.js      # curated EDI flight timetable + deterministic generator
   trains-demo.js    # curated Edinburgh Waverley train timetable + generator
   buses-demo.js     # curated Edinburgh Bus Station coach timetable + generator
+  eurail-demo.js    # sample European intercity board + generator
   airports.js       # ~680 major UK & European airports (name + IATA + ICAO)
   stations.js       # all ~2,600 GB National Rail stations (name + CRS code)
   busstations.js    # ~30 major UK bus & coach stations (name + ATCO code)
-  config.js         # airport/stations/bus station, defaults, status, storage keys
+  eustations.js     # ~200 major European train stations (name + DB EVA id)
+  config.js         # airport/stations/bus & EU station, defaults, status, storage keys
   time.js           # Europe/London time helpers & formatting
   styles.css        # FIDS board styling (dark theme, tabs, responsive cards)
 proxy/              # optional Cloudflare Worker: live data with no per-user key
   worker.js         # CORS + injects creds for AeroDataBox (flights) & TransportAPI (buses)
+                    # (trains via Huxley & EU rail via transport.rest are keyless — no proxy)
   wrangler.toml     # Worker config
   README.md         # deploy steps
 scripts/
@@ -180,7 +212,11 @@ python3 scripts/bump-cache-version.py 2   # use the next number, then commit
 - The free RapidAPI tier is rate-limited; the default auto-refresh is 1 minute.
 - Train data comes from National Rail's Darwin feed via a public Huxley2 proxy
   (best-effort uptime); self-host Huxley2 for reliability.
-- Demo data is **Edinburgh-only** (airport / Waverley): for other airports or
+- EU rail data comes from the public DB transport.rest instance (best-effort,
+  rate-limited); DB's coverage is best for German & international long-distance.
+  Self-host db-rest for reliability.
+- Demo data is **Edinburgh-only** for flights/trains/buses: for other airports or
   stations, switch to **Live** — the demo board stays empty rather than show the
-  wrong place's services.
-- All times are displayed in **Edinburgh (Europe/London)** local time.
+  wrong place's services. (EU Rail's demo is an illustrative pan-European sample.)
+- All times are displayed in **Edinburgh (Europe/London)** local time — including
+  EU rail, so a Berlin 08:00 (CET) departure shows as 07:00 in summer (BST).

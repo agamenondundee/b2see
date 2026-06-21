@@ -6,7 +6,7 @@
   <meta name="description" content="Live departures board for Edinburgh Airport (EDI / EGPH)." />
   <meta name="theme-color" content="#0a0e14" />
   <title>Edinburgh Airport — Live Departures</title>
-  <link rel="stylesheet" href="src/styles.css?v=8" />
+  <link rel="stylesheet" href="src/styles.css?v=9" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffc043' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M2 22h20'/><path d='M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z'/></svg>" />
 </head>
 <body>
@@ -33,6 +33,15 @@
       <path d="M9 18h5" />
       <circle cx="16" cy="18" r="2" />
     </symbol>
+    <symbol id="ic-tram" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect width="16" height="16" x="4" y="3" rx="2" />
+      <path d="M4 11h16" />
+      <path d="M12 3v8" />
+      <path d="m8 19-2 3" />
+      <path d="m18 22-2-3" />
+      <path d="M8 15h.01" />
+      <path d="M16 15h.01" />
+    </symbol>
   </svg>
 
   <div id="app">
@@ -55,6 +64,7 @@
       <button class="tab is-active" data-tab="flights" role="tab" aria-selected="true"><svg class="svg-ic tab-ic" aria-hidden="true"><use href="#ic-plane" /></svg>Flights</button>
       <button class="tab" data-tab="trains" role="tab" aria-selected="false"><svg class="svg-ic tab-ic" aria-hidden="true"><use href="#ic-train" /></svg>Trains</button>
       <button class="tab" data-tab="buses" role="tab" aria-selected="false"><svg class="svg-ic tab-ic" aria-hidden="true"><use href="#ic-bus" /></svg>Buses</button>
+      <button class="tab" data-tab="eurail" role="tab" aria-selected="false"><svg class="svg-ic tab-ic" aria-hidden="true"><use href="#ic-tram" /></svg>EU Rail</button>
     </nav>
 
     <section class="toolbar">
@@ -209,6 +219,40 @@
           </p>
         </div>
 
+        <h3 class="settings-group"><svg class="svg-ic group-ic" aria-hidden="true"><use href="#ic-tram" /></svg> EU Rail</h3>
+        <fieldset class="field">
+          <legend>Data source</legend>
+          <label class="radio">
+            <input type="radio" name="euProvider" value="live" />
+            <span><strong>Live</strong> — Deutsche Bahn (transport.rest), no key needed</span>
+          </label>
+          <label class="radio">
+            <input type="radio" name="euProvider" value="demo" />
+            <span><strong>Demo</strong> — sample European intercity board</span>
+          </label>
+        </fieldset>
+
+        <div class="field">
+          <label for="eu-station">Station</label>
+          <select id="eu-station"></select>
+          <p class="hint">
+            ~200 major European stations (Paris, Berlin, Amsterdam, Milano, Madrid…).
+            UK stations are in the <strong>Trains</strong> tab. GB aside, live covers
+            German &amp; international long-distance via Deutsche Bahn’s open data.
+          </p>
+        </div>
+
+        <div class="field">
+          <label for="eu-base">EU rail data URL <span class="label-opt">(optional)</span></label>
+          <input id="eu-base" type="url" placeholder="https://v6.db.transport.rest" autocomplete="off" spellcheck="false" />
+          <p class="hint">
+            Live EU trains use the public keyless <a href="https://v6.db.transport.rest/" target="_blank" rel="noopener">DB transport.rest</a>
+            API over Deutsche Bahn’s HAFAS feed (best-effort uptime, CORS-enabled). You can
+            <a href="https://github.com/derhuerst/db-rest" target="_blank" rel="noopener">self-host db-rest</a>
+            and point this at it. Falls back to demo data if unreachable.
+          </p>
+        </div>
+
         <h3 class="settings-group">General</h3>
         <div class="field">
           <label for="refresh">Auto-refresh</label>
@@ -229,6 +273,6 @@
     </div>
   </div>
 
-  <script type="module" src="src/app.js?v=8"></script>
+  <script type="module" src="src/app.js?v=9"></script>
 </body>
 </html>
