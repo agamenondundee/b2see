@@ -6,7 +6,7 @@
   <meta name="description" content="Live departures board for Edinburgh Airport (EDI / EGPH)." />
   <meta name="theme-color" content="#0a0e14" />
   <title>Edinburgh Airport — Live Departures</title>
-  <link rel="stylesheet" href="src/styles.css?v=4" />
+  <link rel="stylesheet" href="src/styles.css?v=5" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffc043' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M2 22h20'/><path d='M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z'/></svg>" />
 </head>
 <body>
@@ -44,7 +44,7 @@
           <p class="brand-codes" id="brand-codes">EDI · EGPH</p>
         </div>
       </div>
-      <div class="header-title">DEPARTURES</div>
+      <div class="header-title" id="header-title">DEPARTURES</div>
       <div class="clock" aria-live="off">
         <div class="clock-time" id="clock-time">--:--:--</div>
         <div class="clock-date" id="clock-date">—</div>
@@ -58,6 +58,10 @@
     </nav>
 
     <section class="toolbar">
+      <div class="dir-toggle" id="dir-toggle" role="group" aria-label="Departures or arrivals">
+        <button type="button" data-dir="departures" class="is-active" aria-pressed="true">Departures</button>
+        <button type="button" data-dir="arrivals" aria-pressed="false">Arrivals</button>
+      </div>
       <div class="search-wrap">
         <span class="search-icon" aria-hidden="true">🔎</span>
         <input id="search" type="search" placeholder="Search destination, flight or airline…"
@@ -212,6 +216,6 @@
     </div>
   </div>
 
-  <script type="module" src="src/app.js?v=4"></script>
+  <script type="module" src="src/app.js?v=5"></script>
 </body>
 </html>

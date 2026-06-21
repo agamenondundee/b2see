@@ -6,8 +6,8 @@
 // board with zero configuration. Switch to the live AeroDataBox provider in
 // Settings for real data.
 
-import { londonTimeAt, minutesUntil } from './time.js?v=4';
-import { STATUS } from './config.js?v=4';
+import { londonTimeAt, minutesUntil } from './time.js?v=5';
+import { STATUS } from './config.js?v=5';
 
 const AIRLINES = {
   U2: 'easyJet',
@@ -135,6 +135,15 @@ function demoStatus(mins, rng, cancelled, delayed) {
   return STATUS.DEPARTED;
 }
 
+// Arrivals have a simpler lifecycle: scheduled -> expected -> landed.
+function arrStatus(mins, cancelled, delayed) {
+  if (cancelled) return STATUS.CANCELLED;
+  if (delayed && mins > 0) return STATUS.DELAYED;
+  if (mins <= -10) return STATUS.ARRIVED;
+  if (mins <= 10) return STATUS.EXPECTED;
+  return STATUS.SCHEDULED;
+}
+
 // Build one day's worth of flights as absolute instants.
 function buildDay(dayOffset) {
   const dayKey = new Date(londonTimeAt(dayOffset, 12, 0)).toDateString();
@@ -170,8 +179,9 @@ function buildDay(dayOffset) {
   });
 }
 
-// Public: a live-feeling list of upcoming departures for the demo provider.
-export function generateDemoDepartures({ pastWindowMin, maxRows }) {
+// Public: a live-feeling list of demo flights (departures or arrivals).
+export function generateDemoDepartures({ pastWindowMin, maxRows }, direction = 'departures') {
+  const arrivals = direction === 'arrivals';
   const all = [...buildDay(0), ...buildDay(1)];
   const now = Date.now();
   const earliest = now - pastWindowMin * 60000;
@@ -179,8 +189,10 @@ export function generateDemoDepartures({ pastWindowMin, maxRows }) {
   return all
     .map((f) => {
       const ref = f.estimated || f.time;
-      const status = demoStatus(minutesUntil(ref, now), f._rng, f.cancelled, f.delayed);
-      // Cancelled flights keep their published gate hidden.
+      const mins = minutesUntil(ref, now);
+      const status = arrivals
+        ? arrStatus(mins, f.cancelled, f.delayed)
+        : demoStatus(mins, f._rng, f.cancelled, f.delayed);
       return { ...f, status, gate: status === STATUS.CANCELLED ? null : f.gate };
     })
     .filter((f) => (f.estimated || f.time).getTime() >= earliest)

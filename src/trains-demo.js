@@ -5,8 +5,8 @@
 // statuses evolve in real time, so the Trains tab behaves like a live board with
 // zero setup. The live provider (Huxley/Darwin) replaces this when reachable.
 
-import { londonTimeAt, minutesUntil } from './time.js?v=4';
-import { STATUS } from './config.js?v=4';
+import { londonTimeAt, minutesUntil } from './time.js?v=5';
+import { STATUS } from './config.js?v=5';
 
 const OPERATORS = {
   SR: 'ScotRail',
@@ -106,6 +106,13 @@ function demoTrainStatus(mins, cancelled, delayed) {
   return STATUS.ON_TIME;
 }
 
+function arrTrainStatus(mins, cancelled, delayed) {
+  if (cancelled) return STATUS.CANCELLED;
+  if (delayed && mins > 0) return STATUS.DELAYED;
+  if (mins <= -3) return STATUS.ARRIVED;
+  return STATUS.ON_TIME;
+}
+
 function buildDay(dayOffset) {
   const dayKey = new Date(londonTimeAt(dayOffset, 12, 0)).toDateString();
   return TIMETABLE.map(([h, m, code, dest, via]) => {
@@ -136,7 +143,8 @@ function buildDay(dayOffset) {
   });
 }
 
-export function generateDemoTrains({ pastWindowMin, maxRows }) {
+export function generateDemoTrains({ pastWindowMin, maxRows }, direction = 'departures') {
+  const arrivals = direction === 'arrivals';
   const all = [...buildDay(0), ...buildDay(1)];
   const now = Date.now();
   const earliest = now - pastWindowMin * 60000;
@@ -144,7 +152,10 @@ export function generateDemoTrains({ pastWindowMin, maxRows }) {
   return all
     .map((t) => {
       const ref = t.estimated || t.time;
-      const status = demoTrainStatus(minutesUntil(ref, now), t.cancelled, t.delayed);
+      const mins = minutesUntil(ref, now);
+      const status = arrivals
+        ? arrTrainStatus(mins, t.cancelled, t.delayed)
+        : demoTrainStatus(mins, t.cancelled, t.delayed);
       return { ...t, status, platform: status === STATUS.CANCELLED ? null : t.platform };
     })
     .filter((t) => (t.estimated || t.time).getTime() >= earliest)

@@ -26,6 +26,8 @@ Flights use [AeroDataBox](https://aerodatabox.com/) (free key); trains show
   *indicative* number, shown muted.)
 - **All Scottish airports** — pick Edinburgh, Glasgow, Aberdeen, Inverness,
   Prestwick, Dundee or any of the regional/island airports; the header follows.
+- **Departures or Arrivals** — a toggle on every board. Real arrivals for flights
+  (AeroDataBox) and trains (Darwin); buses fall back to demo arrivals.
 - **Live, no setup** — demo mode generates a plausible day of real routes
   (airlines / train & coach operators), with statuses that progress in real time.
 - **Real data** — AeroDataBox for flights; National Rail (Darwin via Huxley) for
@@ -162,4 +164,7 @@ python3 scripts/bump-cache-version.py 2   # use the next number, then commit
 - The free RapidAPI tier is rate-limited; the default auto-refresh is 1 minute.
 - Train data comes from National Rail's Darwin feed via a public Huxley2 proxy
   (best-effort uptime); self-host Huxley2 for reliability.
+- Demo data is **Edinburgh-only** (airport / Waverley): for other airports or
+  stations, switch to **Live** — the demo board stays empty rather than show the
+  wrong place's services.
 - All times are displayed in **Edinburgh (Europe/London)** local time.
