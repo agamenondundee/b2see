@@ -26,6 +26,11 @@
       </div>
     </header>
 
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Departure type">
+      <button class="tab is-active" data-tab="flights" role="tab" aria-selected="true">🛫 Flights</button>
+      <button class="tab" data-tab="trains" role="tab" aria-selected="false">🚆 Trains</button>
+    </nav>
+
     <section class="toolbar">
       <div class="search-wrap">
         <span class="search-icon" aria-hidden="true">🔎</span>
@@ -41,7 +46,7 @@
       </div>
     </section>
 
-    <main class="board" aria-live="polite">
+    <main class="board" id="board" aria-live="polite">
       <div class="board-head" role="row">
         <span class="col-time">Time</span>
         <span class="col-dest">Destination</span>
@@ -69,6 +74,7 @@
       </div>
 
       <div class="modal-body">
+        <h3 class="settings-group">🛫 Flights</h3>
         <fieldset class="field">
           <legend>Data source</legend>
           <label class="radio">
@@ -102,6 +108,36 @@
           </p>
         </div>
 
+        <h3 class="settings-group">🚆 Trains</h3>
+        <fieldset class="field">
+          <legend>Data source</legend>
+          <label class="radio">
+            <input type="radio" name="trainProvider" value="live" />
+            <span><strong>Live</strong> — National Rail (Darwin), no key needed</span>
+          </label>
+          <label class="radio">
+            <input type="radio" name="trainProvider" value="demo" />
+            <span><strong>Demo</strong> — realistic generated board</span>
+          </label>
+        </fieldset>
+
+        <div class="field">
+          <label for="train-station">Station</label>
+          <select id="train-station"></select>
+        </div>
+
+        <div class="field">
+          <label for="train-base">Trains data URL <span class="label-opt">(optional)</span></label>
+          <input id="train-base" type="url" placeholder="https://huxley2.azurewebsites.net" autocomplete="off" spellcheck="false" />
+          <p class="hint">
+            Live trains use a public <a href="https://huxley2.azurewebsites.net/" target="_blank" rel="noopener">Huxley2</a>
+            proxy over National Rail’s Darwin feed (best-effort uptime). For reliability you can
+            <a href="https://github.com/jpsingleton/Huxley2" target="_blank" rel="noopener">self-host Huxley2</a>
+            and point this at it. Falls back to demo data if unreachable.
+          </p>
+        </div>
+
+        <h3 class="settings-group">General</h3>
         <div class="field">
           <label for="refresh">Auto-refresh</label>
           <select id="refresh">

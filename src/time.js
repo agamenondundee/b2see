@@ -77,3 +77,16 @@ export function fmtLocalApi(date) {
 export function minutesUntil(date, from = Date.now()) {
   return Math.round((date.getTime() - from) / 60000);
 }
+
+// Turn a Darwin/Huxley "HH:MM" wall-clock string into an absolute Date, picking
+// today or tomorrow — whichever puts it in a sensible window around now (so a
+// 00:20 service seen at 23:50 resolves to tomorrow).
+export function parseLondonClock(hhmm, from = Date.now()) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec((hhmm || '').trim());
+  if (!m) return null;
+  const h = +m[1];
+  const min = +m[2];
+  let d = londonTimeAt(0, h, min);
+  if (d.getTime() < from - 6 * 3600 * 1000) d = londonTimeAt(1, h, min);
+  return d;
+}

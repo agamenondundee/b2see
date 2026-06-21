@@ -1,53 +1,29 @@
-// Edinburgh Airport live departures — app orchestrator.
+// Edinburgh live departures — tabbed orchestrator (Flights + Trains).
 
-import { STORE, DEFAULTS, STATUS } from './config.js';
-import { fmtClock, fmtClockSeconds, fmtDate } from './time.js';
-import { demoProvider, makeLiveProvider } from './providers.js';
+import { STORE, DEFAULTS, TRAIN_DEFAULTS, STATIONS } from './config.js';
+import { fmtClockSeconds, fmtClock, fmtDate } from './time.js';
+import { demoProvider, makeLiveProvider, demoTrainProvider, makeTrainProvider } from './providers.js';
 
-// ---- Settings (persisted in localStorage) --------------------------------
+// ---- Settings (persisted) ------------------------------------------------
 
 const settings = {
-  provider: localStorage.getItem(STORE.provider) || DEFAULTS.provider,
+  flightProvider: localStorage.getItem(STORE.provider) || DEFAULTS.provider,
   apiKey: localStorage.getItem(STORE.apiKey) || '',
   proxyUrl: localStorage.getItem(STORE.proxyUrl) || '',
+  trainProvider: localStorage.getItem(STORE.trainProvider) || TRAIN_DEFAULTS.provider,
+  trainStation: localStorage.getItem(STORE.trainStation) || TRAIN_DEFAULTS.station,
+  trainBase: localStorage.getItem(STORE.trainBase) || '',
   refreshMs: Number(localStorage.getItem(STORE.refreshMs) ?? DEFAULTS.refreshMs),
 };
 
-const liveProvider = makeLiveProvider(() => settings.apiKey, () => settings.proxyUrl);
-const providerFor = (id) => (id === 'live' ? liveProvider : demoProvider);
+const liveFlight = makeLiveProvider(() => settings.apiKey, () => settings.proxyUrl);
+const liveTrain = makeTrainProvider(() => settings.trainBase, () => settings.trainStation);
 
-// ---- Runtime state -------------------------------------------------------
+const stationName = (crs) => (STATIONS.find((s) => s.crs === crs) || {}).name || crs;
 
-const state = {
-  flights: [],
-  search: '',
-  statusFilter: 'all',
-  error: null, // message shown when live failed and we fell back to demo
-  loading: false,
-};
-
-let refreshTimer = null;
-
-// ---- DOM refs ------------------------------------------------------------
+// ---- DOM helpers ---------------------------------------------------------
 
 const $ = (id) => document.getElementById(id);
-const rowsEl = $('rows');
-const messageEl = $('message');
-const updatedEl = $('updated');
-const providerBadge = $('provider-badge');
-const footerNote = $('footer-note');
-
-// Status filter chips: id -> predicate over a flight's status key.
-const FILTERS = [
-  { id: 'all', label: 'All', test: () => true },
-  { id: 'boarding', label: 'Boarding', test: (k) => ['checkin', 'boarding', 'gate', 'closing', 'final'].includes(k) },
-  { id: 'delayed', label: 'Delayed', test: (k) => k === 'delayed' },
-  { id: 'departed', label: 'Departed', test: (k) => k === 'departed' },
-  { id: 'cancelled', label: 'Cancelled', test: (k) => k === 'cancelled' },
-];
-
-// ---- Small DOM helper ----------------------------------------------------
-
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -55,59 +31,145 @@ function el(tag, className, text) {
   return node;
 }
 
-// ---- Rendering -----------------------------------------------------------
+const rowsEl = $('rows');
+const messageEl = $('message');
+const updatedEl = $('updated');
+const providerBadge = $('provider-badge');
+const footerNote = $('footer-note');
+const searchEl = $('search');
+const filtersEl = $('filters');
+const boardEl = $('board');
+const tabsEl = $('tabs');
+const headCols = ['col-time', 'col-dest', 'col-flight', 'col-gate', 'col-status'].map(
+  (c) => boardEl.querySelector('.board-head .' + c),
+);
 
-function buildRow(f) {
+// ---- Row builders --------------------------------------------------------
+
+function timeCell(item) {
+  const time = el('span', 'col-time');
+  const sched = el('span', 'sched', fmtClock(item.time));
+  if (item.estimated) sched.classList.add('is-revised');
+  time.appendChild(sched);
+  if (item.estimated) time.appendChild(el('span', 'est', fmtClock(item.estimated)));
+  return time;
+}
+
+function buildFlightRow(f) {
   const row = el('div', `row status--${f.status.key}`);
   row.setAttribute('role', 'row');
+  row.appendChild(timeCell(f));
 
-  // Time (+ estimated when delayed)
-  const time = el('span', 'col-time');
-  const sched = el('span', 'sched', fmtClock(f.time));
-  if (f.estimated) sched.classList.add('is-revised');
-  time.appendChild(sched);
-  if (f.estimated) time.appendChild(el('span', 'est', fmtClock(f.estimated)));
-  row.appendChild(time);
-
-  // Destination
   const dest = el('span', 'col-dest');
   dest.appendChild(el('span', 'dest-name', f.dest));
   if (f.destIata) dest.appendChild(el('span', 'dest-iata', f.destIata));
   row.appendChild(dest);
 
-  // Flight + airline
   const flight = el('span', 'col-flight');
   const fno = el('span', 'flight-no', f.flightNo);
-  flight.appendChild(fno);
   if (f.codeshare) fno.appendChild(el('span', 'cs-tag', 'codeshare'));
+  flight.appendChild(fno);
   if (f.airline) flight.appendChild(el('span', 'flight-airline', f.airline));
   row.appendChild(flight);
 
-  // Gate
   row.appendChild(el('span', 'col-gate', f.gate || '—'));
 
-  // Status
   const status = el('span', 'col-status');
   status.appendChild(el('span', `badge badge--${f.status.key}`, f.status.label));
   row.appendChild(status);
-
   return row;
 }
 
-function visibleFlights() {
-  const q = state.search.trim().toLowerCase();
-  const filter = FILTERS.find((x) => x.id === state.statusFilter) || FILTERS[0];
-  return state.flights.filter((f) => {
-    if (!filter.test(f.status.key)) return false;
-    if (!q) return true;
-    return (
+function buildTrainRow(t) {
+  const row = el('div', `row status--${t.status.key}`);
+  row.setAttribute('role', 'row');
+  row.appendChild(timeCell(t));
+
+  const dest = el('span', 'col-dest');
+  dest.appendChild(el('span', 'dest-name', t.dest));
+  if (t.via) dest.appendChild(el('span', 'dest-iata', `via ${t.via}`));
+  row.appendChild(dest);
+
+  const op = el('span', 'col-flight');
+  op.appendChild(el('span', 'op-name', t.operator));
+  row.appendChild(op);
+
+  row.appendChild(el('span', 'col-gate', t.platform || '—'));
+
+  const status = el('span', 'col-status');
+  status.appendChild(el('span', `badge badge--${t.status.key}`, t.status.label));
+  row.appendChild(status);
+  return row;
+}
+
+// ---- Feed definitions ----------------------------------------------------
+
+const FLIGHT_FILTERS = [
+  { id: 'all', label: 'All', test: () => true },
+  { id: 'boarding', label: 'Boarding', test: (k) => ['checkin', 'boarding', 'gate', 'closing', 'final'].includes(k) },
+  { id: 'delayed', label: 'Delayed', test: (k) => k === 'delayed' },
+  { id: 'departed', label: 'Departed', test: (k) => k === 'departed' },
+  { id: 'cancelled', label: 'Cancelled', test: (k) => k === 'cancelled' },
+];
+const TRAIN_FILTERS = [
+  { id: 'all', label: 'All', test: () => true },
+  { id: 'ontime', label: 'On time', test: (k) => k === 'ontime' },
+  { id: 'delayed', label: 'Delayed', test: (k) => k === 'delayed' },
+  { id: 'departed', label: 'Departed', test: (k) => k === 'departed' },
+  { id: 'cancelled', label: 'Cancelled', test: (k) => k === 'cancelled' },
+];
+
+const FEEDS = {
+  flights: {
+    columns: ['Time', 'Destination', 'Flight', 'Gate', 'Status'],
+    searchPlaceholder: 'Search destination, flight or airline…',
+    providers: { demo: demoProvider, live: liveFlight },
+    providerId: () => settings.flightProvider,
+    opts: () => ({ pastWindowMin: DEFAULTS.pastWindowMin, maxRows: DEFAULTS.maxRows }),
+    buildRow: buildFlightRow,
+    filters: FLIGHT_FILTERS,
+    match: (f, q) =>
       f.flightNo.toLowerCase().includes(q) ||
       f.dest.toLowerCase().includes(q) ||
       f.destIata.toLowerCase().includes(q) ||
-      f.airline.toLowerCase().includes(q)
-    );
-  });
-}
+      f.airline.toLowerCase().includes(q),
+    note: (live, err) =>
+      err
+        ? `⚠ Live flights unavailable: ${err} Showing demo data.`
+        : live
+          ? 'Live flights via AeroDataBox.'
+          : 'Showing demo flights — add an API key in Settings ⚙ for live data.',
+  },
+  trains: {
+    columns: ['Time', 'Destination', 'Operator', 'Plat', 'Status'],
+    searchPlaceholder: 'Search destination, operator or platform…',
+    providers: { demo: demoTrainProvider, live: liveTrain },
+    providerId: () => settings.trainProvider,
+    opts: () => ({ pastWindowMin: TRAIN_DEFAULTS.pastWindowMin, maxRows: TRAIN_DEFAULTS.maxRows }),
+    buildRow: buildTrainRow,
+    filters: TRAIN_FILTERS,
+    match: (t, q) =>
+      t.dest.toLowerCase().includes(q) ||
+      t.operator.toLowerCase().includes(q) ||
+      (t.platform || '').toLowerCase().includes(q) ||
+      (t.via || '').toLowerCase().includes(q),
+    note: (live, err) =>
+      err
+        ? `⚠ Live trains unavailable: ${err} Showing demo data.`
+        : live
+          ? `Live departures from ${stationName(settings.trainStation)} (National Rail).`
+          : `Showing demo trains for ${stationName(settings.trainStation)}.`,
+  },
+};
+
+// ---- Runtime state -------------------------------------------------------
+
+const mkState = () => ({ rows: [], search: '', filter: 'all', error: null, loading: false, loaded: false, updated: null });
+const state = { flights: mkState(), trains: mkState() };
+let activeTab = localStorage.getItem(STORE.tab) || 'flights';
+let refreshTimer = null;
+
+// ---- Rendering -----------------------------------------------------------
 
 function showMessage(text, kind = 'info') {
   messageEl.textContent = text;
@@ -116,73 +178,127 @@ function showMessage(text, kind = 'info') {
 }
 
 function render() {
-  const list = visibleFlights();
-  rowsEl.replaceChildren(...list.map(buildRow));
+  const feed = FEEDS[activeTab];
+  const st = state[activeTab];
+
+  feed.columns.forEach((label, i) => { if (headCols[i]) headCols[i].textContent = label; });
+  boardEl.classList.toggle('feed-trains', activeTab === 'trains');
+
+  const q = st.search.trim().toLowerCase();
+  const filt = feed.filters.find((f) => f.id === st.filter) || feed.filters[0];
+  const list = st.rows.filter((r) => filt.test(r.status.key) && (!q || feed.match(r, q)));
+  rowsEl.replaceChildren(...list.map(feed.buildRow));
 
   if (list.length === 0) {
-    showMessage(
-      state.flights.length === 0 ? 'No departures to show right now.' : 'No flights match your filters.',
-      'info',
-    );
+    showMessage(st.rows.length === 0 ? 'No departures to show right now.' : 'No services match your filters.', 'info');
   } else {
     messageEl.hidden = true;
   }
 
-  // Provider + footer status
-  const live = settings.provider === 'live';
+  const live = feed.providerId() === 'live';
   providerBadge.textContent = live ? 'live' : 'demo';
   providerBadge.classList.toggle('is-live', live);
-
-  if (state.error) {
-    footerNote.textContent = `⚠ Live data unavailable: ${state.error} Showing demo data.`;
-    footerNote.classList.add('is-warn');
-  } else {
-    footerNote.classList.remove('is-warn');
-    footerNote.textContent = live
-      ? 'Live flights via AeroDataBox.'
-      : 'Showing demo data — add an API key in Settings ⚙ for live flights.';
-  }
+  footerNote.classList.toggle('is-warn', !!st.error);
+  footerNote.textContent = feed.note(live, st.error);
+  updatedEl.textContent = st.loading ? 'updating…' : st.updated ? `updated ${fmtClockSeconds(st.updated)}` : '';
 }
 
 // ---- Data refresh --------------------------------------------------------
 
-async function refresh() {
-  if (state.loading) return;
-  state.loading = true;
-  updatedEl.textContent = 'updating…';
-  const opts = { pastWindowMin: DEFAULTS.pastWindowMin, maxRows: DEFAULTS.maxRows };
+async function refresh(feedId = activeTab) {
+  const feed = FEEDS[feedId];
+  const st = state[feedId];
+  if (st.loading) return;
+  st.loading = true;
+  if (feedId === activeTab) updatedEl.textContent = 'updating…';
 
+  const pid = feed.providerId();
   try {
-    state.flights = await providerFor(settings.provider).fetchDepartures(opts);
-    state.error = null;
+    st.rows = await feed.providers[pid].fetchDepartures(feed.opts());
+    st.error = null;
   } catch (err) {
-    if (settings.provider === 'live') {
-      // Graceful demo fallback so the board is never empty.
+    if (pid === 'live') {
       try {
-        state.flights = await demoProvider.fetchDepartures(opts);
-        state.error = err.message;
+        st.rows = await feed.providers.demo.fetchDepartures(feed.opts());
+        st.error = err.message;
       } catch {
-        state.loading = false;
-        showMessage(err.message, 'error');
-        updatedEl.textContent = '';
+        st.loading = false;
+        st.loaded = true;
+        if (feedId === activeTab) {
+          showMessage(err.message, 'error');
+          updatedEl.textContent = '';
+        }
         return;
       }
     } else {
-      state.loading = false;
-      showMessage(err.message, 'error');
-      updatedEl.textContent = '';
+      st.loading = false;
+      st.loaded = true;
+      if (feedId === activeTab) {
+        showMessage(err.message, 'error');
+        updatedEl.textContent = '';
+      }
       return;
     }
   }
 
-  state.loading = false;
-  updatedEl.textContent = `updated ${fmtClockSeconds(new Date())}`;
-  render();
+  st.loading = false;
+  st.loaded = true;
+  st.updated = new Date();
+  if (feedId === activeTab) render();
 }
 
 function scheduleAutoRefresh() {
   if (refreshTimer) clearInterval(refreshTimer);
-  if (settings.refreshMs > 0) refreshTimer = setInterval(refresh, settings.refreshMs);
+  if (settings.refreshMs > 0) refreshTimer = setInterval(() => refresh(activeTab), settings.refreshMs);
+}
+
+// ---- Tabs & filters ------------------------------------------------------
+
+function buildFilters() {
+  const feed = FEEDS[activeTab];
+  const st = state[activeTab];
+  filtersEl.replaceChildren(
+    ...feed.filters.map((f) => {
+      const b = el('button', 'chip', f.label);
+      b.dataset.id = f.id;
+      const active = f.id === st.filter;
+      b.classList.toggle('is-active', active);
+      b.setAttribute('aria-pressed', String(active));
+      b.addEventListener('click', () => {
+        st.filter = f.id;
+        for (const c of filtersEl.children) {
+          const on = c.dataset.id === f.id;
+          c.classList.toggle('is-active', on);
+          c.setAttribute('aria-pressed', String(on));
+        }
+        render();
+      });
+      return b;
+    }),
+  );
+}
+
+function setActiveTabButton() {
+  for (const b of tabsEl.children) {
+    const on = b.dataset.tab === activeTab;
+    b.classList.toggle('is-active', on);
+    b.setAttribute('aria-selected', String(on));
+  }
+}
+
+function switchTab(tabId) {
+  if (tabId === activeTab || !FEEDS[tabId]) return;
+  activeTab = tabId;
+  localStorage.setItem(STORE.tab, tabId);
+  setActiveTabButton();
+  searchEl.value = state[tabId].search;
+  searchEl.placeholder = FEEDS[tabId].searchPlaceholder;
+  buildFilters();
+  render();
+
+  const st = state[tabId];
+  const stale = st.updated && settings.refreshMs > 0 && Date.now() - st.updated.getTime() > settings.refreshMs;
+  if (!st.loaded || stale) refresh(tabId);
 }
 
 // ---- Header clock --------------------------------------------------------
@@ -193,94 +309,86 @@ function tickClock() {
   $('clock-date').textContent = fmtDate(now);
 }
 
-// ---- Filters UI ----------------------------------------------------------
-
-function buildFilters() {
-  const wrap = $('filters');
-  wrap.replaceChildren(
-    ...FILTERS.map((f) => {
-      const b = el('button', 'chip', f.label);
-      b.dataset.id = f.id;
-      b.setAttribute('aria-pressed', String(f.id === state.statusFilter));
-      if (f.id === state.statusFilter) b.classList.add('is-active');
-      b.addEventListener('click', () => {
-        state.statusFilter = f.id;
-        for (const c of wrap.children) {
-          const active = c.dataset.id === f.id;
-          c.classList.toggle('is-active', active);
-          c.setAttribute('aria-pressed', String(active));
-        }
-        render();
-      });
-      return b;
-    }),
-  );
-}
-
 // ---- Settings modal ------------------------------------------------------
 
 const modal = $('settings');
 
+function fillStationSelect() {
+  const sel = $('train-station');
+  sel.replaceChildren(
+    ...STATIONS.map((s) => {
+      const o = el('option', null, `${s.name} (${s.crs})`);
+      o.value = s.crs;
+      return o;
+    }),
+  );
+}
+
 function openSettings() {
-  for (const r of document.querySelectorAll('input[name="provider"]')) {
-    r.checked = r.value === settings.provider;
-  }
+  for (const r of document.querySelectorAll('input[name="provider"]')) r.checked = r.value === settings.flightProvider;
+  for (const r of document.querySelectorAll('input[name="trainProvider"]')) r.checked = r.value === settings.trainProvider;
   $('api-key').value = settings.apiKey;
   $('proxy-url').value = settings.proxyUrl;
+  $('train-station').value = settings.trainStation;
+  $('train-base').value = settings.trainBase;
   $('refresh').value = String(settings.refreshMs);
   modal.hidden = false;
 }
 
-function closeSettings() {
-  modal.hidden = true;
-}
+const closeSettings = () => { modal.hidden = true; };
 
 function saveSettings() {
-  const provider = document.querySelector('input[name="provider"]:checked')?.value || 'demo';
-  settings.provider = provider;
+  settings.flightProvider = document.querySelector('input[name="provider"]:checked')?.value || 'demo';
+  settings.trainProvider = document.querySelector('input[name="trainProvider"]:checked')?.value || 'live';
   settings.apiKey = $('api-key').value.trim();
   settings.proxyUrl = $('proxy-url').value.trim().replace(/\/+$/, '');
+  settings.trainStation = $('train-station').value;
+  settings.trainBase = $('train-base').value.trim().replace(/\/+$/, '');
   settings.refreshMs = Number($('refresh').value);
 
-  localStorage.setItem(STORE.provider, settings.provider);
+  localStorage.setItem(STORE.provider, settings.flightProvider);
+  localStorage.setItem(STORE.trainProvider, settings.trainProvider);
   localStorage.setItem(STORE.apiKey, settings.apiKey);
   localStorage.setItem(STORE.proxyUrl, settings.proxyUrl);
+  localStorage.setItem(STORE.trainStation, settings.trainStation);
+  localStorage.setItem(STORE.trainBase, settings.trainBase);
   localStorage.setItem(STORE.refreshMs, String(settings.refreshMs));
 
   closeSettings();
+  // Settings may have changed providers/station for either feed — reload both.
+  state.flights.loaded = false;
+  state.trains.loaded = false;
   scheduleAutoRefresh();
-  refresh();
+  refresh(activeTab);
 }
 
 // ---- Wire up -------------------------------------------------------------
 
 function init() {
+  fillStationSelect();
+  setActiveTabButton();
+  searchEl.value = state[activeTab].search;
+  searchEl.placeholder = FEEDS[activeTab].searchPlaceholder;
   buildFilters();
   tickClock();
   setInterval(tickClock, 1000);
 
-  $('search').addEventListener('input', (e) => {
-    state.search = e.target.value;
+  for (const b of tabsEl.children) b.addEventListener('click', () => switchTab(b.dataset.tab));
+  searchEl.addEventListener('input', (e) => {
+    state[activeTab].search = e.target.value;
     render();
   });
-  $('refresh-btn').addEventListener('click', refresh);
+  $('refresh-btn').addEventListener('click', () => refresh(activeTab));
   $('settings-btn').addEventListener('click', openSettings);
   $('settings-close').addEventListener('click', closeSettings);
   $('settings-cancel').addEventListener('click', closeSettings);
   $('settings-save').addEventListener('click', saveSettings);
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) closeSettings();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !modal.hidden) closeSettings();
-  });
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeSettings(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) closeSettings(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(activeTab); });
 
-  // Refresh when returning to the tab if data may be stale.
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) refresh();
-  });
-
-  refresh();
+  render();
+  refresh(activeTab);
   scheduleAutoRefresh();
 }
 

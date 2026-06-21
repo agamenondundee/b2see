@@ -5,9 +5,10 @@
 //     time: Date, estimated: Date|null, gate: string|null,
 //     status: {key,label}, codeshare: boolean }
 
-import { AERODATABOX, STATUS } from './config.js';
-import { fmtLocalApi } from './time.js';
+import { AERODATABOX, HUXLEY, STATUS } from './config.js';
+import { fmtLocalApi, parseLondonClock } from './time.js';
 import { generateDemoDepartures } from './demo-data.js';
+import { generateDemoTrains } from './trains-demo.js';
 
 // ---- Demo provider -------------------------------------------------------
 
@@ -18,6 +19,15 @@ export const demoProvider = {
     // Tiny delay so the UI's loading state is exercised like a real fetch.
     await new Promise((r) => setTimeout(r, 150));
     return generateDemoDepartures({ pastWindowMin, maxRows });
+  },
+};
+
+export const demoTrainProvider = {
+  id: 'demo',
+  label: 'Demo data',
+  async fetchDepartures({ pastWindowMin, maxRows }) {
+    await new Promise((r) => setTimeout(r, 150));
+    return generateDemoTrains({ pastWindowMin, maxRows });
   },
 };
 
@@ -135,6 +145,63 @@ export function makeLiveProvider(getApiKey, getProxyUrl = () => '') {
       return list
         .map(normalizeLiveFlight)
         .filter((f) => f.time && (f.estimated || f.time).getTime() >= earliest)
+        .sort((a, b) => a.time - b.time)
+        .slice(0, maxRows);
+    },
+  };
+}
+
+// ---- Trains: Huxley2 (National Rail Darwin) live provider -----------------
+
+function mapTrainStatus(etd, isCancelled) {
+  const e = (etd || '').trim();
+  if (isCancelled || /cancel/i.test(e)) return STATUS.CANCELLED;
+  if (/^\d{1,2}:\d{2}$/.test(e)) return STATUS.DELAYED; // an explicit later time
+  if (/delay/i.test(e)) return STATUS.DELAYED;
+  return STATUS.ON_TIME; // "On time", "Starts here", "No report", etc.
+}
+
+function normalizeTrain(s, i) {
+  const time = parseLondonClock(s.std) || parseLondonClock(s.etd);
+  const status = mapTrainStatus(s.etd, s.isCancelled);
+  const est = status === STATUS.DELAYED ? parseLondonClock(s.etd) : null;
+  const d = (s.destination && s.destination[0]) || {};
+  return {
+    id: s.serviceID || `${s.std}|${d.locationName || ''}|${i}`,
+    operator: s.operator || '',
+    operatorCode: s.operatorCode || '',
+    dest: d.locationName || 'Unknown',
+    via: (d.via || '').replace(/^via\s+/i, ''),
+    time,
+    estimated: est && time && est.getTime() !== time.getTime() ? est : null,
+    platform: s.platform || null,
+    status,
+    cancelled: status === STATUS.CANCELLED,
+  };
+}
+
+export function makeTrainProvider(getBase, getStation) {
+  return {
+    id: 'live',
+    label: 'Live (National Rail)',
+    async fetchDepartures({ maxRows }) {
+      const base = (getBase() || HUXLEY.base).trim().replace(/\/+$/, '');
+      const crs = (getStation() || 'EDB').trim().toUpperCase();
+      const url = `${base}/departures/${crs}/${Math.min(maxRows, 50)}`;
+
+      let res;
+      try {
+        res = await fetch(url, { headers: { Accept: 'application/json' } });
+      } catch {
+        throw new Error('Could not reach the trains service (network/CORS). Check the Huxley URL in Settings.');
+      }
+      if (!res.ok) throw new Error(`Trains data error (HTTP ${res.status}).`);
+
+      const data = await res.json();
+      const list = data.trainServices || [];
+      return list
+        .map(normalizeTrain)
+        .filter((t) => t.time)
         .sort((a, b) => a.time - b.time)
         .slice(0, maxRows);
     },

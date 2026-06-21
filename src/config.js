@@ -11,7 +11,11 @@ export const AIRPORT = {
 export const STORE = {
   apiKey: 'edi.rapidapi.key',
   proxyUrl: 'edi.proxyUrl', // optional Cloudflare Worker proxy (key stays server-side)
-  provider: 'edi.provider', // 'demo' | 'live'
+  provider: 'edi.provider', // flights: 'demo' | 'live'
+  trainProvider: 'edi.trainProvider', // trains: 'demo' | 'live'
+  trainStation: 'edi.trainStation', // CRS code
+  trainBase: 'edi.trainBase', // Huxley base URL
+  tab: 'edi.tab', // active tab: 'flights' | 'trains'
   refreshMs: 'edi.refreshMs',
 };
 
@@ -29,9 +33,32 @@ export const AERODATABOX = {
   base: 'https://aerodatabox.p.rapidapi.com',
 };
 
+// Trains: National Rail Darwin via a Huxley2 JSON proxy (CORS-enabled, keyless).
+export const HUXLEY = {
+  // Public demo instance — no key needed (best-effort uptime). Override in
+  // Settings to point at your own self-hosted Huxley2 for reliability.
+  base: 'https://huxley2.azurewebsites.net',
+};
+
+// Edinburgh-area stations (CRS codes) for the trains board.
+export const STATIONS = [
+  { crs: 'EDB', name: 'Edinburgh Waverley' },
+  { crs: 'HYM', name: 'Haymarket' },
+  { crs: 'EGY', name: 'Edinburgh Gateway' },
+  { crs: 'EDP', name: 'Edinburgh Park' },
+];
+
+export const TRAIN_DEFAULTS = {
+  provider: 'live', // live needs no key, so default the trains tab to real data
+  station: 'EDB',
+  maxRows: 30,
+  pastWindowMin: 15,
+};
+
 // Canonical, display-ready flight status buckets used throughout the UI.
 // Each maps to a CSS modifier class (status--<key>).
 export const STATUS = {
+  ON_TIME: { key: 'ontime', label: 'On time' },
   SCHEDULED: { key: 'scheduled', label: 'Scheduled' },
   CHECKIN: { key: 'checkin', label: 'Check-in' },
   BOARDING: { key: 'boarding', label: 'Boarding' },
