@@ -1,7 +1,7 @@
 // Edinburgh live departures — tabbed orchestrator (Flights + Trains).
 
-import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATION, STATIONS } from './config.js?v=3';
-import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=3';
+import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATION, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=4';
+import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=4';
 import {
   demoProvider,
   makeLiveProvider,
@@ -9,8 +9,8 @@ import {
   makeTrainProvider,
   demoBusProvider,
   makeBusProvider,
-} from './providers.js?v=3';
-import { makeEmblem } from './emblems.js?v=3';
+} from './providers.js?v=4';
+import { makeEmblem } from './emblems.js?v=4';
 
 // ---- Settings (persisted) ------------------------------------------------
 
@@ -18,6 +18,7 @@ const settings = {
   flightProvider: localStorage.getItem(STORE.provider) || DEFAULTS.provider,
   apiKey: localStorage.getItem(STORE.apiKey) || '',
   proxyUrl: localStorage.getItem(STORE.proxyUrl) || '',
+  flightAirport: localStorage.getItem(STORE.flightAirport) || FLIGHT_DEFAULTS.airport,
   trainProvider: localStorage.getItem(STORE.trainProvider) || TRAIN_DEFAULTS.provider,
   trainStation: localStorage.getItem(STORE.trainStation) || TRAIN_DEFAULTS.station,
   trainBase: localStorage.getItem(STORE.trainBase) || '',
@@ -26,11 +27,12 @@ const settings = {
   refreshMs: Number(localStorage.getItem(STORE.refreshMs) ?? DEFAULTS.refreshMs),
 };
 
-const liveFlight = makeLiveProvider(() => settings.apiKey, () => settings.proxyUrl);
+const liveFlight = makeLiveProvider(() => settings.apiKey, () => settings.proxyUrl, () => settings.flightAirport);
 const liveTrain = makeTrainProvider(() => settings.trainBase, () => settings.trainStation);
 const liveBus = makeBusProvider(() => settings.proxyUrl, () => settings.busAtco);
 
 const stationName = (crs) => (STATIONS.find((s) => s.crs === crs) || {}).name || crs;
+const airport = (icao) => AIRPORTS.find((a) => a.icao === icao) || AIRPORTS[0];
 
 // ---- DOM helpers ---------------------------------------------------------
 
@@ -78,11 +80,13 @@ function opCell(emblem, lines) {
 
 const BOARDING_KEYS = ['boarding', 'gate', 'closing', 'final'];
 
-// Gate cell with a highlighted "go to gate" pill while boarding.
-function gateCell(value, active) {
+// Gate cell with a highlighted "go to gate" pill while boarding. Gates not
+// published by the live feed are filled with an indicative number, shown muted.
+function gateCell(value, active, indicative) {
   const cell = el('span', 'col-gate');
   const num = el('span', 'gate-num', value || '—');
   if (value && active) num.classList.add('gate-go');
+  else if (value && indicative) num.classList.add('gate-indicative');
   cell.appendChild(num);
   return cell;
 }
@@ -103,7 +107,7 @@ function buildFlightRow(f) {
   if (f.airline) lines.push(el('span', 'flight-airline', f.airline));
   row.appendChild(opCell(makeEmblem({ kind: 'flight', code: f.airlineCode, name: f.airline }), lines));
 
-  row.appendChild(gateCell(f.gate, BOARDING_KEYS.includes(f.status.key)));
+  row.appendChild(gateCell(f.gate, BOARDING_KEYS.includes(f.status.key), f.gateIndicative));
 
   const status = el('span', 'col-status');
   status.appendChild(el('span', `badge badge--${f.status.key}`, f.status.label));
@@ -188,9 +192,9 @@ const FEEDS = {
       f.airline.toLowerCase().includes(q),
     note: (live, err) =>
       err
-        ? `⚠ Live flights unavailable: ${err} Showing demo data.`
+        ? `⚠ Live flights unavailable for ${airport(settings.flightAirport).name}: ${err} Showing demo data.`
         : live
-          ? 'Live flights via AeroDataBox.'
+          ? `Live departures from ${airport(settings.flightAirport).name} Airport (AeroDataBox) · gates indicative where unpublished.`
           : 'Showing demo flights — add an API key in Settings ⚙ for live data.',
   },
   trains: {
@@ -398,12 +402,31 @@ function fillStationSelect() {
   );
 }
 
+function fillAirportSelect() {
+  const sel = $('flight-airport');
+  sel.replaceChildren(
+    ...AIRPORTS.map((a) => {
+      const o = el('option', null, `${a.name} (${a.iata})`);
+      o.value = a.icao;
+      return o;
+    }),
+  );
+}
+
+// Reflect the selected airport in the header brand.
+function updateAirportHeader() {
+  const a = airport(settings.flightAirport);
+  $('brand-name').textContent = `${a.name} Airport`;
+  $('brand-codes').textContent = `${a.iata} · ${a.icao}`;
+}
+
 function openSettings() {
   for (const r of document.querySelectorAll('input[name="provider"]')) r.checked = r.value === settings.flightProvider;
   for (const r of document.querySelectorAll('input[name="trainProvider"]')) r.checked = r.value === settings.trainProvider;
   for (const r of document.querySelectorAll('input[name="busProvider"]')) r.checked = r.value === settings.busProvider;
   $('api-key').value = settings.apiKey;
   $('proxy-url').value = settings.proxyUrl;
+  $('flight-airport').value = settings.flightAirport;
   $('train-station').value = settings.trainStation;
   $('train-base').value = settings.trainBase;
   $('bus-atco').value = settings.busAtco;
@@ -419,6 +442,7 @@ function saveSettings() {
   settings.busProvider = document.querySelector('input[name="busProvider"]:checked')?.value || 'demo';
   settings.apiKey = $('api-key').value.trim();
   settings.proxyUrl = $('proxy-url').value.trim().replace(/\/+$/, '');
+  settings.flightAirport = $('flight-airport').value;
   settings.trainStation = $('train-station').value;
   settings.trainBase = $('train-base').value.trim().replace(/\/+$/, '');
   settings.busAtco = $('bus-atco').value.trim();
@@ -432,9 +456,11 @@ function saveSettings() {
   localStorage.setItem(STORE.trainStation, settings.trainStation);
   localStorage.setItem(STORE.trainBase, settings.trainBase);
   localStorage.setItem(STORE.busAtco, settings.busAtco);
+  localStorage.setItem(STORE.flightAirport, settings.flightAirport);
   localStorage.setItem(STORE.refreshMs, String(settings.refreshMs));
 
   closeSettings();
+  updateAirportHeader();
   // Settings may have changed providers/station for any feed — reload all.
   state.flights.loaded = false;
   state.trains.loaded = false;
@@ -447,6 +473,8 @@ function saveSettings() {
 
 function init() {
   fillStationSelect();
+  fillAirportSelect();
+  updateAirportHeader();
   setActiveTabButton();
   searchEl.value = state[activeTab].search;
   searchEl.placeholder = FEEDS[activeTab].searchPlaceholder;

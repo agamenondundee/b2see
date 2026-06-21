@@ -22,10 +22,14 @@ Flights use [AeroDataBox](https://aerodatabox.com/) (free key); trains show
   rail/bus via Clearbit) with an instant colour-coded monogram fallback, so it
   always looks right even offline.
 - **Go-to-gate cue** — a flight's gate number lights up while it's boarding.
+  (AeroDataBox rarely publishes gates, so unpublished ones are filled with an
+  *indicative* number, shown muted.)
+- **All Scottish airports** — pick Edinburgh, Glasgow, Aberdeen, Inverness,
+  Prestwick, Dundee or any of the regional/island airports; the header follows.
 - **Live, no setup** — demo mode generates a plausible day of real routes
   (airlines / train & coach operators), with statuses that progress in real time.
 - **Real data** — AeroDataBox for flights; National Rail (Darwin via Huxley) for
-  trains; TransportAPI for buses. Station picker for trains.
+  trains; TransportAPI for buses. Airport & station pickers.
 - **Search & filter** — by destination, flight/operator/service, plus status chips.
 - **Auto-refresh** (30s–5min, or off) and a manual refresh.
 - **Edinburgh local time** everywhere, regardless of where you're viewing from.
