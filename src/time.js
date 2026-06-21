@@ -2,7 +2,7 @@
 // time regardless of where the viewer is, so all formatting is pinned to that
 // zone. Flights carry absolute Date instants; display/format happens here.
 
-import { AIRPORT } from './config.js?v=6';
+import { AIRPORT } from './config.js?v=7';
 
 // Milliseconds between UTC and Europe/London at a given instant (handles DST).
 export function londonOffsetMs(instant = Date.now()) {
