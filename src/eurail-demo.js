@@ -2,11 +2,11 @@
 //
 // A plausible pan-European intercity departure board (ICE, TGV, Eurostar,
 // Frecciarossa, Railjet, AVE, …). It isn't tied to one station — it's an
-// illustrative sample shown when live data (DB transport.rest) is unavailable or
+// illustrative sample shown when live data (Transitous) is unavailable or
 // when Demo is chosen, so the tab always looks alive with zero setup.
 
-import { londonTimeAt, minutesUntil } from './time.js?v=11';
-import { STATUS } from './config.js?v=11';
+import { londonTimeAt, minutesUntil } from './time.js?v=12';
+import { STATUS } from './config.js?v=12';
 
 const OPERATORS = {
   DB: 'Deutsche Bahn',

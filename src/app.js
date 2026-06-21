@@ -1,7 +1,7 @@
 // Edinburgh live departures — tabbed orchestrator (Flights, Trains, Buses, EU Rail).
 
-import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATIONS, EU_DEFAULTS, EU_STATIONS, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=11';
-import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=11';
+import { STORE, DEFAULTS, TRAIN_DEFAULTS, BUS_DEFAULTS, BUS_STATIONS, EU_DEFAULTS, EU_STATIONS, STATIONS, AIRPORTS, FLIGHT_DEFAULTS } from './config.js?v=12';
+import { fmtClockSeconds, fmtClock, fmtDate } from './time.js?v=12';
 import {
   demoProvider,
   makeLiveProvider,
@@ -11,8 +11,8 @@ import {
   makeBusProvider,
   demoEuRailProvider,
   makeEuRailProvider,
-} from './providers.js?v=11';
-import { makeEmblem } from './emblems.js?v=11';
+} from './providers.js?v=12';
+import { makeEmblem } from './emblems.js?v=12';
 
 // ---- Settings (persisted) ------------------------------------------------
 
@@ -42,7 +42,10 @@ const busAtco = () => settings.busAtco.trim() || busStation().atco;
 const liveFlight = makeLiveProvider(() => settings.apiKey, () => settings.proxyUrl, () => settings.flightAirport, dir);
 const liveTrain = makeTrainProvider(() => settings.trainBase, () => settings.trainStation, dir);
 const liveBus = makeBusProvider(() => settings.proxyUrl, busAtco, dir);
-const liveEuRail = makeEuRailProvider(() => settings.proxyUrl, () => settings.euBase, () => settings.euStation, dir);
+// Transitous needs the station's name + coordinates (to geocode the MOTIS stop),
+// so the provider gets the whole station object, not just its id.
+const euStation = () => EU_STATIONS.find((s) => s.id === settings.euStation) || EU_STATIONS[0];
+const liveEuRail = makeEuRailProvider(() => settings.proxyUrl, () => settings.euBase, euStation, dir);
 
 const stationName = (crs) => (STATIONS.find((s) => s.crs === crs) || {}).name || crs;
 const euStationName = (id) => (EU_STATIONS.find((s) => s.id === id) || {}).name || id;
@@ -303,7 +306,7 @@ const FEEDS = {
     note: (live, err) => {
       const name = euStationName(settings.euStation);
       if (err) return `⚠ Live EU rail for ${name}: ${err} Showing a sample board meanwhile.`;
-      if (live) return `Live ${dirWord()} for ${name} (Deutsche Bahn · transport.rest).`;
+      if (live) return `Live ${dirWord()} for ${name} (Transitous · MOTIS).`;
       return `Showing a sample European board (demo) — switch to Live for ${name}.`;
     },
   },
