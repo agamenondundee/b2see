@@ -3,15 +3,15 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=28';
-import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=28';
-import { DOCUMENTS } from './documents-data.js?v=28';
-import { REGISTER_SEED } from './data/registers.js?v=28';
-import { AUDIT_SEED } from './data/audits.js?v=28';
-import { CERT_BODY_SEED } from './data/cert-bodies.js?v=28';
+import { CONTROLS } from './data/controls.js?v=29';
+import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=29';
+import { DOCUMENTS } from './documents-data.js?v=29';
+import { REGISTER_SEED } from './data/registers.js?v=29';
+import { AUDIT_SEED } from './data/audits.js?v=29';
+import { CERT_BODY_SEED } from './data/cert-bodies.js?v=29';
 
 const NS = 'cloudax.isms.';
-const SEED_VERSION = 10;
+const SEED_VERSION = 11;
 
 export const CONFIG = {
   prefixes: { Policy: 'POL', Procedure: 'PROC', Standard: 'STD', Guideline: 'GUI', Plan: 'PLAN', Register: 'REG', Record: 'REC', Form: 'FORM' },
@@ -55,6 +55,11 @@ export const CONFIG = {
     ] },
     { key: 'legal', label: 'Legal and regulatory register', fields: [
       { name: 'requirement', label: 'Requirement' }, { name: 'source', label: 'Source' }, { name: 'owner', label: 'Owner' }, { name: 'reviewDate', label: 'Review date', type: 'date' },
+    ] },
+    { key: 'evidence', label: 'Evidence register', fields: [
+      { name: 'evidenceId', label: 'Evidence ID' }, { name: 'title', label: 'Title' },
+      { name: 'type', label: 'Type', type: 'select', options: ['Record', 'Report', 'Screenshot', 'Configuration', 'Log', 'Certificate', 'Ticket'] },
+      { name: 'controlRef', label: 'Annex A control' }, { name: 'date', label: 'Date', type: 'date' }, { name: 'owner', label: 'Owner' }, { name: 'location', label: 'Location' },
     ] },
     { key: 'context', label: 'Context and interested parties', fields: [
       { name: 'category', label: 'Category' }, { name: 'item', label: 'Issue or party' }, { name: 'requirements', label: 'Requirements' },
@@ -308,6 +313,12 @@ export function ensureSeed() {
       }
     }
     if (touched) write('aimsSoa', aims);
+  }
+  // Seed the evidence register once for systems created before it existed, but only if
+  // it is still empty, so a register the user has populated or cleared is left as it is.
+  if ((s.seedVersion || 0) < 11 && read('register.evidence', []).length === 0) {
+    const seed = REGISTER_SEED.evidence || [];
+    if (seed.length) write('register.evidence', seed.map((e) => ({ id: cid(), ...e })));
   }
   if (s.seedVersion !== SEED_VERSION) setSettings({ ...s, seedVersion: SEED_VERSION });
 }

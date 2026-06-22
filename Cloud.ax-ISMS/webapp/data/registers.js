@@ -64,6 +64,17 @@ export const REGISTER_SEED = {
     { requirement: 'Network and Information Systems Regulations', source: 'NIS Regulations 2018', owner: 'Information Security Lead', reviewDate: '2027-02-28' },
     { requirement: 'Computer Misuse Act 1990', source: 'UK statute', owner: 'Information Security Lead', reviewDate: '2027-02-28' },
   ],
+  evidence: [
+    { evidenceId: 'EV-001', title: 'Quarterly access review export', type: 'Record', controlRef: 'A.5.18', date: '2026-04-05', owner: 'Information Security Lead', location: 'Confluence: Security / Access reviews' },
+    { evidenceId: 'EV-002', title: 'Backup restoration test report', type: 'Report', controlRef: 'A.8.13', date: '2026-03-20', owner: 'Head of Platform', location: 'Confluence: Platform / Disaster recovery' },
+    { evidenceId: 'EV-003', title: 'Joiner and leaver records', type: 'Record', controlRef: 'A.6.5', date: '2026-05-01', owner: 'IT Manager', location: 'HR system' },
+    { evidenceId: 'EV-004', title: 'Annual penetration test report', type: 'Report', controlRef: 'A.8.8', date: '2026-02-15', owner: 'Information Security Lead', location: 'Vault: Pentests / 2026' },
+    { evidenceId: 'EV-005', title: 'Encryption configuration baseline', type: 'Configuration', controlRef: 'A.8.24', date: '2026-01-30', owner: 'Head of Engineering', location: 'Git: infrastructure / security' },
+    { evidenceId: 'EV-006', title: 'Security awareness training completion', type: 'Record', controlRef: 'A.6.3', date: '2026-04-30', owner: 'IT Manager', location: 'Learning platform export' },
+    { evidenceId: 'EV-007', title: 'Supplier due diligence pack', type: 'Record', controlRef: 'A.5.19', date: '2026-03-10', owner: 'Procurement Lead', location: 'Confluence: Suppliers' },
+    { evidenceId: 'EV-008', title: 'Logging and monitoring dashboard', type: 'Screenshot', controlRef: 'A.8.15', date: '2026-05-18', owner: 'Head of Platform', location: 'Datadog' },
+    { evidenceId: 'EV-009', title: 'Cloud configuration review', type: 'Report', controlRef: 'A.5.23', date: '2026-04-22', owner: 'Head of Platform', location: 'Confluence: Cloud security' },
+  ],
   context: [
     { category: 'Internal issue', item: 'Rapid product growth and frequent AI feature delivery', requirements: 'Security must scale without slowing delivery', climate: 'No' },
     { category: 'External issue', item: 'Evolving AI regulation in the UK and EU', requirements: 'Maintain compliance with the EU AI Act and UK guidance', climate: 'No' },
