@@ -2,16 +2,16 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=45';
-import { CLAUSES } from './data/clauses.js?v=45';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=45';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=45';
-import { LANGUAGES, STRINGS } from './i18n.js?v=45';
+import { CONTROLS } from './data/controls.js?v=46';
+import { CLAUSES } from './data/clauses.js?v=46';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=46';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=46';
+import { LANGUAGES, STRINGS } from './i18n.js?v=46';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=45';
+} from './store.js?v=46';
 
 // Interface language. t(key) returns the string for the current language, falling back
 // to English, then to the key itself, so a missing translation never breaks the page.
@@ -210,7 +210,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=45').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=46').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -1511,6 +1511,28 @@ function calendarEvents() {
   return ev.sort((a, b) => a.t - b.t);
 }
 
+// A timeline of dated obligations over the next year, in swimlanes by type. Each marker
+// is coloured by urgency and links to where the obligation is managed.
+function complianceTimeline(events) {
+  const now = Date.now(); const span = 365 * 86400000; const t1 = now + span;
+  const inRange = events.filter((e) => e.t <= t1);
+  if (!inRange.length) return '<p class="muted">No dated obligations in the next year.</p>';
+  const types = Array.from(new Set(inRange.map((e) => e.type)));
+  const W = 920; const left = 168; const right = 22; const top = 24; const laneH = 32; const H = top + types.length * laneH + 26;
+  const plotW = W - left - right;
+  const x = (tm) => left + ((Math.max(now, Math.min(t1, tm)) - now) / span) * plotW;
+  const months = []; const d0 = new Date(); d0.setDate(1);
+  for (let i = 0; i <= 12; i++) { const md = new Date(d0.getFullYear(), d0.getMonth() + i, 1); if (md.getTime() > t1) break; months.push(md); }
+  const grid = months.map((md) => { const gx = x(md.getTime()); return `<line x1="${gx.toFixed(1)}" y1="${top - 6}" x2="${gx.toFixed(1)}" y2="${(H - 20).toFixed(1)}" class="tl-grid"/><text x="${gx.toFixed(1)}" y="${H - 6}" class="tl-axis" text-anchor="middle">${md.toLocaleDateString('en-GB', { month: 'short' })}</text>`; }).join('');
+  const lanes = types.map((ty, i) => {
+    const y = top + i * laneH + laneH / 2;
+    const head = `<text x="${left - 10}" y="${(y + 3).toFixed(1)}" class="tl-lane" text-anchor="end">${esc(ty)}</text><line x1="${left}" y1="${y.toFixed(1)}" x2="${(W - right).toFixed(1)}" y2="${y.toFixed(1)}" class="tl-base"/>`;
+    const dots = inRange.filter((e) => e.type === ty).map((e) => { const inner = `<circle cx="${x(e.t).toFixed(1)}" cy="${y.toFixed(1)}" r="5.5" class="tl-dot ${e.kind}"><title>${esc(fmtDate(e.date))}: ${esc(e.title)}</title></circle>`; return e.view ? `<a href="#/${e.view}" class="dfd-link">${inner}</a>` : inner; }).join('');
+    return head + dots;
+  }).join('');
+  return `<svg class="tl" viewBox="0 0 ${W} ${H}" role="img" aria-label="Compliance timeline">${grid}${lanes}</svg>`;
+}
+
 function renderCalendar() {
   const ev = calendarEvents();
   const now = Date.now();
@@ -1530,6 +1552,9 @@ function renderCalendar() {
   viewEl().innerHTML = `<h2>${esc(routeTitle('calendar'))}</h2>
     <div class="panel"><div class="panel-head"><h3>Obligations</h3><span class="muted">${ev.length} dated obligations across the management system</span></div>
       <div class="mini-cards">${mini(overdue.length, 'Overdue', overdue.length ? 'danger' : 'ok')}${mini(soon.length, 'Due within 30 days', soon.length ? 'warn' : 'ok')}${mini(upcoming.length, 'In the next year')}</div>
+    </div>
+    <div class="panel"><div class="panel-head"><h3>Timeline</h3><span class="legend" style="margin:0"><span class="leg"><i class="dot danger"></i>Overdue</span><span class="leg"><i class="dot warn"></i>Due soon</span><span class="leg"><i class="dot info"></i>Scheduled</span></span></div>
+      ${complianceTimeline(ev)}
     </div>
     ${overdue.length ? `<div class="panel"><div class="panel-head"><h3>Overdue</h3><span class="pill danger">${overdue.length}</span></div>${table(cols, overdue.map(evRow))}</div>` : ''}
     ${monthKeys.length ? monthKeys.map((k) => { const items = groups[k].items; const shown = items.slice(0, 25); return `<div class="panel"><div class="panel-head"><h3>${esc(groups[k].label)}</h3><span class="muted">${items.length} item${items.length === 1 ? '' : 's'}</span></div>${table(cols, shown.map(evRow))}${items.length > 25 ? `<p class="muted">and ${items.length - 25} more this month.</p>` : ''}</div>`; }).join('') : '<div class="panel"><p class="muted">No scheduled obligations in the next year.</p></div>'}`;

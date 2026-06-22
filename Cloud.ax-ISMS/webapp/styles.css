@@ -455,6 +455,10 @@ mark { background: #fde68a; color: inherit; padding: 0 2px; border-radius: 3px; 
 .gantt-bar.warn, .gantt-dot.warn { fill: var(--warn-solid); }
 .gantt-bar.info, .gantt-dot.info { fill: var(--info-solid); }
 .dfd-link:hover .gantt-dot { stroke: var(--brand); stroke-width: 2.5; }
+.tl-dot.overdue { fill: var(--danger-solid); }
+.tl-dot.soon { fill: var(--warn-solid); }
+.tl-dot.future { fill: var(--info-solid); }
+.dfd-link:hover .tl-dot { stroke: var(--brand); stroke-width: 2.5; }
 /* Supplier data residency columns */
 .res-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 4px; }
 .res-col { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; background: var(--panel); }
