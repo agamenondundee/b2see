@@ -3,12 +3,12 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=8';
-import { DOCUMENTS } from './documents-data.js?v=8';
-import { REGISTER_SEED } from './data/registers.js?v=8';
+import { CONTROLS } from './data/controls.js?v=9';
+import { DOCUMENTS } from './documents-data.js?v=9';
+import { REGISTER_SEED } from './data/registers.js?v=9';
 
 const NS = 'cloudax.isms.';
-const SEED_VERSION = 4;
+const SEED_VERSION = 5;
 
 export const CONFIG = {
   prefixes: { Policy: 'POL', Procedure: 'PROC', Standard: 'STD', Guideline: 'GUI', Plan: 'PLAN', Register: 'REG', Record: 'REC', Form: 'FORM' },
@@ -24,6 +24,7 @@ export const CONFIG = {
       { name: 'riskId', label: 'Risk ID' }, { name: 'description', label: 'Description' },
       { name: 'likelihood', label: 'Likelihood', type: 'number' }, { name: 'impact', label: 'Impact', type: 'number' },
       { name: 'treatment', label: 'Treatment', type: 'select', options: ['Modify', 'Retain', 'Avoid', 'Share'] },
+      { name: 'relatedControls', label: 'Related controls' },
       { name: 'owner', label: 'Owner' }, { name: 'status', label: 'Status' }, { name: 'reviewDate', label: 'Review date', type: 'date' },
     ] },
     { key: 'asset', label: 'Asset register', fields: [
@@ -204,6 +205,15 @@ export function ensureSeed() {
         write('register.' + r.key, seed.map((e) => ({ id: cid(), ...e })));
       }
     }
+  }
+  // Backfill the controls that treat each risk onto existing risk entries, matched by
+  // risk identifier, without disturbing any other recorded values.
+  if ((s.seedVersion || 0) < 5) {
+    const seedControls = Object.fromEntries((REGISTER_SEED.risk || []).map((r) => [r.riskId, r.relatedControls]));
+    const risks = read('register.risk', []);
+    let touched = false;
+    for (const r of risks) { if (!r.relatedControls && seedControls[r.riskId]) { r.relatedControls = seedControls[r.riskId]; touched = true; } }
+    if (touched) write('register.risk', risks);
   }
   if (s.seedVersion !== SEED_VERSION) setSettings({ ...s, seedVersion: SEED_VERSION });
 }

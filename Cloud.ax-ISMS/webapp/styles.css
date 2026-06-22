@@ -289,6 +289,31 @@ td .soon-date { color: var(--warn); font-weight: 600; }
 .snippet { color: var(--muted); font-size: 13px; margin-top: 4px; line-height: 1.55; }
 mark { background: #fde68a; color: inherit; padding: 0 2px; border-radius: 3px; }
 
+/* ---- Readiness and audit pack ------------------------------------------ */
+
+.readiness-hero { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+.ring { position: relative; width: 128px; height: 128px; border-radius: 50%; flex: none; background: conic-gradient(var(--ring-c, var(--brand)) calc(var(--p, 0) * 3.6deg), var(--line-2) 0); }
+.ring.ok { --ring-c: var(--ok-solid); }
+.ring.warn { --ring-c: var(--warn-solid); }
+.ring.danger { --ring-c: var(--danger-solid); }
+.ring .inner { position: absolute; inset: 12px; background: var(--panel); border-radius: 50%; display: grid; place-items: center; text-align: center; }
+.ring .v { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+.ring .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.readiness-sum { flex: 1; min-width: 260px; }
+.checks { display: flex; flex-direction: column; gap: 8px; }
+.check { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-sm); text-decoration: none; color: inherit; background: var(--panel); transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease; }
+.check:hover { border-color: var(--brand); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+.check .pill { flex: none; margin-top: 1px; }
+.check-body { display: flex; flex-direction: column; }
+.check-label { font-weight: 600; color: var(--ink); }
+.check-detail { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+.report h1 { font-size: 24px; margin: 0 0 2px; }
+.report .cover h2 { margin: 0 0 8px; color: var(--brand-700); }
+.report-section { margin-bottom: 24px; }
+.report .matrix .heat { cursor: default; }
+@media print { .report-section.break { break-before: page; } .report-section { break-inside: avoid; } }
+
 /* ---- Motion ------------------------------------------------------------- */
 
 @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
