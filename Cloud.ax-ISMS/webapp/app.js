@@ -2,12 +2,12 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=8';
-import { CLAUSES } from './data/clauses.js?v=8';
+import { CONTROLS } from './data/controls.js?v=9';
+import { CLAUSES } from './data/clauses.js?v=9';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, cid, addMonths, nextReference,
-} from './store.js?v=8';
+} from './store.js?v=9';
 
 ensureSeed();
 
@@ -51,15 +51,16 @@ const ICONS = {
   framework: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 8.6 8 11 4.6-2.4 8-6 8-11V5z"/><path d="m9 12 2 2 4-4"/></svg>',
   soa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
   registers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>',
+  readiness: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h1V5a1 1 0 0 1 1-1z"/><path d="m9 13 2 2 4-4"/></svg>',
   audit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
 };
 
 const ROUTE_TITLES = {
-  dashboard: 'Dashboard', documents: 'Documents', framework: 'Framework',
+  dashboard: 'Dashboard', readiness: 'Certification readiness', documents: 'Documents', framework: 'Framework',
   soa: 'Statement of Applicability', registers: 'Registers', audit: 'Audit log',
-  search: 'Search', settings: 'Settings',
+  search: 'Search', settings: 'Settings', report: 'Audit pack',
 };
 
 function pct(n, d) { return d ? Math.round((n / d) * 100) : 0; }
@@ -115,7 +116,7 @@ function animateCounts(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=8').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=9').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -148,6 +149,10 @@ function reviewCell(iso) {
   if (dueSoon(iso)) return `<span class="soon-date">${fmtDate(iso)}</span> ${pill('soon', 'warn')}`;
   return fmtDate(iso);
 }
+function controlChips(s) {
+  const refs = (s || '').split(',').map((x) => x.trim()).filter(Boolean);
+  return refs.length ? refs.map((r) => `<span class="chip">${esc(r)}</span>`).join('') : '<span class="muted">-</span>';
+}
 
 function riskMatrix(rows) {
   const at = (l, i) => rows.filter((r) => num(r.likelihood) === l && num(r.impact) === i).length;
@@ -168,9 +173,9 @@ function riskMatrix(rows) {
 // optional default sort. Falls back to the raw fields when a register has no entry.
 const REG_DISPLAY = {
   risk: {
-    columns: [{ key: 'riskId', label: 'Risk ID' }, { key: 'description', label: 'Description' }, { key: 'l', label: 'L' }, { key: 'i', label: 'I' }, { key: 'score', label: 'Score' }, { key: 'level', label: 'Level' }, { key: 'treatment', label: 'Treatment' }, { key: 'owner', label: 'Owner' }, { key: 'status', label: 'Status' }, { key: 'review', label: 'Review' }],
+    columns: [{ key: 'riskId', label: 'Risk ID' }, { key: 'description', label: 'Description' }, { key: 'l', label: 'L' }, { key: 'i', label: 'I' }, { key: 'score', label: 'Score' }, { key: 'level', label: 'Level' }, { key: 'treatment', label: 'Treatment' }, { key: 'controls', label: 'Controls' }, { key: 'owner', label: 'Owner' }, { key: 'status', label: 'Status' }, { key: 'review', label: 'Review' }],
     sort: (a, b) => riskScore(b) - riskScore(a),
-    row: (e) => { const s = riskScore(e); const lv = riskLevel(s); return { riskId: esc(e.riskId), description: esc(e.description), l: esc(num(e.likelihood) || '-'), i: esc(num(e.impact) || '-'), score: `<b>${s || '-'}</b>`, level: pill(lv.label, lv.kind), treatment: `<span class="chip">${esc(e.treatment || '-')}</span>`, owner: esc(e.owner), status: pill(e.status || '-', riskStatusKind(e.status)), review: reviewCell(e.reviewDate) }; },
+    row: (e) => { const s = riskScore(e); const lv = riskLevel(s); return { riskId: esc(e.riskId), description: esc(e.description), l: esc(num(e.likelihood) || '-'), i: esc(num(e.impact) || '-'), score: `<b>${s || '-'}</b>`, level: pill(lv.label, lv.kind), treatment: `<span class="chip">${esc(e.treatment || '-')}</span>`, controls: controlChips(e.relatedControls), owner: esc(e.owner), status: pill(e.status || '-', riskStatusKind(e.status)), review: reviewCell(e.reviewDate) }; },
   },
   asset: {
     columns: [{ key: 'assetId', label: 'Asset ID' }, { key: 'name', label: 'Name' }, { key: 'type', label: 'Type' }, { key: 'owner', label: 'Owner' }, { key: 'classification', label: 'Classification' }, { key: 'status', label: 'Status' }],
@@ -301,7 +306,7 @@ function applyTransition(doc, action) {
 
 function shell(active) {
   const nav = [
-    ['dashboard', 'Dashboard'], ['documents', 'Documents'], ['framework', 'Framework'],
+    ['dashboard', 'Dashboard'], ['readiness', 'Readiness'], ['documents', 'Documents'], ['framework', 'Framework'],
     ['soa', 'Statement of Applicability'], ['registers', 'Registers'],
   ];
   if (can('ISMS Manager')) nav.push(['audit', 'Audit log']);
@@ -805,6 +810,130 @@ function renderRegisters() {
   if (cancel) cancel.addEventListener('click', () => { regEditingId = null; renderRegisters(); });
 }
 
+function readinessData() {
+  const docs = getCollection('documents');
+  const soa = getCollection('soa');
+  const now = Date.now();
+  const published = docs.filter((d) => d.status === 'Published');
+  const linkedClause = new Set(docs.flatMap((d) => d.clauseRefs || []));
+  const mandatory = CLAUSES.filter((c) => c.mandatory.length > 0);
+  const clauseGaps = mandatory.filter((c) => !linkedClause.has(c.number));
+  const decided = soa.filter((s) => s.applicable !== null);
+  const undecided = soa.length - decided.length;
+  const unjustified = decided.filter((s) => !(s.justification || '').trim()).length;
+  const applicable = soa.filter((s) => s.applicable === true);
+  const implemented = applicable.filter((s) => ['Implemented', 'Verified'].includes(s.status)).length;
+  const overdueDocs = published.filter((d) => d.nextReviewDate && new Date(d.nextReviewDate).getTime() < now).length;
+  const risks = getCollection('register.risk');
+  const risksUntreated = risks.filter((r) => !(r.treatment || '').trim() || !(r.owner || '').trim()).length;
+  const ncOverdue = getCollection('register.nonconformity').filter((r) => r.dueDate && new Date(r.dueDate).getTime() < now && !/clos|resolv|verif|complet/i.test(r.status)).length;
+  const audits = getCollection('register.audit');
+  const auditDone = audits.some((a) => /complet/i.test(a.status));
+  const auditPlanned = audits.some((a) => /plan|schedul/i.test(a.status));
+  const mrDates = getCollection('register.management-review').map((r) => r.date).filter(Boolean).sort();
+  const lastMr = mrDates.filter((d) => new Date(d) <= new Date()).pop();
+  const mrCurrent = lastMr && (now - new Date(lastMr).getTime()) < 366 * 86400000;
+  const suppliers = getCollection('register.supplier');
+  const supNoDpa = suppliers.filter((s) => !/^y/i.test(s.dpa || '')).length;
+  const supOverdue = suppliers.filter((s) => s.reviewDate && new Date(s.reviewDate).getTime() < now).length;
+  const ctx = getCollection('register.context').length;
+  const C = (label, ok, sev, detail, view) => ({ label, ok, sev: ok ? 'ok' : sev, detail, view });
+  return [
+    C('Mandatory documented information', clauseGaps.length === 0, 'danger', `${mandatory.length - clauseGaps.length} of ${mandatory.length} clauses with required records are covered`, 'framework'),
+    C('Statement of Applicability decided', undecided === 0, 'danger', undecided === 0 ? 'All controls have an applicability decision' : `${undecided} controls undecided`, 'soa'),
+    C('Applicability justified', unjustified === 0, 'danger', unjustified === 0 ? 'Every decided control has a justification' : `${unjustified} decided controls need a justification`, 'soa'),
+    C('Applicable controls implemented', applicable.length > 0 && implemented === applicable.length, 'warn', `${implemented} of ${applicable.length} applicable controls implemented or verified`, 'framework'),
+    C('Document reviews current', overdueDocs === 0, 'danger', overdueDocs === 0 ? 'No published document is overdue for review' : `${overdueDocs} documents overdue for review`, 'documents'),
+    C('Risk treatment recorded', risks.length > 0 && risksUntreated === 0, 'warn', `${risks.length - risksUntreated} of ${risks.length} risks have an owner and a treatment`, 'registers'),
+    C('Corrective actions on track', ncOverdue === 0, 'danger', ncOverdue === 0 ? 'No corrective action is overdue' : `${ncOverdue} corrective actions overdue`, 'registers'),
+    C('Internal audit programme', auditDone && auditPlanned, 'warn', `${auditDone ? 'A completed audit is recorded' : 'No completed audit recorded'}; ${auditPlanned ? 'a future audit is planned' : 'no future audit planned'}`, 'registers'),
+    C('Management review current', !!mrCurrent, 'danger', lastMr ? `Last management review ${fmtDate(lastMr)}` : 'No management review recorded', 'registers'),
+    C('Supplier assurance', supNoDpa === 0 && supOverdue === 0, 'warn', `${supNoDpa} without a data processing agreement, ${supOverdue} reviews overdue`, 'registers'),
+    C('Context and interested parties', ctx > 0, 'warn', `${ctx} context entries recorded`, 'registers'),
+  ];
+}
+
+function renderReadiness() {
+  const checks = readinessData();
+  const met = checks.filter((c) => c.ok).length;
+  const score = pct(met, checks.length);
+  const ring = score >= 90 ? 'ok' : score >= 70 ? 'warn' : 'danger';
+  viewEl().innerHTML = `
+    <h2>Certification readiness</h2>
+    <div class="panel">
+      <div class="readiness-hero">
+        <div class="ring ${ring}" style="--p:${score}"><div class="inner"><div class="v">${score}%</div><div class="l">ready</div></div></div>
+        <div class="readiness-sum">
+          <p><strong>${met} of ${checks.length} readiness checks met</strong> against ISO/IEC 27001:2022.</p>
+          <p class="muted">A live view of how close the management system is to certification, drawn from the documents, the Statement of Applicability and the registers. Each check links to where it is managed.</p>
+          <div class="toolbar"><button id="audit-pack">Generate audit pack</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel"><div class="panel-head"><h3>Readiness checks</h3><span class="muted">${met} met, ${checks.length - met} to address</span></div>
+      <div class="checks">${checks.map((c) => `
+        <a class="check" href="#/${c.view}">
+          <span class="pill ${c.sev}">${c.ok ? 'Met' : c.sev === 'danger' ? 'Gap' : 'Action'}</span>
+          <span class="check-body"><span class="check-label">${esc(c.label)}</span><span class="check-detail">${esc(c.detail)}</span></span>
+        </a>`).join('')}</div>
+    </div>`;
+  const btn = document.getElementById('audit-pack');
+  if (btn) btn.addEventListener('click', () => go('report'));
+}
+
+function renderReport() {
+  const docs = getCollection('documents');
+  const soa = getCollection('soa');
+  const ctrlByRef = Object.fromEntries(CONTROLS.map((c) => [c.ref, c]));
+  const checks = readinessData();
+  const met = checks.filter((c) => c.ok).length;
+  const score = pct(met, checks.length);
+  const applicable = soa.filter((s) => s.applicable === true).length;
+  const excluded = soa.filter((s) => s.applicable === false).length;
+  const undecided = soa.length - applicable - excluded;
+  const risks = getCollection('register.risk').slice().sort((a, b) => riskScore(b) - riskScore(a));
+  const linkedClause = new Set(docs.flatMap((d) => d.clauseRefs || []));
+  const gaps = CLAUSES.filter((c) => c.mandatory.length > 0 && !linkedClause.has(c.number));
+  const audits = getCollection('register.audit');
+  const mrs = getCollection('register.management-review');
+  const today = new Date().toISOString().slice(0, 10);
+  viewEl().innerHTML = `
+    <div class="toolbar"><button class="secondary" id="pack-back">Back</button><button id="print-pack">Print or save as PDF</button></div>
+    <div class="report">
+      <section class="report-section cover">
+        <h1>Information Security Management System</h1>
+        <h2>Audit pack</h2>
+        <p class="muted">Cloudax Ltd, Cloudax Connect Conversational AI Platform</p>
+        <p class="muted">ISO/IEC 27001:2022 and ISO/IEC 42001:2023 | Generated ${today} | Classification: Internal</p>
+        <div class="ring ${score >= 90 ? 'ok' : score >= 70 ? 'warn' : 'danger'}" style="--p:${score}"><div class="inner"><div class="v">${score}%</div><div class="l">ready</div></div></div>
+      </section>
+      <section class="report-section break"><h3>Readiness summary</h3>${table(
+        [{ key: 'check', label: 'Check' }, { key: 'status', label: 'Status' }, { key: 'detail', label: 'Detail' }],
+        checks.map((c) => ({ __html: true, check: esc(c.label), status: pill(c.ok ? 'Met' : c.sev === 'danger' ? 'Gap' : 'Action', c.sev), detail: esc(c.detail) })),
+      )}</section>
+      <section class="report-section break"><h3>Statement of Applicability</h3>
+        ${stackedBar([{ label: 'Applicable', value: applicable, kind: 'ok' }, { label: 'Excluded', value: excluded, kind: 'neutral' }, { label: 'Undecided', value: undecided, kind: 'warn' }])}
+        ${table(
+          [{ key: 'ref', label: 'Control' }, { key: 'title', label: 'Title' }, { key: 'app', label: 'Applicable' }, { key: 'status', label: 'Status' }, { key: 'just', label: 'Justification' }],
+          soa.map((s) => ({ __html: true, ref: esc(s.ref), title: esc(ctrlByRef[s.ref] ? ctrlByRef[s.ref].title : ''), app: applicablePill(s.applicable), status: s.applicable === true ? pill(s.status, statusKind(s.status)) : '<span class="muted">-</span>', just: esc(s.justification || '') })),
+        )}</section>
+      <section class="report-section break"><h3>Risk summary</h3>
+        <div class="matrix-wrap"><div>${riskMatrix(risks)}</div></div>
+        ${table(
+          [{ key: 'id', label: 'Risk' }, { key: 'desc', label: 'Description' }, { key: 'score', label: 'Score' }, { key: 'level', label: 'Level' }, { key: 'treat', label: 'Treatment' }, { key: 'ctrls', label: 'Controls' }, { key: 'owner', label: 'Owner' }],
+          risks.map((r) => { const sc = riskScore(r); const lv = riskLevel(sc); return { __html: true, id: esc(r.riskId), desc: esc(r.description), score: `<b>${sc}</b>`, level: pill(lv.label, lv.kind), treat: esc(r.treatment), ctrls: esc(r.relatedControls || ''), owner: esc(r.owner) }; }),
+        )}</section>
+      <section class="report-section break"><h3>Mandatory documented information</h3>${gaps.length ? table([{ key: 'number', label: 'Clause' }, { key: 'title', label: 'Title' }, { key: 'rec', label: 'Required record' }], gaps.map((g) => ({ number: g.number, title: g.title, rec: g.mandatory.join('; ') }))) : '<p>No gaps. Every clause that requires documented information has a linked document.</p>'}</section>
+      <section class="report-section break"><h3>Internal audit programme</h3>${table([{ key: 'auditId', label: 'Audit' }, { key: 'scope', label: 'Scope' }, { key: 'date', label: 'Date' }, { key: 'auditor', label: 'Auditor' }, { key: 'status', label: 'Status' }], audits.map((a) => ({ auditId: a.auditId, scope: a.scope, date: fmtDate(a.date), auditor: a.auditor, status: a.status })))}</section>
+      <section class="report-section"><h3>Management review log</h3>${table([{ key: 'reviewId', label: 'Review' }, { key: 'date', label: 'Date' }, { key: 'attendees', label: 'Attendees' }, { key: 'decisions', label: 'Decisions' }], mrs.map((m) => ({ reviewId: m.reviewId, date: fmtDate(m.date), attendees: m.attendees, decisions: m.decisions })))}</section>
+      <section class="report-section break"><h3>Controlled document register</h3>${table([{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'sys', label: 'System' }, { key: 'ver', label: 'Version' }, { key: 'status', label: 'Status' }, { key: 'review', label: 'Review by' }], docs.map((d) => ({ __html: true, ref: esc(d.ref), title: esc(d.title), sys: esc(d.system || ''), ver: esc(d.currentVersion || ''), status: pill(d.status), review: esc(fmtDate(d.nextReviewDate) || '-') })))}</section>
+    </div>`;
+  const back = document.getElementById('pack-back');
+  if (back) back.addEventListener('click', () => go('readiness'));
+  const p = document.getElementById('print-pack');
+  if (p) p.addEventListener('click', () => window.print());
+}
+
 function renderAudit() {
   if (!can('ISMS Manager')) { viewEl().innerHTML = '<p class="error">The audit log is available to the ISMS Manager and Administrator roles.</p>'; return; }
   const log = getCollection('audit');
@@ -928,9 +1057,9 @@ function navigate() {
   const [route, param] = parseHash();
   shell(route);
   const views = {
-    dashboard: renderDashboard, documents: () => (param ? renderDocumentDetail(param) : renderDocuments()),
+    dashboard: renderDashboard, readiness: renderReadiness, documents: () => (param ? renderDocumentDetail(param) : renderDocuments()),
     framework: renderFramework, soa: renderSoa, registers: renderRegisters, audit: renderAudit,
-    search: renderSearch, settings: renderSettings,
+    search: renderSearch, settings: renderSettings, report: renderReport,
   };
   (views[route] || renderDashboard)();
   viewEl().focus();
