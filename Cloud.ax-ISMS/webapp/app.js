@@ -2,13 +2,14 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=19';
-import { CLAUSES } from './data/clauses.js?v=19';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=19';
+import { CONTROLS } from './data/controls.js?v=20';
+import { CLAUSES } from './data/clauses.js?v=20';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=20';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=20';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
-} from './store.js?v=19';
+} from './store.js?v=20';
 
 ensureSeed();
 applyTheme();
@@ -51,6 +52,7 @@ const ICONS = {
   dashboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>',
   documents: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8"/></svg>',
   framework: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 8.6 8 11 4.6-2.4 8-6 8-11V5z"/><path d="m9 12 2 2 4-4"/></svg>',
+  aims: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="7" width="14" height="12" rx="2"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/><path d="M9 12h.01M15 12h.01M9.5 15.5a3 3 0 0 0 5 0"/></svg>',
   soa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
   registers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>',
   readiness: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h1V5a1 1 0 0 1 1-1z"/><path d="m9 13 2 2 4-4"/></svg>',
@@ -81,7 +83,7 @@ function toggleTheme() {
 
 const ROUTE_TITLES = {
   dashboard: 'Dashboard', readiness: 'Certification readiness', calendar: 'Compliance calendar', documents: 'Documents', framework: 'Framework',
-  soa: 'Statement of Applicability', registers: 'Registers', audits: 'Internal audits', certbody: 'Certification body', audit: 'Audit log',
+  soa: 'Statement of Applicability', aims: 'AI management (42001)', registers: 'Registers', audits: 'Internal audits', certbody: 'Certification body', audit: 'Audit log',
   search: 'Search', settings: 'Settings', report: 'Audit pack',
 };
 
@@ -157,7 +159,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=19').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=20').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -379,7 +381,7 @@ function applyTransition(doc, action) {
 function shell(active) {
   const nav = [
     ['dashboard', 'Dashboard'], ['readiness', 'Readiness'], ['calendar', 'Calendar'], ['documents', 'Documents'], ['framework', 'Framework'],
-    ['soa', 'Statement of Applicability'], ['registers', 'Registers'], ['audits', 'Internal audits'], ['certbody', 'Certification body'],
+    ['soa', 'Statement of Applicability'], ['aims', 'AI management (42001)'], ['registers', 'Registers'], ['audits', 'Internal audits'], ['certbody', 'Certification body'],
   ];
   if (can('ISMS Manager')) nav.push(['audit', 'Audit log']);
   nav.push(['search', 'Search'], ['settings', 'Settings']);
@@ -831,6 +833,117 @@ function renderSoa() {
     setCollection('soa', soa);
     audit('Updated', 'SoaEntry', 'Statement of Applicability');
     renderSoa();
+  });
+}
+
+const aimsFilter = { obj: 'All', status: 'All', q: '' };
+function renderAims() {
+  const rows = getCollection('aimsSoa');
+  const byRef = Object.fromEntries(AIMS_CONTROLS.map((c) => [c.ref, c]));
+  const objName = Object.fromEntries(AIMS_OBJECTIVES.map((o) => [o.ref, o.name]));
+  const editable = can('ISMS Manager');
+  const applicable = rows.filter((s) => s.applicable === true).length;
+  const excluded = rows.filter((s) => s.applicable === false).length;
+  const undecided = rows.length - applicable - excluded;
+  const implemented = rows.filter((s) => s.applicable === true && (s.status === 'Implemented' || s.status === 'Verified')).length;
+  // Signals drawn from elsewhere in the management system, so the AI view is connected
+  // to the risks, obligations and competence already recorded rather than standing alone.
+  const matches = (coll, re) => getCollection('register.' + coll).filter((e) => re.test(JSON.stringify(e))).length;
+  const aiRisks = matches('risk', /\bAI\b|model|prompt|inference/i);
+  const aiLegal = matches('legal', /\bAI\b/i);
+  const aiTraining = matches('competence', /\bAI\b|42001|responsible/i);
+  const objSelOpts = ['All', ...AIMS_OBJECTIVES.map((o) => `${o.ref} ${o.name}`)];
+  const sel = (id, opts, cur, width) => `<select id="${id}" aria-label="${id}"${width ? ` style="max-width:${width}px"` : ''}>${opts.map((o) => `<option ${o === cur ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  viewEl().innerHTML = `
+    <h2>AI management system, ISO/IEC 42001:2023</h2>
+    <div class="panel"><p class="muted" style="margin:0">The AI management system extends the information security management system to the specific risks of building and operating AI. Personal data is held in the UK or EU only. Annex A below records applicability and implementation for each reference control, in the same way as the Statement of Applicability.</p>
+      <div class="mini-cards" style="margin-top:12px">
+        ${mini(aiRisks, 'AI related risks on the register', aiRisks ? 'warn' : '')}
+        ${mini(aiLegal, 'AI legal and regulatory obligations', '')}
+        ${mini(aiTraining, 'AI competence and training records', aiTraining ? 'ok' : '')}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Annex A applicability</h3><span class="muted">${applicable} applicable, ${implemented} implemented, ${rows.length} controls</span></div>
+      ${stackedBar([
+        { label: 'Applicable', value: applicable, kind: 'ok' },
+        { label: 'Excluded', value: excluded, kind: 'neutral' },
+        { label: 'Undecided', value: undecided, kind: 'warn' },
+      ])}
+    </div>
+    <div class="toolbar">
+      ${sel('aims-obj', objSelOpts, aimsFilter.obj, 240)}
+      ${sel('aims-status', ['All', 'Applicable', 'Excluded', 'Undecided', ...CONFIG.implementationStatuses], aimsFilter.status, 160)}
+      <input id="aims-q" placeholder="Filter by reference or title" value="${esc(aimsFilter.q)}" style="width:220px" aria-label="Filter AI controls" />
+      <span class="badge" id="aims-count"></span>
+      <span class="spacer"></span>
+      <button class="secondary" id="aims-csv">Export spreadsheet (CSV)</button>
+      <button class="secondary" id="aims-print">Print or save as PDF</button>
+      ${editable ? '<button id="aims-save">Save changes</button>' : ''}
+    </div>
+    <div class="panel table-wrap" id="aims-rows"></div>
+    <div class="panel"><h3>Management clauses</h3>${table(
+      [{ key: 'number', label: 'Clause' }, { key: 'title', label: 'Title' }],
+      AIMS_CLAUSES.map((c) => ({ number: c.number, title: c.title })),
+    )}</div>`;
+
+  const draw = () => {
+    const q = aimsFilter.q.trim().toLowerCase();
+    const list = rows.filter((s) => {
+      const c = byRef[s.ref] || {};
+      const appLabel = s.applicable === true ? 'Applicable' : s.applicable === false ? 'Excluded' : 'Undecided';
+      if (aimsFilter.obj !== 'All' && `${c.objective} ${objName[c.objective]}` !== aimsFilter.obj) return false;
+      if (aimsFilter.status !== 'All' && aimsFilter.status !== appLabel && !(s.applicable === true && s.status === aimsFilter.status)) return false;
+      if (q && !(`${s.ref} ${c.title || ''}`).toLowerCase().includes(q)) return false;
+      return true;
+    });
+    const sel2 = (name, value, options, ref) => `<select data-ref="${esc(ref)}" data-field="${name}" ${editable ? '' : 'disabled'}>${options.map((o) => `<option value="${o.v}" ${o.v === value ? 'selected' : ''}>${o.t}</option>`).join('')}</select>`;
+    const body = list.map((s) => {
+      const c = byRef[s.ref] || {};
+      const applicableValue = s.applicable === null ? '' : s.applicable ? 'yes' : 'no';
+      return `<tr>
+        <td><b>${esc(s.ref)}</b></td>
+        <td>${esc(c.title || '')}</td>
+        <td><span class="chip">${esc(c.objective || '')}</span></td>
+        <td>${sel2('applicable', applicableValue, [{ v: '', t: 'Undecided' }, { v: 'yes', t: 'Yes' }, { v: 'no', t: 'No' }], s.ref)}</td>
+        <td><input data-ref="${esc(s.ref)}" data-field="justification" value="${esc(s.justification)}" ${editable ? '' : 'disabled'} /></td>
+        <td>${sel2('status', s.status, CONFIG.implementationStatuses.map((x) => ({ v: x, t: x })), s.ref)}</td>
+        <td><input data-ref="${esc(s.ref)}" data-field="owner" value="${esc(s.owner)}" style="width:120px" ${editable ? '' : 'disabled'} /></td>
+      </tr>`;
+    }).join('');
+    document.getElementById('aims-rows').innerHTML = `<table><thead><tr><th>Control</th><th>Title</th><th>Objective</th><th>Applicable</th><th>Justification</th><th>Status</th><th>Owner</th></tr></thead><tbody>${body || '<tr><td colspan="7" class="muted">No controls match the current filter.</td></tr>'}</tbody></table>`;
+    document.getElementById('aims-count').textContent = `${list.length} of ${rows.length}`;
+    // Keep the in memory working copy in step with edits, so changes survive filtering.
+    document.querySelectorAll('#aims-rows [data-ref]').forEach((input) => {
+      const handler = () => {
+        const entry = rows.find((s) => s.ref === input.dataset.ref);
+        if (!entry) return;
+        const field = input.dataset.field;
+        if (field === 'applicable') entry.applicable = input.value === '' ? null : input.value === 'yes';
+        else entry[field] = input.value;
+      };
+      input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', handler);
+    });
+  };
+  document.getElementById('aims-obj').addEventListener('change', (e) => { aimsFilter.obj = e.target.value; draw(); });
+  document.getElementById('aims-status').addEventListener('change', (e) => { aimsFilter.status = e.target.value; draw(); });
+  document.getElementById('aims-q').addEventListener('input', (e) => { aimsFilter.q = e.target.value; draw(); });
+  draw();
+
+  document.getElementById('aims-csv').addEventListener('click', () => {
+    const cols = [{ key: 'ref', label: 'Control' }, { key: 'title', label: 'Title' }, { key: 'objective', label: 'Objective' }, { key: 'applicable', label: 'Applicable' }, { key: 'justification', label: 'Justification' }, { key: 'status', label: 'Implementation status' }, { key: 'owner', label: 'Owner' }];
+    const data = rows.map((s) => ({ ref: s.ref, title: byRef[s.ref] ? byRef[s.ref].title : '', objective: byRef[s.ref] ? `${byRef[s.ref].objective} ${objName[byRef[s.ref].objective]}` : '', applicable: s.applicable === null ? 'Undecided' : s.applicable ? 'Yes' : 'No', justification: s.justification, status: s.status, owner: s.owner }));
+    download('aims-statement-of-applicability.csv', toCsv(cols, data), 'text/csv');
+    audit('Exported', 'AimsSoa', 'AI management Statement of Applicability to CSV');
+  });
+  document.getElementById('aims-print').addEventListener('click', () => window.print());
+  const save = document.getElementById('aims-save');
+  if (save) save.addEventListener('click', () => {
+    for (const s of rows) if (s.applicable !== null && !String(s.justification).trim()) { toast(`A justification is required for ${s.ref} once applicability is decided.`, 'danger'); return; }
+    setCollection('aimsSoa', rows);
+    audit('Updated', 'AimsSoa', 'AI management Statement of Applicability');
+    toast('AI management Statement of Applicability saved.');
+    renderAims();
   });
 }
 
@@ -1535,7 +1648,7 @@ function renderSettings() {
 
 function paletteItems() {
   const items = [];
-  const navs = [['dashboard', 'Dashboard'], ['readiness', 'Certification readiness'], ['calendar', 'Compliance calendar'], ['documents', 'Documents'], ['framework', 'Framework'], ['soa', 'Statement of Applicability'], ['registers', 'Registers'], ['audits', 'Internal audits'], ['certbody', 'Certification body'], ['search', 'Search'], ['settings', 'Settings']];
+  const navs = [['dashboard', 'Dashboard'], ['readiness', 'Certification readiness'], ['calendar', 'Compliance calendar'], ['documents', 'Documents'], ['framework', 'Framework'], ['soa', 'Statement of Applicability'], ['aims', 'AI management (42001)'], ['registers', 'Registers'], ['audits', 'Internal audits'], ['certbody', 'Certification body'], ['search', 'Search'], ['settings', 'Settings']];
   for (const [k, l] of navs) items.push({ group: 'Go to', label: l, icon: ICONS[k] || '', run: () => go(k) });
   items.push({ group: 'Actions', label: 'Generate audit pack', icon: ICONS.readiness, run: () => go('report') });
   items.push({ group: 'Actions', label: `Switch to ${currentTheme() === 'dark' ? 'light' : 'dark'} mode`, icon: currentTheme() === 'dark' ? ICONS.sun : ICONS.moon, run: () => { toggleTheme(); navigate(); } });
@@ -1543,6 +1656,7 @@ function paletteItems() {
   for (const d of getCollection('documents')) items.push({ group: 'Documents', label: `${d.ref} ${d.title}`, meta: d.system, icon: ICONS.documents, run: () => go('documents/' + d.id) });
   for (const a of getCollection('audits')) items.push({ group: 'Internal audits', label: `${a.ref} ${a.scope}`, meta: a.status, icon: ICONS.audits, run: () => go('audits/' + a.id) });
   for (const c of CONTROLS) items.push({ group: 'Controls', label: `${c.ref} ${c.title}`, meta: c.theme, icon: ICONS.framework, run: () => go('framework') });
+  for (const c of AIMS_CONTROLS) items.push({ group: 'AI controls', label: `${c.ref} ${c.title}`, meta: 'ISO 42001', icon: ICONS.aims, run: () => go('aims') });
   for (const c of CLAUSES) items.push({ group: 'Clauses', label: `${c.number} ${c.title}`, icon: ICONS.soa, run: () => go('framework') });
   return items;
 }
@@ -1609,7 +1723,7 @@ function navigate() {
   shell(route);
   const views = {
     dashboard: renderDashboard, readiness: renderReadiness, calendar: renderCalendar, documents: () => (param ? renderDocumentDetail(param) : renderDocuments()),
-    framework: renderFramework, soa: renderSoa, registers: renderRegisters,
+    framework: renderFramework, soa: renderSoa, aims: renderAims, registers: renderRegisters,
     audits: () => (param ? renderAuditDetail(param) : renderInternalAudits()),
     certbody: () => (param ? renderCertBodyDetail(param) : renderCertBodies()), audit: renderAudit,
     search: renderSearch, settings: renderSettings, report: renderReport,

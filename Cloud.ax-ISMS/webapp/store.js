@@ -3,14 +3,15 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=19';
-import { DOCUMENTS } from './documents-data.js?v=19';
-import { REGISTER_SEED } from './data/registers.js?v=19';
-import { AUDIT_SEED } from './data/audits.js?v=19';
-import { CERT_BODY_SEED } from './data/cert-bodies.js?v=19';
+import { CONTROLS } from './data/controls.js?v=20';
+import { AIMS_CONTROLS } from './data/aims-controls.js?v=20';
+import { DOCUMENTS } from './documents-data.js?v=20';
+import { REGISTER_SEED } from './data/registers.js?v=20';
+import { AUDIT_SEED } from './data/audits.js?v=20';
+import { CERT_BODY_SEED } from './data/cert-bodies.js?v=20';
 
 const NS = 'cloudax.isms.';
-const SEED_VERSION = 8;
+const SEED_VERSION = 9;
 
 export const CONFIG = {
   prefixes: { Policy: 'POL', Procedure: 'PROC', Standard: 'STD', Guideline: 'GUI', Plan: 'PLAN', Register: 'REG', Record: 'REC', Form: 'FORM' },
@@ -204,6 +205,11 @@ export function ensureSeed() {
   }
   if (read('documents', null) === null) write('documents', []);
   if (!read('audit', null)) write('audit', []);
+  // Seed the AI management system Statement of Applicability from the ISO/IEC 42001
+  // Annex A controls. Created once and never overwritten, so recorded decisions stay.
+  if (!read('aimsSoa', null)) {
+    write('aimsSoa', AIMS_CONTROLS.map((c) => ({ ref: c.ref, applicable: null, justification: '', status: 'Not started', owner: '' })));
+  }
   // One time import of the controlled document set. This runs on a new install and when
   // the seed version is raised, but it never overwrites documents already created here.
   if ((s.seedVersion || 0) < 2 && read('documents', []).length === 0) {
@@ -260,13 +266,13 @@ export function ensureSeed() {
 }
 
 export function resetAll() {
-  for (const k of ['documents', 'soa', 'audit', 'audits', 'certBodies', 'settings']) localStorage.removeItem(NS + k);
+  for (const k of ['documents', 'soa', 'aimsSoa', 'audit', 'audits', 'certBodies', 'settings']) localStorage.removeItem(NS + k);
   for (const r of CONFIG.registers) localStorage.removeItem(NS + 'register.' + r.key);
   ensureSeed();
 }
 
 export function exportAll() {
-  const data = { settings: getSettings(), documents: read('documents', []), soa: read('soa', []), audit: read('audit', []), registers: {} };
+  const data = { settings: getSettings(), documents: read('documents', []), soa: read('soa', []), aimsSoa: read('aimsSoa', []), audit: read('audit', []), registers: {} };
   for (const r of CONFIG.registers) data.registers[r.key] = read('register.' + r.key, []);
   return data;
 }
@@ -274,6 +280,7 @@ export function exportAll() {
 export function importAll(data) {
   if (data.documents) write('documents', data.documents);
   if (data.soa) write('soa', data.soa);
+  if (data.aimsSoa) write('aimsSoa', data.aimsSoa);
   if (data.audit) write('audit', data.audit);
   if (data.settings) write('settings', data.settings);
   if (data.registers) for (const k of Object.keys(data.registers)) write('register.' + k, data.registers[k]);
