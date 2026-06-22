@@ -2,15 +2,15 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=33';
-import { CLAUSES } from './data/clauses.js?v=33';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=33';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=33';
+import { CONTROLS } from './data/controls.js?v=35';
+import { CLAUSES } from './data/clauses.js?v=35';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=35';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=35';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=33';
+} from './store.js?v=35';
 
 ensureSeed();
 applyTheme();
@@ -187,7 +187,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=33').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=35').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -1854,6 +1854,37 @@ function dataFlowDiagram() {
   return flowSvg(nodes, edges, 900, 520);
 }
 
+function incidentFlowDiagram() {
+  const top = ['detect', 'triage', 'contain', 'recover', 'assess', 'review'];
+  const titles = { detect: 'Detect and report', triage: 'Triage and classify', contain: 'Contain', recover: 'Eradicate and recover', assess: 'Personal data breach?', review: 'Post incident review' };
+  const kinds = { detect: 'system', triage: 'system', contain: 'system', recover: 'system', assess: 'vault', review: 'store' };
+  const w = 132; const step = 148; const x0 = 18; const y = 60; const h = 66;
+  const nodes = top.map((id, i) => ({ id, kind: kinds[id], x: x0 + i * step, y, w, h, title: titles[id] }));
+  nodes.push({ id: 'notify', kind: 'alert', x: x0 + 4 * step, y: 214, w, h: 72, title: 'Notify the ICO within 72 hours' });
+  const edges = [
+    { from: 'detect', to: 'triage' }, { from: 'triage', to: 'contain' }, { from: 'contain', to: 'recover' }, { from: 'recover', to: 'assess' },
+    { from: 'assess', to: 'review' }, { from: 'assess', to: 'notify', label: 'breach' }, { from: 'notify', to: 'review' },
+  ];
+  return flowSvg(nodes, edges, 960, 320);
+}
+
+function documentLifecycleDiagram() {
+  const nodes = [
+    { id: 'draft', kind: 'external', x: 30, y: 150, w: 124, h: 54, title: 'Draft' },
+    { id: 'review', kind: 'vault', x: 196, y: 150, w: 124, h: 54, title: 'In review' },
+    { id: 'approved', kind: 'system', x: 362, y: 150, w: 124, h: 54, title: 'Approved' },
+    { id: 'published', kind: 'store', x: 528, y: 150, w: 124, h: 54, title: 'Published' },
+    { id: 'retired', kind: 'external', x: 712, y: 150, w: 124, h: 54, title: 'Retired' },
+    { id: 'revision', kind: 'vault', x: 528, y: 40, w: 124, h: 54, title: 'Under revision' },
+  ];
+  const edges = [
+    { from: 'draft', to: 'review', label: 'submit' }, { from: 'review', to: 'approved', label: 'approve' },
+    { from: 'approved', to: 'published', label: 'publish' }, { from: 'published', to: 'retired', label: 'retire' },
+    { from: 'published', to: 'revision', label: 'revise' }, { from: 'revision', to: 'review', label: 'resubmit', dashed: true },
+  ];
+  return flowSvg(nodes, edges, 880, 240);
+}
+
 function operatingModelDiagram() {
   const stages = [
     ['context', 'Context', 'registers', 'plan'], ['risk', 'Risk assessment', 'registers', 'plan'], ['treat', 'Risk treatment', 'framework', 'plan'],
@@ -1914,6 +1945,18 @@ function renderArchitecture() {
       <div class="panel-head"><h3>Management system operating model</h3><span class="muted">Plan, do, check, act</span></div>
       <p class="muted">The golden thread of the management system, from understanding the context through to continual improvement. Each stage links to where it is run.</p>
       ${operatingModelDiagram()}
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><h3>Incident and breach response</h3></div>
+        <p class="muted">From detection to lessons learned, with the assessment of whether personal data is affected and notification of the ICO within seventy two hours.</p>
+        ${incidentFlowDiagram()}
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>Document control lifecycle</h3></div>
+        <p class="muted">The states a controlled document moves through, from draft to retirement, including the revision loop after publication.</p>
+        ${documentLifecycleDiagram()}
+      </div>
     </div>
     <div class="panel">
       <div class="panel-head"><h3>Annex A control status</h3><span class="muted">${applicable} applicable, ${implemented} implemented or verified</span></div>
