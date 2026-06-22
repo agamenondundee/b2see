@@ -1,0 +1,52 @@
+# Local and demonstration stack. For production, run the database and object storage
+# as managed services in a UK or EU region, terminate TLS in front of the frontend,
+# and supply real OIDC, storage and SMTP values. MinIO here stands in for S3
+# compatible object storage during development only.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: isms
+      POSTGRES_PASSWORD: isms_local_password
+      POSTGRES_DB: isms
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+
+  storage:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: isms
+      MINIO_ROOT_PASSWORD: isms_local_password
+    volumes:
+      - storage-data:/data
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+
+  backend:
+    build: ./backend
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://isms:isms_local_password@db:5432/isms?schema=public
+      PORT: '4000'
+      SESSION_SECRET: change-me-to-a-long-random-value
+      CORS_ORIGIN: http://localhost:8080
+    depends_on:
+      - db
+    ports:
+      - '4000:4000'
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - '8080:80'
+
+volumes:
+  db-data:
+  storage-data:
