@@ -2,15 +2,15 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=28';
-import { CLAUSES } from './data/clauses.js?v=28';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=28';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=28';
+import { CONTROLS } from './data/controls.js?v=29';
+import { CLAUSES } from './data/clauses.js?v=29';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=29';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=29';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=28';
+} from './store.js?v=29';
 
 ensureSeed();
 applyTheme();
@@ -184,7 +184,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=28').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=29').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -239,6 +239,11 @@ function reviewCell(iso) {
   if (overdue(iso)) return `<span class="overdue-date">${fmtDate(iso)}</span> ${pill('overdue', 'danger')}`;
   if (dueSoon(iso)) return `<span class="soon-date">${fmtDate(iso)}</span> ${pill('soon', 'warn')}`;
   return fmtDate(iso);
+}
+function isStale(iso) { const t = new Date(iso).getTime(); return Number.isFinite(t) && t < Date.now() - 365 * 86400000; }
+function ageCell(iso) {
+  if (!iso) return '<span class="muted">-</span>';
+  return isStale(iso) ? `${fmtDate(iso)} ${pill('dated', 'warn')}` : fmtDate(iso);
 }
 const CONTROL_REFS = new Set(CONTROLS.map((c) => c.ref));
 function controlChips(s) {
@@ -308,6 +313,11 @@ const REG_DISPLAY = {
     columns: [{ key: 'requirement', label: 'Requirement' }, { key: 'source', label: 'Source' }, { key: 'owner', label: 'Owner' }, { key: 'review', label: 'Review' }],
     row: (e) => ({ requirement: esc(e.requirement), source: esc(e.source), owner: esc(e.owner), review: reviewCell(e.reviewDate) }),
   },
+  evidence: {
+    columns: [{ key: 'evidenceId', label: 'Evidence ID' }, { key: 'title', label: 'Title' }, { key: 'type', label: 'Type' }, { key: 'control', label: 'Control' }, { key: 'date', label: 'Date' }, { key: 'owner', label: 'Owner' }, { key: 'location', label: 'Location' }],
+    sort: (a, b) => String(b.date || '').localeCompare(String(a.date || '')),
+    row: (e) => ({ evidenceId: esc(e.evidenceId), title: esc(e.title), type: `<span class="chip">${esc(e.type || '-')}</span>`, control: controlChips(e.controlRef), date: ageCell(e.date), owner: esc(e.owner), location: esc(e.location) }),
+  },
   context: {
     columns: [{ key: 'category', label: 'Category' }, { key: 'item', label: 'Issue or party' }, { key: 'requirements', label: 'Requirements' }, { key: 'climate', label: 'Climate' }],
     row: (e) => ({ category: esc(e.category), item: esc(e.item), requirements: esc(e.requirements), climate: /^y/i.test(e.climate || '') ? pill('Yes', 'info') : pill('No', 'neutral') }),
@@ -335,6 +345,12 @@ function regSummary(key, rows) {
     const due = rows.filter((r) => overdue(r.reviewDate) || dueSoon(r.reviewDate)).length;
     const offshore = rows.filter((r) => !isUkEu(r.dataLocation)).length;
     return `<div class="mini-cards">${mini(rows.length, 'Suppliers')}${mini(dpa, 'DPA in place', dpa === rows.length ? 'ok' : 'warn')}${mini(rows.length - dpa, 'DPA missing', rows.length - dpa ? 'danger' : 'ok')}${mini(offshore, 'Outside UK or EU', offshore ? 'danger' : 'ok')}${mini(due, 'Reviews due or overdue', due ? 'warn' : 'ok')}</div>`;
+  }
+  if (key === 'evidence') {
+    const linked = rows.filter((e) => CONTROL_REFS.has(String(e.controlRef || '').trim())).length;
+    const stale = rows.filter((e) => isStale(e.date)).length;
+    const types = new Set(rows.map((e) => e.type).filter(Boolean)).size;
+    return `<div class="mini-cards">${mini(rows.length, 'Evidence items')}${mini(linked, 'Linked to a control', linked === rows.length ? 'ok' : 'warn')}${mini(stale, 'Older than 12 months', stale ? 'warn' : 'ok')}${mini(types, 'Types of evidence')}</div>`;
   }
   if (key === 'nonconformity') {
     const open = rows.filter((r) => /open|new/i.test(r.status)).length;
@@ -842,6 +858,7 @@ function renderControlDetail(ref) {
   const docs = getCollection('documents').filter((d) => (d.controlRefs || []).includes(ref));
   const parse = (v) => String(v || '').split(/[,;]/).map((x) => x.trim()).filter(Boolean);
   const risks = getCollection('register.risk').filter((r) => parse(r.relatedControls).includes(ref));
+  const evidence = getCollection('register.evidence').filter((e) => String(e.controlRef || '').trim() === ref);
   const idx = CONTROLS.findIndex((x) => x.ref === ref);
   const prev = idx > 0 ? CONTROLS[idx - 1] : null;
   const next = idx < CONTROLS.length - 1 ? CONTROLS[idx + 1] : null;
@@ -879,6 +896,13 @@ function renderControlDetail(ref) {
         [{ key: 'id', label: 'Risk' }, { key: 'desc', label: 'Description' }, { key: 'inh', label: 'Inherent' }, { key: 'res', label: 'Residual' }, { key: 'treat', label: 'Treatment' }, { key: 'owner', label: 'Owner' }],
         risks.map((r) => { const sc = riskScore(r); const lv = riskLevel(sc); const rsc = residualScore(r); const rlv = riskLevel(rsc); return { __html: true, id: `<a href="#/registers">${esc(r.riskId)}</a>`, desc: esc(r.description), inh: `<b>${sc}</b> ${pill(lv.label, lv.kind)}`, res: rsc ? `<b>${rsc}</b> ${pill(rlv.label, rlv.kind)}` : '-', treat: `<span class="chip">${esc(r.treatment || '-')}</span>`, owner: esc(r.owner) }; }),
       ) : '<p class="muted">No risk on the register names this control in its treatment.</p>'}
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Evidence</h3><span class="muted">${evidence.length}</span></div>
+      ${evidence.length ? table(
+        [{ key: 'id', label: 'Evidence' }, { key: 'title', label: 'Title' }, { key: 'type', label: 'Type' }, { key: 'date', label: 'Date' }, { key: 'owner', label: 'Owner' }, { key: 'location', label: 'Location' }],
+        evidence.map((e) => ({ __html: true, id: `<a href="#/registers">${esc(e.evidenceId)}</a>`, title: esc(e.title), type: `<span class="chip">${esc(e.type || '-')}</span>`, date: ageCell(e.date), owner: esc(e.owner), location: esc(e.location) })),
+      ) : '<p class="muted">No evidence is recorded against this control yet. Add it in the evidence register.</p>'}
     </div>
     <div class="toolbar">${prev ? `<a class="chip" href="#/control/${esc(prev.ref)}">Previous ${esc(prev.ref)}</a>` : ''}${next ? `<a class="chip" href="#/control/${esc(next.ref)}">Next ${esc(next.ref)}</a>` : ''}<span class="spacer"></span><a class="chip" href="#/framework">All controls</a></div>`;
 }
@@ -1317,6 +1341,7 @@ function renderReport() {
   const gaps = CLAUSES.filter((c) => c.mandatory.length > 0 && !linkedClause.has(c.number));
   const audits = getCollection('audits');
   const mrs = getCollection('register.management-review');
+  const evidence = getCollection('register.evidence').slice().sort((a, b) => String(a.controlRef || '').localeCompare(String(b.controlRef || '')));
   const today = new Date().toISOString().slice(0, 10);
   viewEl().innerHTML = `
     <div class="toolbar"><button class="secondary" id="pack-back">Back</button><button id="print-pack">Print or save as PDF</button></div>
@@ -1354,6 +1379,7 @@ function renderReport() {
       <section class="report-section break"><h3>Internal audit programme</h3>${table([{ key: 'ref', label: 'Audit' }, { key: 'scope', label: 'Scope' }, { key: 'standard', label: 'Standard' }, { key: 'date', label: 'Date' }, { key: 'auditor', label: 'Auditor' }, { key: 'status', label: 'Status' }, { key: 'findings', label: 'Findings' }], audits.map((a) => ({ ref: a.ref, scope: a.scope, standard: a.standard, date: fmtDate(a.completedDate || a.plannedDate), auditor: a.auditor, status: a.status, findings: String((a.findings || []).length) })))}</section>
       <section class="report-section"><h3>Management review log</h3>${table([{ key: 'reviewId', label: 'Review' }, { key: 'date', label: 'Date' }, { key: 'attendees', label: 'Attendees' }, { key: 'decisions', label: 'Decisions' }], mrs.map((m) => ({ reviewId: m.reviewId, date: fmtDate(m.date), attendees: m.attendees, decisions: m.decisions })))}</section>
       <section class="report-section break"><h3>Controlled document register</h3>${table([{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'sys', label: 'System' }, { key: 'ver', label: 'Version' }, { key: 'status', label: 'Status' }, { key: 'review', label: 'Review by' }], docs.map((d) => ({ __html: true, ref: esc(d.ref), title: esc(d.title), sys: esc(d.system || ''), ver: esc(d.currentVersion || ''), status: pill(d.status), review: esc(fmtDate(d.nextReviewDate) || '-') })))}</section>
+      ${evidence.length ? `<section class="report-section break"><h3>Evidence register</h3><p class="muted">${evidence.length} items of evidence supporting the controls.</p>${table([{ key: 'id', label: 'Evidence' }, { key: 'title', label: 'Title' }, { key: 'type', label: 'Type' }, { key: 'control', label: 'Control' }, { key: 'date', label: 'Date' }, { key: 'owner', label: 'Owner' }, { key: 'location', label: 'Location' }], evidence.map((e) => ({ id: e.evidenceId, title: e.title, type: e.type, control: e.controlRef, date: fmtDate(e.date), owner: e.owner, location: e.location })))}</section>` : ''}
     </div>`;
   const back = document.getElementById('pack-back');
   if (back) back.addEventListener('click', () => go('readiness'));
