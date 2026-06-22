@@ -171,6 +171,16 @@ html[data-theme="dark"] mark { background: #6b5d12; color: #fff7d6; }
 .cmdk-item.active, .cmdk-item:hover { background: var(--brand-50); }
 .cmdk-item.active .ic { color: var(--brand); }
 .cmdk-empty { padding: 22px; text-align: center; color: var(--muted); }
+/* Keyboard shortcuts overlay */
+.cmdk.sc { width: min(640px, 92vw); }
+.sc-head { display: flex; align-items: center; justify-content: space-between; padding: 15px 18px; border-bottom: 1px solid var(--line); }
+.sc-head .icon-btn { font-size: 18px; line-height: 1; }
+.sc-body { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 28px; padding: 14px 18px 20px; }
+.sc-group { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 6px 0 8px; }
+.sc-row { display: flex; align-items: center; gap: 7px; padding: 5px 0; font-size: 13.5px; }
+.sc-then { color: var(--muted); font-size: 12px; }
+.sc-label { margin-left: auto; color: var(--ink-2); text-align: right; }
+@media (max-width: 640px) { .sc-body { grid-template-columns: 1fr; } }
 .topbar .crumb { font-size: 13px; color: var(--muted); }
 .topbar .crumb b { color: var(--ink); font-weight: 600; }
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
