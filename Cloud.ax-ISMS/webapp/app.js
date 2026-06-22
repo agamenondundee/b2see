@@ -2,13 +2,13 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=17';
-import { CLAUSES } from './data/clauses.js?v=17';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=17';
+import { CONTROLS } from './data/controls.js?v=18';
+import { CLAUSES } from './data/clauses.js?v=18';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=18';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
-} from './store.js?v=17';
+} from './store.js?v=18';
 
 ensureSeed();
 applyTheme();
@@ -157,7 +157,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=17').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=18').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -192,6 +192,7 @@ async function loadFeedInto(el, feed) {
 
 function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
 function riskScore(e) { return num(e.likelihood) * num(e.impact); }
+function residualScore(e) { return num(e.residualLikelihood) * num(e.residualImpact); }
 function riskLevel(s) {
   if (s >= 15) return { label: 'Critical', kind: 'danger' };
   if (s >= 10) return { label: 'High', kind: 'danger' };
@@ -236,9 +237,16 @@ function riskMatrix(rows) {
 // optional default sort. Falls back to the raw fields when a register has no entry.
 const REG_DISPLAY = {
   risk: {
-    columns: [{ key: 'riskId', label: 'Risk ID' }, { key: 'description', label: 'Description' }, { key: 'l', label: 'L' }, { key: 'i', label: 'I' }, { key: 'score', label: 'Score' }, { key: 'level', label: 'Level' }, { key: 'treatment', label: 'Treatment' }, { key: 'controls', label: 'Controls' }, { key: 'owner', label: 'Owner' }, { key: 'status', label: 'Status' }, { key: 'review', label: 'Review' }],
+    columns: [{ key: 'riskId', label: 'Risk ID' }, { key: 'description', label: 'Description' }, { key: 'inherent', label: 'Inherent' }, { key: 'residual', label: 'Residual' }, { key: 'treatment', label: 'Treatment' }, { key: 'controls', label: 'Controls' }, { key: 'owner', label: 'Owner' }, { key: 'status', label: 'Status' }, { key: 'review', label: 'Review' }],
     sort: (a, b) => riskScore(b) - riskScore(a),
-    row: (e) => { const s = riskScore(e); const lv = riskLevel(s); return { riskId: esc(e.riskId), description: esc(e.description), l: esc(num(e.likelihood) || '-'), i: esc(num(e.impact) || '-'), score: `<b>${s || '-'}</b>`, level: pill(lv.label, lv.kind), treatment: `<span class="chip">${esc(e.treatment || '-')}</span>`, controls: controlChips(e.relatedControls), owner: esc(e.owner), status: pill(e.status || '-', riskStatusKind(e.status)), review: reviewCell(e.reviewDate) }; },
+    row: (e) => {
+      const s = riskScore(e); const lv = riskLevel(s);
+      const rs = residualScore(e); const rlv = riskLevel(rs);
+      return { riskId: esc(e.riskId), description: esc(e.description),
+        inherent: `<b>${s || '-'}</b> ${pill(lv.label, lv.kind)}`,
+        residual: rs ? `<b>${rs}</b> ${pill(rlv.label, rlv.kind)}` : '<span class="muted">-</span>',
+        treatment: `<span class="chip">${esc(e.treatment || '-')}</span>`, controls: controlChips(e.relatedControls), owner: esc(e.owner), status: pill(e.status || '-', riskStatusKind(e.status)), review: reviewCell(e.reviewDate) };
+    },
   },
   asset: {
     columns: [{ key: 'assetId', label: 'Asset ID' }, { key: 'name', label: 'Name' }, { key: 'type', label: 'Type' }, { key: 'owner', label: 'Owner' }, { key: 'classification', label: 'Classification' }, { key: 'status', label: 'Status' }],
@@ -272,9 +280,14 @@ const REG_DISPLAY = {
 
 function regSummary(key, rows) {
   if (key === 'risk') {
-    const lv = (e) => riskLevel(riskScore(e)).label;
-    const seg = [['Critical', 'danger'], ['High', 'danger'], ['Medium', 'warn'], ['Low', 'ok']].map(([l, k]) => ({ label: l, value: rows.filter((e) => lv(e) === l).length, kind: k }));
-    return `<div class="matrix-wrap"><div><div class="matrix-axis" style="margin-bottom:6px">Likelihood across, impact up</div>${riskMatrix(rows)}</div><div style="min-width:260px;flex:1">${stackedBar(seg)}</div></div>`;
+    const levels = [['Critical', 'danger'], ['High', 'danger'], ['Medium', 'warn'], ['Low', 'ok']];
+    const inhSeg = levels.map(([l, k]) => ({ label: l, value: rows.filter((e) => riskLevel(riskScore(e)).label === l).length, kind: k }));
+    const resSeg = levels.map(([l, k]) => ({ label: l, value: rows.filter((e) => riskLevel(residualScore(e)).label === l).length, kind: k }));
+    return `<div class="matrix-wrap"><div><div class="matrix-axis" style="margin-bottom:6px">Inherent risk: likelihood across, impact up</div>${riskMatrix(rows)}</div>
+      <div style="min-width:260px;flex:1">
+        <div class="muted" style="font-size:12px;margin-bottom:4px">Inherent risk levels</div>${stackedBar(inhSeg)}
+        <div class="muted" style="font-size:12px;margin:14px 0 4px">Residual risk levels, after treatment</div>${stackedBar(resSeg)}
+      </div></div>`;
   }
   if (key === 'supplier') {
     const dpa = rows.filter((r) => /^y/i.test(r.dpa || '')).length;
@@ -1018,8 +1031,8 @@ function renderReport() {
       <section class="report-section break"><h3>Risk summary</h3>
         <div class="matrix-wrap"><div>${riskMatrix(risks)}</div></div>
         ${table(
-          [{ key: 'id', label: 'Risk' }, { key: 'desc', label: 'Description' }, { key: 'score', label: 'Score' }, { key: 'level', label: 'Level' }, { key: 'treat', label: 'Treatment' }, { key: 'ctrls', label: 'Controls' }, { key: 'owner', label: 'Owner' }],
-          risks.map((r) => { const sc = riskScore(r); const lv = riskLevel(sc); return { __html: true, id: esc(r.riskId), desc: esc(r.description), score: `<b>${sc}</b>`, level: pill(lv.label, lv.kind), treat: esc(r.treatment), ctrls: esc(r.relatedControls || ''), owner: esc(r.owner) }; }),
+          [{ key: 'id', label: 'Risk' }, { key: 'desc', label: 'Description' }, { key: 'inh', label: 'Inherent' }, { key: 'res', label: 'Residual' }, { key: 'treat', label: 'Treatment' }, { key: 'ctrls', label: 'Controls' }, { key: 'owner', label: 'Owner' }],
+          risks.map((r) => { const sc = riskScore(r); const lv = riskLevel(sc); const rsc = residualScore(r); const rlv = riskLevel(rsc); return { __html: true, id: esc(r.riskId), desc: esc(r.description), inh: `<b>${sc}</b> ${pill(lv.label, lv.kind)}`, res: rsc ? `<b>${rsc}</b> ${pill(rlv.label, rlv.kind)}` : '-', treat: esc(r.treatment), ctrls: esc(r.relatedControls || ''), owner: esc(r.owner) }; }),
         )}</section>
       <section class="report-section break"><h3>Mandatory documented information</h3>${gaps.length ? table([{ key: 'number', label: 'Clause' }, { key: 'title', label: 'Title' }, { key: 'rec', label: 'Required record' }], gaps.map((g) => ({ number: g.number, title: g.title, rec: g.mandatory.join('; ') }))) : '<p>No gaps. Every clause that requires documented information has a linked document.</p>'}</section>
       <section class="report-section break"><h3>Internal audit programme</h3>${table([{ key: 'ref', label: 'Audit' }, { key: 'scope', label: 'Scope' }, { key: 'standard', label: 'Standard' }, { key: 'date', label: 'Date' }, { key: 'auditor', label: 'Auditor' }, { key: 'status', label: 'Status' }, { key: 'findings', label: 'Findings' }], audits.map((a) => ({ ref: a.ref, scope: a.scope, standard: a.standard, date: fmtDate(a.completedDate || a.plannedDate), auditor: a.auditor, status: a.status, findings: String((a.findings || []).length) })))}</section>

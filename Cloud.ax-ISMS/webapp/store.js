@@ -3,14 +3,14 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=17';
-import { DOCUMENTS } from './documents-data.js?v=17';
-import { REGISTER_SEED } from './data/registers.js?v=17';
-import { AUDIT_SEED } from './data/audits.js?v=17';
-import { CERT_BODY_SEED } from './data/cert-bodies.js?v=17';
+import { CONTROLS } from './data/controls.js?v=18';
+import { DOCUMENTS } from './documents-data.js?v=18';
+import { REGISTER_SEED } from './data/registers.js?v=18';
+import { AUDIT_SEED } from './data/audits.js?v=18';
+import { CERT_BODY_SEED } from './data/cert-bodies.js?v=18';
 
 const NS = 'cloudax.isms.';
-const SEED_VERSION = 7;
+const SEED_VERSION = 8;
 
 export const CONFIG = {
   prefixes: { Policy: 'POL', Procedure: 'PROC', Standard: 'STD', Guideline: 'GUI', Plan: 'PLAN', Register: 'REG', Record: 'REC', Form: 'FORM' },
@@ -31,6 +31,7 @@ export const CONFIG = {
       { name: 'likelihood', label: 'Likelihood', type: 'number' }, { name: 'impact', label: 'Impact', type: 'number' },
       { name: 'treatment', label: 'Treatment', type: 'select', options: ['Modify', 'Retain', 'Avoid', 'Share'] },
       { name: 'relatedControls', label: 'Related controls' },
+      { name: 'residualLikelihood', label: 'Residual likelihood', type: 'number' }, { name: 'residualImpact', label: 'Residual impact', type: 'number' },
       { name: 'owner', label: 'Owner' }, { name: 'status', label: 'Status' }, { name: 'reviewDate', label: 'Review date', type: 'date' },
     ] },
     { key: 'asset', label: 'Asset register', fields: [
@@ -237,6 +238,22 @@ export function ensureSeed() {
     const risks = read('register.risk', []);
     let touched = false;
     for (const r of risks) { if (!r.relatedControls && seedControls[r.riskId]) { r.relatedControls = seedControls[r.riskId]; touched = true; } }
+    if (touched) write('register.risk', risks);
+  }
+  // Backfill the residual likelihood and impact onto existing risks, from the seed
+  // where the risk identifier matches, otherwise defaulting to the inherent values.
+  if ((s.seedVersion || 0) < 8) {
+    const seedRes = Object.fromEntries((REGISTER_SEED.risk || []).map((r) => [r.riskId, r]));
+    const risks = read('register.risk', []);
+    let touched = false;
+    for (const r of risks) {
+      if (r.residualLikelihood == null || r.residualLikelihood === '') {
+        const sr = seedRes[r.riskId];
+        r.residualLikelihood = sr ? sr.residualLikelihood : r.likelihood;
+        r.residualImpact = sr ? sr.residualImpact : r.impact;
+        touched = true;
+      }
+    }
     if (touched) write('register.risk', risks);
   }
   if (s.seedVersion !== SEED_VERSION) setSettings({ ...s, seedVersion: SEED_VERSION });
