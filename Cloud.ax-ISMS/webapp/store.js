@@ -3,15 +3,15 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=20';
-import { AIMS_CONTROLS } from './data/aims-controls.js?v=20';
-import { DOCUMENTS } from './documents-data.js?v=20';
-import { REGISTER_SEED } from './data/registers.js?v=20';
-import { AUDIT_SEED } from './data/audits.js?v=20';
-import { CERT_BODY_SEED } from './data/cert-bodies.js?v=20';
+import { CONTROLS } from './data/controls.js?v=21';
+import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=21';
+import { DOCUMENTS } from './documents-data.js?v=21';
+import { REGISTER_SEED } from './data/registers.js?v=21';
+import { AUDIT_SEED } from './data/audits.js?v=21';
+import { CERT_BODY_SEED } from './data/cert-bodies.js?v=21';
 
 const NS = 'cloudax.isms.';
-const SEED_VERSION = 9;
+const SEED_VERSION = 10;
 
 export const CONFIG = {
   prefixes: { Policy: 'POL', Procedure: 'PROC', Standard: 'STD', Guideline: 'GUI', Plan: 'PLAN', Register: 'REG', Record: 'REC', Form: 'FORM' },
@@ -206,9 +206,11 @@ export function ensureSeed() {
   if (read('documents', null) === null) write('documents', []);
   if (!read('audit', null)) write('audit', []);
   // Seed the AI management system Statement of Applicability from the ISO/IEC 42001
-  // Annex A controls. Created once and never overwritten, so recorded decisions stay.
+  // Annex A controls with their starter decisions. Created once and never overwritten,
+  // so recorded decisions stay. Refs missing from the seed default to undecided.
   if (!read('aimsSoa', null)) {
-    write('aimsSoa', AIMS_CONTROLS.map((c) => ({ ref: c.ref, applicable: null, justification: '', status: 'Not started', owner: '' })));
+    const seedByRef = Object.fromEntries(AIMS_SOA_SEED.map((e) => [e.ref, e]));
+    write('aimsSoa', AIMS_CONTROLS.map((c) => seedByRef[c.ref] ? { ...seedByRef[c.ref] } : { ref: c.ref, applicable: null, justification: '', status: 'Not started', owner: '' }));
   }
   // One time import of the controlled document set. This runs on a new install and when
   // the seed version is raised, but it never overwrites documents already created here.
@@ -261,6 +263,20 @@ export function ensureSeed() {
       }
     }
     if (touched) write('register.risk', risks);
+  }
+  // Backfill starter decisions onto an AI management Statement of Applicability that is
+  // still pristine, matched by control reference. Only undecided controls with no
+  // justification are filled, so any recorded decision is left untouched.
+  if ((s.seedVersion || 0) < 10) {
+    const seedByRef = Object.fromEntries(AIMS_SOA_SEED.map((e) => [e.ref, e]));
+    const aims = read('aimsSoa', []);
+    let touched = false;
+    for (const e of aims) {
+      if (e.applicable == null && !String(e.justification || '').trim() && seedByRef[e.ref]) {
+        Object.assign(e, seedByRef[e.ref]); touched = true;
+      }
+    }
+    if (touched) write('aimsSoa', aims);
   }
   if (s.seedVersion !== SEED_VERSION) setSettings({ ...s, seedVersion: SEED_VERSION });
 }

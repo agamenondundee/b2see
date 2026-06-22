@@ -76,3 +76,34 @@ export const AIMS_CLAUSES = [
   { number: '9', title: 'Performance evaluation' },
   { number: '10', title: 'Improvement' },
 ];
+
+// Starter applicability decisions for the AI management Statement of Applicability, set
+// at the objective level for a conversational AI platform that builds and operates AI.
+// All reference controls are taken as applicable; the implementation status varies to
+// reflect a system part way to certification. This is evaluation content and should be
+// reviewed and adjusted for real use.
+const AIMS_OBJECTIVE_SEED = {
+  'A.2': { owner: 'AI Governance Lead', status: 'Implemented', justification: 'An AI policy is established, aligned with the wider policy framework and reviewed on the management cycle.' },
+  'A.3': { owner: 'AI Governance Lead', status: 'Implemented', justification: 'AI roles and responsibilities are defined and there is a route for staff to raise concerns about AI.' },
+  'A.4': { owner: 'Head of Engineering', status: 'In progress', justification: 'Data, tooling, computing and human resources for AI systems are documented and managed.' },
+  'A.5': { owner: 'AI Governance Lead', status: 'In progress', justification: 'An AI system impact assessment process considers impacts on individuals, groups and society, and results are documented.' },
+  'A.6': { owner: 'Head of Engineering', status: 'In progress', justification: 'Responsible development objectives and processes govern design, verification, deployment, operation, monitoring and logging across the AI life cycle.' },
+  'A.7': { owner: 'Head of Platform', status: 'In progress', justification: 'Data acquisition, quality, provenance and preparation for AI systems are governed, with data held in the UK or EU only.' },
+  'A.8': { owner: 'Head of Customer', status: 'In progress', justification: 'System documentation, external reporting and incident communication keep interested parties informed about the AI systems.' },
+  'A.9': { owner: 'AI Governance Lead', status: 'Implemented', justification: 'Processes, objectives and a defined intended use govern the responsible use of AI systems.' },
+  'A.10': { owner: 'Procurement Lead', status: 'In progress', justification: 'Responsibilities across suppliers and customers in the AI value chain are allocated and managed.' },
+};
+
+// Per control overrides where the implementation maturity differs from its objective.
+const AIMS_STATUS_OVERRIDE = {
+  'A.2.2': 'Verified',
+  'A.9.4': 'Verified',
+  'A.5.3': 'Not started',
+  'A.6.2.8': 'Not started',
+  'A.7.5': 'Not started',
+};
+
+export const AIMS_SOA_SEED = AIMS_CONTROLS.map((c) => {
+  const base = AIMS_OBJECTIVE_SEED[c.objective] || { owner: '', status: 'Not started', justification: '' };
+  return { ref: c.ref, applicable: true, justification: base.justification, status: AIMS_STATUS_OVERRIDE[c.ref] || base.status, owner: base.owner };
+});
