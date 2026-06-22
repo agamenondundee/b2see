@@ -2,15 +2,15 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=30';
-import { CLAUSES } from './data/clauses.js?v=30';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=30';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=30';
+import { CONTROLS } from './data/controls.js?v=31';
+import { CLAUSES } from './data/clauses.js?v=31';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=31';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=31';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=30';
+} from './store.js?v=31';
 
 ensureSeed();
 applyTheme();
@@ -186,7 +186,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=30').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=31').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -1928,12 +1928,53 @@ function openPalette() {
 }
 function closePalette() { if (paletteEl) { paletteEl.remove(); paletteEl = null; } }
 
+// Keyboard shortcuts: a help overlay on "?" and a "g then key" navigation that mirrors
+// the sidebar, so the whole application can be driven without the mouse.
+const NAV_KEYS = [
+  ['d', 'Dashboard', 'dashboard'], ['r', 'Readiness', 'readiness'], ['c', 'Calendar', 'calendar'],
+  ['m', 'Documents', 'documents'], ['f', 'Framework', 'framework'], ['s', 'Statement of Applicability', 'soa'],
+  ['a', 'AI management', 'aims'], ['g', 'Registers', 'registers'], ['i', 'Internal audits', 'audits'],
+  ['b', 'Certification body', 'certbody'], ['l', 'Audit log', 'audit'], [',', 'Settings', 'settings'],
+];
+const NAV_KEY_MAP = Object.fromEntries(NAV_KEYS.map(([k, , route]) => [k, route]));
+
+let shortcutsEl = null;
+function openShortcuts() {
+  if (shortcutsEl) return;
+  closePalette();
+  const kbd = (s) => s.split('+').map((x) => `<kbd>${esc(x)}</kbd>`).join('');
+  const general = [
+    [`${IS_MAC ? 'Cmd' : 'Ctrl'}+K`, 'Open the command palette'],
+    ['/', 'Search and jump to'],
+    ['?', 'Show this help'],
+    ['Esc', 'Close a dialog'],
+    [`${IS_MAC ? 'Cmd' : 'Ctrl'}+P`, 'Print or save as PDF'],
+  ];
+  const genRows = general.map(([k, label]) => `<div class="sc-row">${kbd(k)}<span class="sc-label">${esc(label)}</span></div>`).join('');
+  const navRows = NAV_KEYS.map(([k, label]) => `<div class="sc-row">${kbd('g')}<span class="sc-then">then</span>${kbd(k)}<span class="sc-label">${esc(label)}</span></div>`).join('');
+  shortcutsEl = document.createElement('div');
+  shortcutsEl.className = 'cmdk-overlay';
+  shortcutsEl.innerHTML = `<div class="cmdk sc" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+    <div class="sc-head"><h3 style="margin:0">Keyboard shortcuts</h3><button class="icon-btn" id="sc-close" aria-label="Close">&times;</button></div>
+    <div class="sc-body"><div><div class="sc-group">General</div>${genRows}</div><div><div class="sc-group">Go to</div>${navRows}</div></div></div>`;
+  document.body.appendChild(shortcutsEl);
+  shortcutsEl.addEventListener('mousedown', (e) => { if (e.target === shortcutsEl) closeShortcuts(); });
+  document.getElementById('sc-close').addEventListener('click', closeShortcuts);
+}
+function closeShortcuts() { if (shortcutsEl) { shortcutsEl.remove(); shortcutsEl = null; } }
+
+let gArmed = 0;
 window.addEventListener('keydown', (e) => {
   if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (paletteEl) closePalette(); else openPalette(); return; }
-  if (e.key === '/' && !paletteEl) {
-    const t = document.activeElement;
-    if (!t || !(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) { e.preventDefault(); openPalette(); }
-  }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = document.activeElement;
+  if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+  if (paletteEl) return;
+  if (e.key === 'Escape' && shortcutsEl) { e.preventDefault(); closeShortcuts(); return; }
+  if (e.key === '/') { e.preventDefault(); closeShortcuts(); openPalette(); return; }
+  if (e.key === '?') { e.preventDefault(); if (shortcutsEl) closeShortcuts(); else openShortcuts(); return; }
+  if (gArmed && Date.now() - gArmed < 1200 && NAV_KEY_MAP[e.key]) { e.preventDefault(); gArmed = 0; closeShortcuts(); go(NAV_KEY_MAP[e.key]); return; }
+  gArmed = e.key === 'g' ? Date.now() : 0;
 });
 
 // ---- routing ---------------------------------------------------------------
