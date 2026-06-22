@@ -2,16 +2,16 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=47';
-import { CLAUSES } from './data/clauses.js?v=47';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=47';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=47';
-import { LANGUAGES, STRINGS } from './i18n.js?v=47';
+import { CONTROLS } from './data/controls.js?v=49';
+import { CLAUSES } from './data/clauses.js?v=49';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=49';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=49';
+import { LANGUAGES, STRINGS } from './i18n.js?v=49';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=47';
+} from './store.js?v=49';
 
 // Interface language. t(key) returns the string for the current language, falling back
 // to English, then to the key itself, so a missing translation never breaks the page.
@@ -210,7 +210,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=47').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=49').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -1030,10 +1030,10 @@ function renderSoa() {
       <input id="soa-q" placeholder="Filter by reference, title, justification or owner" value="${esc(soaFilter.q)}" style="width:240px" aria-label="Filter the Statement of Applicability" />
       <span class="badge" id="soa-count"></span>
       <span class="spacer"></span>
-      <button class="secondary" id="soa-csv">Export spreadsheet (CSV)</button>
-      <button class="secondary" id="soa-print">Print or save as PDF</button>
+      <button class="secondary" id="soa-csv">${esc(t('btn.export'))}</button>
+      <button class="secondary" id="soa-print">${esc(t('btn.print'))}</button>
       ${editable ? '<button class="secondary" id="soa-populate">Populate from the document set</button>' : ''}
-      ${editable ? '<button id="soa-save">Save changes</button>' : ''}
+      ${editable ? `<button id="soa-save">${esc(t('btn.save'))}</button>` : ''}
     </div>
     <div class="panel table-wrap" id="soa-rows"></div>`;
 
@@ -1143,9 +1143,9 @@ function renderAims() {
       <input id="aims-q" placeholder="Filter by reference or title" value="${esc(aimsFilter.q)}" style="width:220px" aria-label="Filter AI controls" />
       <span class="badge" id="aims-count"></span>
       <span class="spacer"></span>
-      <button class="secondary" id="aims-csv">Export spreadsheet (CSV)</button>
-      <button class="secondary" id="aims-print">Print or save as PDF</button>
-      ${editable ? '<button id="aims-save">Save changes</button>' : ''}
+      <button class="secondary" id="aims-csv">${esc(t('btn.export'))}</button>
+      <button class="secondary" id="aims-print">${esc(t('btn.print'))}</button>
+      ${editable ? `<button id="aims-save">${esc(t('btn.save'))}</button>` : ''}
     </div>
     <div class="panel table-wrap" id="aims-rows"></div>
     <div class="panel"><h3>Management clauses</h3>${table(
@@ -1398,7 +1398,7 @@ function renderReadiness() {
         <div class="readiness-sum">
           <p><strong>${met} of ${checks.length} readiness checks met</strong> against ISO/IEC 27001:2022 and ISO/IEC 42001:2023.</p>
           <p class="muted">A live view of how close the management system is to certification, drawn from the documents, both Statements of Applicability and the registers. Each check links to where it is managed.</p>
-          <div class="toolbar"><button id="audit-pack">Generate audit pack</button></div>
+          <div class="toolbar"><button id="audit-pack">${esc(t('btn.generatePack'))}</button></div>
         </div>
       </div>
     </div>
@@ -1439,7 +1439,7 @@ function renderReport() {
   const evidence = getCollection('register.evidence').slice().sort((a, b) => String(a.controlRef || '').localeCompare(String(b.controlRef || '')));
   const today = new Date().toISOString().slice(0, 10);
   viewEl().innerHTML = `
-    <div class="toolbar"><button class="secondary" id="pack-back">Back</button><button id="print-pack">Print or save as PDF</button></div>
+    <div class="toolbar"><button class="secondary" id="pack-back">Back</button><button id="print-pack">${esc(t('btn.print'))}</button></div>
     <div class="report">
       <section class="report-section cover">
         <h1>${esc(t('chrome.org'))}</h1>
@@ -1590,7 +1590,7 @@ function renderManagementReview(id) {
   viewEl().innerHTML = `
     <p class="muted"><a href="#/registers">Registers</a> <span aria-hidden="true">/</span> ${esc(r.reviewId)}</p>
     <h2>${esc(routeTitle('review'))}: ${esc(r.reviewId)}</h2>
-    <div class="toolbar"><button class="secondary" id="mr-print">Print or save as PDF</button><span class="spacer"></span><a class="chip" href="#/registers">Back to the register</a></div>
+    <div class="toolbar"><button class="secondary" id="mr-print">${esc(t('btn.print'))}</button><span class="spacer"></span><a class="chip" href="#/registers">Back to the register</a></div>
     <div class="report">
       <div class="panel">
         <p>${held ? pill('Held', 'ok') : pill('Scheduled', 'warn')} <span class="muted">${date ? fmtDate(r.date) : 'date not set'}</span></p>
