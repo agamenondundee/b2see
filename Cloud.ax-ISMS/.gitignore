@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment and secrets, never commit these
+.env
+.env.*
+!.env.example
+
+# Prisma local artefacts
+backend/prisma/*.db
+
+# Logs and OS files
+*.log
+.DS_Store

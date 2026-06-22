@@ -1,0 +1,389 @@
+// Cloud.ax ISMS data model.
+//
+// Structured data lives here in PostgreSQL. Document files live in object storage;
+// only their metadata and a storage reference are held in the database. Classification
+// is stored as a string and validated in the application against the configurable
+// scheme, so the scheme is not fixed in the database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---- Enumerations fixed by the standard and the workflow -------------------
+
+enum DocumentType {
+  Policy
+  Procedure
+  Standard
+  Guideline
+  Plan
+  Register
+  Record
+  FormTemplate
+}
+
+enum DocumentStatus {
+  Draft
+  InReview
+  Approved
+  Published
+  UnderRevision
+  Retired
+}
+
+enum VersionStatus {
+  Draft
+  InReview
+  Approved
+  Published
+  Superseded
+}
+
+enum ControlTheme {
+  Organizational
+  People
+  Physical
+  Technological
+}
+
+enum ControlType {
+  Preventive
+  Detective
+  Corrective
+}
+
+enum SecurityProperty {
+  Confidentiality
+  Integrity
+  Availability
+}
+
+enum CybersecurityConcept {
+  Identify
+  Protect
+  Detect
+  Respond
+  Recover
+}
+
+enum ImplementationStatus {
+  NotStarted
+  InProgress
+  Implemented
+  Verified
+}
+
+enum RiskTreatmentOption {
+  Modify
+  Retain
+  Avoid
+  Share
+}
+
+// ---- People and access -----------------------------------------------------
+
+model User {
+  id          String    @id @default(cuid())
+  externalId  String?   @unique // OIDC subject
+  email       String    @unique
+  displayName String
+  status      String    @default("Active") // Active or Disabled
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  roles             Role[]     @relation("UserRoles")
+  ownedDocuments    Document[] @relation("DocumentOwner")
+  approvedDocuments Document[] @relation("DocumentApprover")
+  authoredDocuments Document[] @relation("DocumentAuthor")
+  authoredVersions  Version[]  @relation("VersionAuthor")
+  approvedVersions  Version[]  @relation("VersionApprover")
+}
+
+model Role {
+  id          String @id @default(cuid())
+  name        String @unique
+  description String @default("")
+  users       User[] @relation("UserRoles")
+}
+
+// ---- Documents and versions ------------------------------------------------
+
+model Document {
+  id                   String         @id @default(cuid())
+  documentId           String         @unique // human readable, prefix by type, for example POL-EDR-001
+  title                String
+  documentType         DocumentType
+  classification       String // validated against the configurable scheme
+  status               DocumentStatus @default(Draft)
+  reviewFrequencyMonths Int           @default(12)
+  lastApprovedAt       DateTime?
+  nextReviewDate       DateTime?
+
+  ownerId    String?
+  owner      User?   @relation("DocumentOwner", fields: [ownerId], references: [id])
+  approverId String?
+  approver   User?   @relation("DocumentApprover", fields: [approverId], references: [id])
+  authorId   String?
+  author     User?   @relation("DocumentAuthor", fields: [authorId], references: [id])
+
+  currentVersionId String?  @unique
+  currentVersion   Version? @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  versions         Version[] @relation("DocumentVersions")
+
+  clauses     Clause[]         @relation("DocumentClauses")
+  controls    AnnexAControl[]  @relation("DocumentControls")
+  soaEntries  SoaEntry[]       @relation("SoaDocuments")
+  relatedTo   Document[]       @relation("RelatedDocuments")
+  relatedFrom Document[]       @relation("RelatedDocuments")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([documentType])
+  @@index([nextReviewDate])
+}
+
+model Version {
+  id            String        @id @default(cuid())
+  versionNumber String // for example 1.0, 1.1, 2.0
+  status        VersionStatus @default(Draft)
+  changeSummary String        @default("")
+  fileReference String? // object storage key
+  fileName      String?
+
+  documentId String
+  document   Document @relation("DocumentVersions", fields: [documentId], references: [id])
+
+  authorId   String?
+  author     User?   @relation("VersionAuthor", fields: [authorId], references: [id])
+  approverId String?
+  approver   User?   @relation("VersionApprover", fields: [approverId], references: [id])
+
+  approvedAt  DateTime?
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  currentForDocument Document? @relation("CurrentVersion")
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId])
+}
+
+// ---- Framework: clauses and Annex A controls -------------------------------
+
+model Clause {
+  id                     String   @id @default(cuid())
+  clauseNumber           String   @unique // for example 6.1.3
+  title                  String
+  description            String   @default("")
+  mandatoryDocuments     String[] // documented information the clause requires
+  isClimateConsideration Boolean  @default(false)
+
+  documents Document[] @relation("DocumentClauses")
+}
+
+model AnnexAControl {
+  id               String                 @id @default(cuid())
+  controlReference String                 @unique // for example A.8.9
+  title            String
+  theme            ControlTheme
+  description      String                 @default("") // populate from the licensed standard
+  controlTypes     ControlType[]
+  properties       SecurityProperty[]
+  concepts         CybersecurityConcept[]
+
+  documents Document[]          @relation("DocumentControls")
+  risks     RiskRegisterEntry[] @relation("RiskControls")
+  soaEntry  SoaEntry?
+}
+
+// ---- Statement of Applicability --------------------------------------------
+
+model SoaEntry {
+  id                   String               @id @default(cuid())
+  controlId            String               @unique
+  control              AnnexAControl        @relation(fields: [controlId], references: [id])
+  applicable           Boolean? // null until decided; Yes or No once set
+  justification        String               @default("") // mandatory for inclusion and exclusion, enforced in the application
+  implementationStatus ImplementationStatus @default(NotStarted)
+  controlOwner         String               @default("")
+  lastReviewedAt       DateTime?
+
+  documents Document[]          @relation("SoaDocuments")
+  risks     RiskRegisterEntry[] @relation("SoaRisks")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---- Core registers --------------------------------------------------------
+
+model RiskRegisterEntry {
+  id                 String               @id @default(cuid())
+  riskId             String               @unique
+  description        String
+  assets             String               @default("")
+  threat             String               @default("")
+  vulnerability      String               @default("")
+  ciaImpact          String               @default("")
+  likelihood         Int?
+  impact             Int?
+  inherentScore      Int?
+  existingControls   String               @default("")
+  treatmentOption    RiskTreatmentOption?
+  treatmentPlan      String               @default("")
+  residualLikelihood Int?
+  residualImpact     Int?
+  residualScore      Int?
+  riskOwner          String               @default("")
+  status             String               @default("Open")
+  reviewDate         DateTime?
+
+  controls   AnnexAControl[] @relation("RiskControls")
+  soaEntries SoaEntry[]      @relation("SoaRisks")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AssetRegisterEntry {
+  id             String    @id @default(cuid())
+  assetId        String    @unique
+  name           String
+  assetType      String    @default("")
+  owner          String    @default("")
+  custodian      String    @default("")
+  classification String    @default("")
+  location       String    @default("")
+  ratingC        String    @default("")
+  ratingI        String    @default("")
+  ratingA        String    @default("")
+  status         String    @default("Active")
+  reviewDate     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model SupplierRegisterEntry {
+  id              String    @id @default(cuid())
+  supplierId      String    @unique
+  name            String
+  serviceProvided String    @default("")
+  dataProcessed   String    @default("")
+  isSubProcessor  Boolean   @default(false)
+  dataLocation    String    @default("")
+  dpaInPlace      Boolean   @default(false)
+  riskRating      String    @default("")
+  contractRef     String    @default("")
+  reviewDate      DateTime?
+  status          String    @default("Active")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model NonconformityEntry {
+  id               String    @id @default(cuid())
+  ncId             String    @unique
+  source           String    @default("") // Audit, Incident, Review
+  description      String
+  clauseOrControl  String    @default("")
+  rootCause        String    @default("")
+  correction       String    @default("")
+  correctiveAction String    @default("")
+  owner            String    @default("")
+  dueDate          DateTime?
+  status           String    @default("Open")
+  verification     String    @default("")
+  closedDate       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model InternalAuditEntry {
+  id              String    @id @default(cuid())
+  auditId         String    @unique
+  scope           String    @default("")
+  auditDate       DateTime?
+  auditor         String    @default("")
+  clausesCovered  String    @default("")
+  controlsCovered String    @default("")
+  findings        String    @default("")
+  reportReference String    @default("")
+  status          String    @default("Planned")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model ManagementReviewEntry {
+  id              String    @id @default(cuid())
+  reviewId        String    @unique
+  reviewDate      DateTime?
+  attendees       String    @default("")
+  inputs          String    @default("")
+  decisions       String    @default("")
+  actions         String    @default("")
+  minutesReference String   @default("")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model CompetenceTrainingEntry {
+  id                   String    @id @default(cuid())
+  person               String
+  role                 String    @default("")
+  requiredCompetencies String    @default("")
+  trainingCompleted    String    @default("")
+  completedDate        DateTime?
+  evidenceReference    String    @default("")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model LegalRegisterEntry {
+  id           String    @id @default(cuid())
+  requirement  String
+  source       String    @default("") // for example UK GDPR, Data Protection Act 2018
+  applicability String   @default("")
+  howAddressed String    @default("")
+  owner        String    @default("")
+  reviewDate   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model ContextRegisterEntry {
+  id                    String   @id @default(cuid())
+  category              String   @default("") // Internal issue, External issue, Interested party
+  description           String
+  partyOrIssue          String   @default("")
+  requirements          String   @default("")
+  isClimateRelated      Boolean  @default(false)
+  climateRequirements   String   @default("")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// ---- Audit trail (append only) ---------------------------------------------
+
+model AuditLogEntry {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorLabel String   @default("")
+  action     String // for example Created, StatusChanged, Downloaded, Exported, LoggedIn
+  entityType String // for example Document, Version, SoaEntry, User
+  entityId   String?
+  summary    String   @default("")
+  sourceIp   String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+}

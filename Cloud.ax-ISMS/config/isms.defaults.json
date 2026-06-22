@@ -1,0 +1,37 @@
+{
+  "branding": {
+    "organisationName": "[ORGANISATION NAME]",
+    "productName": "Cloud.ax ISMS",
+    "primaryColour": "#0b3d2e"
+  },
+  "documentTypePrefixes": {
+    "Policy": "POL",
+    "Procedure": "PROC",
+    "Standard": "STD",
+    "Guideline": "GUI",
+    "Plan": "PLAN",
+    "Register": "REG",
+    "Record": "REC",
+    "FormTemplate": "FORM"
+  },
+  "classificationScheme": ["Public", "Internal", "Confidential", "Restricted"],
+  "defaultClassification": "Internal",
+  "reviewFrequenciesMonths": [6, 12, 24],
+  "defaultReviewFrequencyMonths": 12,
+  "reviewDueWithinDays": 30,
+  "roles": [
+    "Administrator",
+    "ISMS Manager",
+    "Document Owner",
+    "Reviewer",
+    "Approver",
+    "Reader"
+  ],
+  "dataResidency": {
+    "allowedRegions": ["UK", "EU"]
+  },
+  "notifications": {
+    "email": { "enabled": true },
+    "teams": { "enabled": false, "webhookUrl": "" }
+  }
+}
