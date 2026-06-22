@@ -2,15 +2,15 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=27';
-import { CLAUSES } from './data/clauses.js?v=27';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=27';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=27';
+import { CONTROLS } from './data/controls.js?v=28';
+import { CLAUSES } from './data/clauses.js?v=28';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=28';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=28';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=27';
+} from './store.js?v=28';
 
 ensureSeed();
 applyTheme();
@@ -184,7 +184,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=27').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=28').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -240,9 +240,18 @@ function reviewCell(iso) {
   if (dueSoon(iso)) return `<span class="soon-date">${fmtDate(iso)}</span> ${pill('soon', 'warn')}`;
   return fmtDate(iso);
 }
+const CONTROL_REFS = new Set(CONTROLS.map((c) => c.ref));
 function controlChips(s) {
-  const refs = (s || '').split(',').map((x) => x.trim()).filter(Boolean);
-  return refs.length ? refs.map((r) => `<span class="chip">${esc(r)}</span>`).join('') : '<span class="muted">-</span>';
+  const refs = (s || '').split(/[,;]/).map((x) => x.trim()).filter(Boolean);
+  return refs.length ? refs.map((r) => (CONTROL_REFS.has(r) ? `<a class="chip" href="#/control/${esc(r)}">${esc(r)}</a>` : `<span class="chip">${esc(r)}</span>`)).join('') : '<span class="muted">-</span>';
+}
+// For a register entry that names Annex A controls, how many of those controls are
+// implemented or verified in the Statement of Applicability. Used to show whether a
+// risk's treatment is actually in place, not just planned.
+function controlCoverage(relatedControls, soaByRef) {
+  const refs = String(relatedControls || '').split(/[,;]/).map((x) => x.trim()).filter((r) => CONTROL_REFS.has(r));
+  const implemented = refs.filter((r) => { const s = soaByRef[r]; return s && s.applicable === true && ['Implemented', 'Verified'].includes(s.status); }).length;
+  return { total: refs.length, implemented };
 }
 
 function riskMatrix(rows) {
@@ -310,11 +319,16 @@ function regSummary(key, rows) {
     const levels = [['Critical', 'danger'], ['High', 'danger'], ['Medium', 'warn'], ['Low', 'ok']];
     const inhSeg = levels.map(([l, k]) => ({ label: l, value: rows.filter((e) => riskLevel(riskScore(e)).label === l).length, kind: k }));
     const resSeg = levels.map(([l, k]) => ({ label: l, value: rows.filter((e) => riskLevel(residualScore(e)).label === l).length, kind: k }));
+    const soaByRef = Object.fromEntries(getCollection('soa').map((s) => [s.ref, s]));
+    const withControls = rows.filter((e) => controlCoverage(e.relatedControls, soaByRef).total > 0);
+    const fullyCovered = withControls.filter((e) => { const c = controlCoverage(e.relatedControls, soaByRef); return c.implemented === c.total; }).length;
+    const noControls = rows.length - withControls.length;
     return `<div class="matrix-wrap"><div><div class="matrix-axis" style="margin-bottom:6px">Inherent risk: likelihood across, impact up</div>${riskMatrix(rows)}</div>
       <div style="min-width:260px;flex:1">
         <div class="muted" style="font-size:12px;margin-bottom:4px">Inherent risk levels</div>${stackedBar(inhSeg)}
         <div class="muted" style="font-size:12px;margin:14px 0 4px">Residual risk levels, after treatment</div>${stackedBar(resSeg)}
-      </div></div>`;
+      </div></div>
+      <div class="mini-cards" style="margin-top:14px">${mini(`${fullyCovered}/${withControls.length}`, 'Risks with all controls implemented', fullyCovered === withControls.length ? 'ok' : 'warn')}${mini(noControls, 'Risks with no control named', noControls ? 'warn' : 'ok')}</div>`;
   }
   if (key === 'supplier') {
     const dpa = rows.filter((r) => /^y/i.test(r.dpa || '')).length;
@@ -692,7 +706,7 @@ function renderDocumentDetail(id) {
         [{ key: 'ref', label: 'Control' }, { key: 'title', label: 'Title' }, { key: 'app', label: 'Applicable' }, { key: 'impl', label: 'Implementation' }],
         doc.controlRefs.map((ref) => {
           const s = soaByRef[ref];
-          return { __html: true, ref: esc(ref), title: esc(ctrlByRef[ref] ? ctrlByRef[ref].title : ''),
+          return { __html: true, ref: CONTROL_REFS.has(ref) ? `<a href="#/control/${esc(ref)}">${esc(ref)}</a>` : esc(ref), title: esc(ctrlByRef[ref] ? ctrlByRef[ref].title : ''),
             app: s ? applicablePill(s.applicable) : '<span class="muted">-</span>',
             impl: s && s.applicable === true ? pill(s.status, statusKind(s.status)) : '<span class="muted">-</span>' };
         }),
