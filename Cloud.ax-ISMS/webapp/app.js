@@ -2,14 +2,14 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=22';
-import { CLAUSES } from './data/clauses.js?v=22';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=22';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=22';
+import { CONTROLS } from './data/controls.js?v=23';
+import { CLAUSES } from './data/clauses.js?v=23';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=23';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=23';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
-} from './store.js?v=22';
+} from './store.js?v=23';
 
 ensureSeed();
 applyTheme();
@@ -159,7 +159,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=22').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=23').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -435,6 +435,13 @@ function renderDashboard() {
   const documented = soa.filter((s) => (s.docRefs || []).length > 0).length;
   const implCounts = CONFIG.implementationStatuses.map((st) => ({ label: st, value: soa.filter((s) => s.applicable === true && s.status === st).length, kind: statusKind(st) }));
 
+  const aims = getCollection('aimsSoa');
+  const aimsApplicable = aims.filter((s) => s.applicable === true).length;
+  const aimsExcluded = aims.filter((s) => s.applicable === false).length;
+  const aimsUndecided = aims.length - aimsApplicable - aimsExcluded;
+  const aimsImplemented = aims.filter((s) => s.applicable === true && ['Implemented', 'Verified'].includes(s.status)).length;
+  const aimsImplCounts = CONFIG.implementationStatuses.map((st) => ({ label: st, value: aims.filter((s) => s.applicable === true && s.status === st).length, kind: statusKind(st) }));
+
   const bySystem = {};
   for (const d of docs) bySystem[d.system || 'Other'] = (bySystem[d.system || 'Other'] || 0) + 1;
   const statusCounts = CONFIG.statuses.map((st) => ({ st, n: docs.filter((d) => d.status === st).length })).filter((x) => x.n);
@@ -482,6 +489,7 @@ function renderDashboard() {
       ${kpi(readyScore >= 90 ? 'ok' : 'warn', ICONS.readiness, `${readyScore}%`, 'Certification readiness', `${checks.filter((c) => c.ok).length} of ${checks.length} checks met`, '#/readiness')}
       ${kpi('', ICONS.documents, docs.length, 'Controlled documents', `${published.length} published`, '#/documents')}
       ${kpi('ok', ICONS.soa, `${pct(applicable, soa.length)}%`, 'Controls applicable', `${applicable} of ${soa.length} Annex A`, '#/soa')}
+      ${kpi(aimsApplicable && aimsImplemented === aimsApplicable ? 'ok' : 'warn', ICONS.aims, `${pct(aimsImplemented, aimsApplicable)}%`, 'AI controls implemented', `${aimsImplemented} of ${aimsApplicable} ISO 42001`, '#/aims')}
       ${kpi(overdueDocs.length ? 'danger' : 'ok', ICONS.audit, overdueDocs.length, 'Reviews overdue', `${dueDocs.length} due within ${CONFIG.reviewDueWithinDays} days`, '#/documents')}
       ${kpi(openFindings ? 'warn' : 'ok', ICONS.audits, openFindings, 'Open audit findings', 'across the programme', '#/audits')}
       ${kpi(gaps.length ? 'warn' : 'ok', ICONS.framework, gaps.length, 'Clause coverage gaps', `${mandatory.length - gaps.length} of ${mandatory.length} clauses covered`, '#/framework')}
@@ -511,6 +519,21 @@ function renderDashboard() {
       <div class="panel">
         <div class="panel-head"><h3>Implementation of applicable controls</h3><span class="muted">${applicable} applicable</span></div>
         ${applicable ? stackedBar(implCounts) : '<p class="muted">No controls are marked applicable yet.</p>'}
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:18px">
+      <div class="panel">
+        <div class="panel-head"><h3>AI management applicability</h3><a href="#/aims">ISO 42001</a></div>
+        ${stackedBar([
+          { label: 'Applicable', value: aimsApplicable, kind: 'ok' },
+          { label: 'Excluded', value: aimsExcluded, kind: 'neutral' },
+          { label: 'Undecided', value: aimsUndecided, kind: 'warn' },
+        ])}
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>AI control implementation</h3><span class="muted">${aimsApplicable} applicable</span></div>
+        ${aimsApplicable ? stackedBar(aimsImplCounts) : '<p class="muted">No AI controls are marked applicable yet.</p>'}
       </div>
     </div>
 
