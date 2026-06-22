@@ -10,6 +10,15 @@ Applicability and the core registers, tracks review cycles, and produces audit
 evidence packs on demand. Every action is logged and every document has a traceable
 history, so the platform is itself defensible as audit evidence.
 
+## Two ways to run it
+
+- **Browser version (`webapp/`)**: a self contained web application with no server,
+  no database and no build step. Open it and it works, with all data stored in the
+  browser. Best for evaluation and single user use. See [`webapp/README.md`](webapp/README.md).
+- **Full application (`backend/` and `frontend/`)**: a Node and TypeScript API,
+  PostgreSQL and an identity provider for a multi user, server enforced deployment
+  with a tamper resistant audit store and access control. Described below.
+
 ## Status
 
 All nine phases are implemented as a working baseline.
