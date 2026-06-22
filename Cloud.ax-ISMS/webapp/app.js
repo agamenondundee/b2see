@@ -2,16 +2,16 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=44';
-import { CLAUSES } from './data/clauses.js?v=44';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=44';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=44';
-import { LANGUAGES, STRINGS } from './i18n.js?v=44';
+import { CONTROLS } from './data/controls.js?v=45';
+import { CLAUSES } from './data/clauses.js?v=45';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=45';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=45';
+import { LANGUAGES, STRINGS } from './i18n.js?v=45';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=44';
+} from './store.js?v=45';
 
 // Interface language. t(key) returns the string for the current language, falling back
 // to English, then to the key itself, so a missing translation never breaks the page.
@@ -210,7 +210,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=44').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=45').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -622,30 +622,30 @@ function renderDashboard() {
   viewEl().innerHTML = `
     <h2>${esc(routeTitle('dashboard'))}</h2>
     <div class="cards">
-      ${kpi(readyScore >= 90 ? 'ok' : 'warn', ICONS.readiness, `${readyScore}%`, 'Certification readiness', `${checks.filter((c) => c.ok).length} of ${checks.length} checks met`, '#/readiness')}
-      ${kpi('', ICONS.documents, docs.length, 'Controlled documents', `${published.length} published`, '#/documents')}
-      ${kpi('ok', ICONS.soa, `${pct(applicable, soa.length)}%`, 'Controls applicable', `${applicable} of ${soa.length} Annex A`, '#/soa')}
-      ${kpi(aimsApplicable && aimsImplemented === aimsApplicable ? 'ok' : 'warn', ICONS.aims, `${pct(aimsImplemented, aimsApplicable)}%`, 'AI controls implemented', `${aimsImplemented} of ${aimsApplicable} ISO 42001`, '#/aims')}
-      ${kpi(overdueDocs.length ? 'danger' : 'ok', ICONS.audit, overdueDocs.length, 'Reviews overdue', `${dueDocs.length} due within ${CONFIG.reviewDueWithinDays} days`, '#/documents')}
-      ${kpi(openFindings ? 'warn' : 'ok', ICONS.audits, openFindings, 'Open audit findings', 'across the programme', '#/audits')}
-      ${kpi(gaps.length ? 'warn' : 'ok', ICONS.framework, gaps.length, 'Clause coverage gaps', `${mandatory.length - gaps.length} of ${mandatory.length} clauses covered`, '#/framework')}
+      ${kpi(readyScore >= 90 ? 'ok' : 'warn', ICONS.readiness, `${readyScore}%`, t('title.readiness'), `${checks.filter((c) => c.ok).length} of ${checks.length} checks met`, '#/readiness')}
+      ${kpi('', ICONS.documents, docs.length, t('dash.documents'), `${published.length} published`, '#/documents')}
+      ${kpi('ok', ICONS.soa, `${pct(applicable, soa.length)}%`, t('dash.controlsApplicable'), `${applicable} of ${soa.length} Annex A`, '#/soa')}
+      ${kpi(aimsApplicable && aimsImplemented === aimsApplicable ? 'ok' : 'warn', ICONS.aims, `${pct(aimsImplemented, aimsApplicable)}%`, t('dash.aiImplemented'), `${aimsImplemented} of ${aimsApplicable} ISO 42001`, '#/aims')}
+      ${kpi(overdueDocs.length ? 'danger' : 'ok', ICONS.audit, overdueDocs.length, t('dash.reviewsOverdue'), `${dueDocs.length} due within ${CONFIG.reviewDueWithinDays} days`, '#/documents')}
+      ${kpi(openFindings ? 'warn' : 'ok', ICONS.audits, openFindings, t('dash.openFindings'), 'across the programme', '#/audits')}
+      ${kpi(gaps.length ? 'warn' : 'ok', ICONS.framework, gaps.length, t('dash.clauseGaps'), `${mandatory.length - gaps.length} of ${mandatory.length} clauses covered`, '#/framework')}
     </div>
 
     <div class="grid-2">
       <div class="panel">
-        <div class="panel-head"><h3>Actions and notifications</h3>${attention.length ? `<span class="pill warn">${attention.length}</span>` : '<span class="pill ok">clear</span>'}</div>
+        <div class="panel-head"><h3>${esc(t('dash.actions'))}</h3>${attention.length ? `<span class="pill warn">${attention.length}</span>` : '<span class="pill ok">clear</span>'}</div>
         ${attention.length ? `<div class="attn">${attention.slice(0, 8).map((a) => `<div class="attn-row"><span>${esc(a.what)}${a.due ? ` <span class="muted">due ${esc(a.due)}</span>` : ''}</span><a class="chip" href="${mailto(settings.notifyEmail, 'Cloudax ISMS: ' + a.what, `Owner: ${a.owner || 'unassigned'}\nDue: ${a.due || 'not set'}\n\nSent from the Cloudax ISMS.`)}">Email</a></div>`).join('')}</div>${attention.length > 8 ? `<p class="muted">and ${attention.length - 8} more.</p>` : ''}` : '<p class="muted">Nothing needs attention. Reviews, audit findings, corrective actions and supplier reviews are up to date.</p>'}
         <div class="toolbar" style="margin-top:12px"><a class="email-btn" href="${mailto(settings.notifyEmail, 'Cloudax ISMS summary', summaryBody)}">Email this summary</a>${settings.notifyEmail ? `<span class="muted">to ${esc(settings.notifyEmail)}</span>` : '<span class="muted">Set a recipient in Settings.</span>'}</div>
       </div>
       <div class="panel">
-        <div class="panel-head"><h3>Regulatory and standards updates</h3><a href="#/settings">Sources</a></div>
+        <div class="panel-head"><h3>${esc(t('dash.feeds'))}</h3><a href="#/settings">Sources</a></div>
         ${feeds.map((f) => `<div class="feed"><div class="feed-name">${esc(f.label || f.name)}</div><div class="feed-body" data-feed="${esc(f.name)}"><p class="muted"><span class="spinner"></span>Loading the latest...</p></div></div>`).join('')}
       </div>
     </div>
 
     <div class="grid-2" style="margin-top:18px">
       <div class="panel">
-        <div class="panel-head"><h3>Annex A control applicability</h3><span class="muted">${soa.length} controls</span></div>
+        <div class="panel-head"><h3>${esc(t('dash.annexApplicability'))}</h3><span class="muted">${soa.length} controls</span></div>
         ${stackedBar([
           { label: 'Applicable', value: applicable, kind: 'ok' },
           { label: 'Excluded', value: excluded, kind: 'neutral' },
@@ -653,14 +653,14 @@ function renderDashboard() {
         ])}
       </div>
       <div class="panel">
-        <div class="panel-head"><h3>Implementation of applicable controls</h3><span class="muted">${applicable} applicable</span></div>
+        <div class="panel-head"><h3>${esc(t('dash.implementation'))}</h3><span class="muted">${applicable} applicable</span></div>
         ${applicable ? donut(implCounts, { center: pct(soa.filter((s) => s.applicable === true && ['Implemented', 'Verified'].includes(s.status)).length, applicable) + '%', sub: 'done', aria: 'Implementation of applicable controls' }) : '<p class="muted">No controls are marked applicable yet.</p>'}
       </div>
     </div>
 
     <div class="grid-2" style="margin-top:18px">
       <div class="panel">
-        <div class="panel-head"><h3>AI management applicability</h3><a href="#/aims">ISO 42001</a></div>
+        <div class="panel-head"><h3>${esc(t('dash.aiApplicability'))}</h3><a href="#/aims">ISO 42001</a></div>
         ${stackedBar([
           { label: 'Applicable', value: aimsApplicable, kind: 'ok' },
           { label: 'Excluded', value: aimsExcluded, kind: 'neutral' },
@@ -668,19 +668,19 @@ function renderDashboard() {
         ])}
       </div>
       <div class="panel">
-        <div class="panel-head"><h3>AI control implementation</h3><span class="muted">${aimsApplicable} applicable</span></div>
+        <div class="panel-head"><h3>${esc(t('dash.aiImplementation'))}</h3><span class="muted">${aimsApplicable} applicable</span></div>
         ${aimsApplicable ? donut(aimsImplCounts, { center: pct(aimsImplemented, aimsApplicable) + '%', sub: 'done', aria: 'AI control implementation' }) : '<p class="muted">No AI controls are marked applicable yet.</p>'}
       </div>
     </div>
 
     <div class="grid-2" style="margin-top:18px">
       <div class="panel">
-        <div class="panel-head"><h3>Documents by system</h3><a href="#/documents">Open</a></div>
+        <div class="panel-head"><h3>${esc(t('dash.docsBySystem'))}</h3><a href="#/documents">Open</a></div>
         ${Object.entries(bySystem).map(([k, v]) => metricBar(k, v, docs.length)).join('') || '<p class="muted">No documents.</p>'}
         <div class="legend" style="margin-top:14px">${statusCounts.map((x) => `<span class="leg">${pill(x.st, statusKind(x.st))} <b>${x.n}</b></span>`).join('')}</div>
       </div>
       <div class="panel">
-        <div class="panel-head"><h3>Upcoming reviews</h3>${overdueDocs.length ? `<span class="pill danger">${overdueDocs.length} overdue</span>` : '<span class="muted">on track</span>'}</div>
+        <div class="panel-head"><h3>${esc(t('dash.upcomingReviews'))}</h3>${overdueDocs.length ? `<span class="pill danger">${overdueDocs.length} overdue</span>` : '<span class="muted">on track</span>'}</div>
         ${upcoming.length ? table(
           [{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'due', label: 'Review by' }],
           upcoming.map((d) => ({ __html: true, ref: `<a href="#/documents/${d.id}">${esc(d.ref)}</a>`, title: esc(d.title), due: `${fmtDate(d.nextReviewDate)} ${new Date(d.nextReviewDate).getTime() < now ? pill('overdue', 'danger') : ''}` })),
@@ -690,11 +690,11 @@ function renderDashboard() {
 
     <div class="grid-2" style="margin-top:18px">
       <div class="panel">
-        <div class="panel-head"><h3>Risk profile</h3><a href="#/registers">Open registers</a></div>
+        <div class="panel-head"><h3>${esc(t('dash.riskProfile'))}</h3><a href="#/registers">Open registers</a></div>
         ${risks.length ? stackedBar(riskSeg) : '<p class="muted">No risks recorded.</p>'}
       </div>
       <div class="panel">
-        <div class="panel-head"><h3>Governance and obligations</h3></div>
+        <div class="panel-head"><h3>${esc(t('dash.governance'))}</h3></div>
         <div class="mini-cards">
           ${mini(ncOpen, 'Open nonconformities', ncOpen ? 'warn' : 'ok')}
           ${mini(ncOverdue, 'Overdue actions', ncOverdue ? 'danger' : 'ok')}
@@ -707,7 +707,7 @@ function renderDashboard() {
     </div>
 
     <div class="panel" style="margin-top:18px">
-      <div class="panel-head"><h3>Recent activity</h3><a href="#/audit">View all</a></div>
+      <div class="panel-head"><h3>${esc(t('dash.recentActivity'))}</h3><a href="#/audit">View all</a></div>
       ${table(
         [{ key: 'ts', label: 'When' }, { key: 'actor', label: 'Who' }, { key: 'action', label: 'Action' }, { key: 'detail', label: 'Detail' }],
         log.map((a) => ({ ts: a.ts.slice(0, 16).replace('T', ' '), actor: a.actor, action: `${a.action} ${a.entity}`, detail: a.detail })),
@@ -1442,11 +1442,11 @@ function renderReport() {
     <div class="toolbar"><button class="secondary" id="pack-back">Back</button><button id="print-pack">Print or save as PDF</button></div>
     <div class="report">
       <section class="report-section cover">
-        <h1>Information Security Management System</h1>
-        <h2>Audit pack</h2>
+        <h1>${esc(t('chrome.org'))}</h1>
+        <h2>${esc(t('title.report'))}</h2>
         <p class="muted">${esc(getOrg().name)}</p>
-        <p class="muted">Scope: ${esc(getOrg().scope)}</p>
-        <p class="muted">ISO/IEC 27001:2022 and ISO/IEC 42001:2023 | Generated ${today} | Classification: Internal</p>
+        <p class="muted">${esc(t('report.scope'))}: ${esc(getOrg().scope)}</p>
+        <p class="muted">ISO/IEC 27001:2022 and ISO/IEC 42001:2023 | ${esc(t('report.generated'))} ${today} | ${esc(t('report.classification'))}</p>
         <div class="ring ${score >= 90 ? 'ok' : score >= 70 ? 'warn' : 'danger'}" style="--p:${score}"><div class="inner"><div class="v">${score}%</div><div class="l">ready</div></div></div>
       </section>
       <section class="report-section break"><h3>Readiness summary</h3>${table(
