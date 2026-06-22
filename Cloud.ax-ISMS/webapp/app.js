@@ -2,13 +2,13 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=12';
-import { CLAUSES } from './data/clauses.js?v=12';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=12';
+import { CONTROLS } from './data/controls.js?v=14';
+import { CLAUSES } from './data/clauses.js?v=14';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=14';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
-} from './store.js?v=12';
+} from './store.js?v=14';
 
 ensureSeed();
 
@@ -119,7 +119,7 @@ function animateCounts(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=12').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=14').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
