@@ -2,15 +2,15 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=36';
-import { CLAUSES } from './data/clauses.js?v=36';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=36';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=36';
+import { CONTROLS } from './data/controls.js?v=38';
+import { CLAUSES } from './data/clauses.js?v=38';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=38';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=38';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=36';
+} from './store.js?v=38';
 
 ensureSeed();
 applyTheme();
@@ -112,6 +112,20 @@ function stackedBar(segments) {
   const legend = segments.map((s) => `<span class="leg"><i class="dot ${s.kind}"></i>${esc(s.label)} <b>${s.value}</b></span>`).join('');
   return `<div class="bar">${bar}</div><div class="legend">${legend}</div>`;
 }
+// A doughnut chart: each segment is an arc on a single ring, with a value in the centre
+// and a legend beside it. Colours come from the semantic solid tokens.
+function donut(segments, opts = {}) {
+  const total = segments.reduce((a, s) => a + (s.value || 0), 0);
+  const size = opts.size || 168; const sw = opts.sw || 24; const r = (size - sw) / 2 - 2; const c = size / 2; const C = 2 * Math.PI * r;
+  let acc = 0;
+  const arcs = total ? segments.filter((s) => s.value > 0).map((s) => {
+    const frac = s.value / total;
+    const el = `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--${s.kind || 'neutral'}-solid)" stroke-width="${sw}" stroke-dasharray="${(frac * C).toFixed(2)} ${(C - frac * C).toFixed(2)}" stroke-dashoffset="${(-acc * C).toFixed(2)}" transform="rotate(-90 ${c} ${c})"><title>${esc(s.label)}: ${s.value}</title></circle>`;
+    acc += frac; return el;
+  }).join('') : `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--line-2)" stroke-width="${sw}"/>`;
+  const legend = `<div class="legend">${segments.map((s) => `<span class="leg"><i class="dot ${s.kind || 'neutral'}"></i>${esc(s.label)} <b>${s.value}</b></span>`).join('')}</div>`;
+  return `<div class="donut-wrap"><svg class="donut" viewBox="0 0 ${size} ${size}" role="img" aria-label="${esc(opts.aria || 'Doughnut chart')}">${arcs}<text x="${c}" y="${c - 1}" class="donut-c" text-anchor="middle">${esc(opts.center != null ? String(opts.center) : String(total))}</text>${opts.sub ? `<text x="${c}" y="${c + 17}" class="donut-s" text-anchor="middle">${esc(opts.sub)}</text>` : ''}</svg>${legend}</div>`;
+}
 function metricBar(name, value, total) {
   return `<div class="metric-row"><span class="name">${esc(name)}</span><span class="track"><span style="width:${pct(value, total)}%"></span></span><span class="val">${value}</span></div>`;
 }
@@ -187,7 +201,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=36').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=38').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -577,7 +591,7 @@ function renderDashboard() {
       </div>
       <div class="panel">
         <div class="panel-head"><h3>Implementation of applicable controls</h3><span class="muted">${applicable} applicable</span></div>
-        ${applicable ? stackedBar(implCounts) : '<p class="muted">No controls are marked applicable yet.</p>'}
+        ${applicable ? donut(implCounts, { center: pct(soa.filter((s) => s.applicable === true && ['Implemented', 'Verified'].includes(s.status)).length, applicable) + '%', sub: 'done', aria: 'Implementation of applicable controls' }) : '<p class="muted">No controls are marked applicable yet.</p>'}
       </div>
     </div>
 
@@ -592,7 +606,7 @@ function renderDashboard() {
       </div>
       <div class="panel">
         <div class="panel-head"><h3>AI control implementation</h3><span class="muted">${aimsApplicable} applicable</span></div>
-        ${aimsApplicable ? stackedBar(aimsImplCounts) : '<p class="muted">No AI controls are marked applicable yet.</p>'}
+        ${aimsApplicable ? donut(aimsImplCounts, { center: pct(aimsImplemented, aimsApplicable) + '%', sub: 'done', aria: 'AI control implementation' }) : '<p class="muted">No AI controls are marked applicable yet.</p>'}
       </div>
     </div>
 
