@@ -405,6 +405,7 @@ mark { background: #fde68a; color: inherit; padding: 0 2px; border-radius: 3px; 
 .dfd-store { fill: var(--ok-bg); stroke: var(--ok-solid); }
 .dfd-vault { fill: var(--warn-bg); stroke: var(--warn-solid); }
 .dfd-external { fill: var(--neutral-bg); stroke: var(--neutral-solid); }
+.dfd-alert { fill: var(--danger-bg); stroke: var(--danger-solid); }
 .dfd-om { fill: var(--panel); stroke: var(--line); }
 .dfd-om.plan { fill: var(--brand-50); stroke: var(--brand-300); }
 .dfd-om.do { fill: var(--ok-bg); stroke: var(--ok-solid); }
