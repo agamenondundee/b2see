@@ -2,14 +2,14 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=20';
-import { CLAUSES } from './data/clauses.js?v=20';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=20';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=20';
+import { CONTROLS } from './data/controls.js?v=21';
+import { CLAUSES } from './data/clauses.js?v=21';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=21';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=21';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
-} from './store.js?v=20';
+} from './store.js?v=21';
 
 ensureSeed();
 applyTheme();
@@ -159,7 +159,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=20').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=21').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -1061,6 +1061,10 @@ function renderRegisters() {
 function readinessData() {
   const docs = getCollection('documents');
   const soa = getCollection('soa');
+  const aims = getCollection('aimsSoa');
+  const aimsUndecided = aims.filter((s) => s.applicable === null).length;
+  const aimsApplicable = aims.filter((s) => s.applicable === true);
+  const aimsImplemented = aimsApplicable.filter((s) => ['Implemented', 'Verified'].includes(s.status)).length;
   const now = Date.now();
   const published = docs.filter((d) => d.status === 'Published');
   const linkedClause = new Set(docs.flatMap((d) => d.clauseRefs || []));
@@ -1100,6 +1104,8 @@ function readinessData() {
     C('Management review current', !!mrCurrent, 'danger', lastMr ? `Last management review ${fmtDate(lastMr)}` : 'No management review recorded', 'registers'),
     C('Supplier assurance', supNoDpa === 0 && supOverdue === 0, 'warn', `${supNoDpa} without a data processing agreement, ${supOverdue} reviews overdue`, 'registers'),
     C('Context and interested parties', ctx > 0, 'warn', `${ctx} context entries recorded`, 'registers'),
+    C('AI management applicability decided', aims.length > 0 && aimsUndecided === 0, 'warn', aimsUndecided === 0 ? 'All ISO 42001 controls have an applicability decision' : `${aimsUndecided} AI controls undecided`, 'aims'),
+    C('AI controls implemented', aimsApplicable.length > 0 && aimsImplemented === aimsApplicable.length, 'warn', `${aimsImplemented} of ${aimsApplicable.length} applicable AI controls implemented or verified`, 'aims'),
   ];
 }
 
@@ -1114,8 +1120,8 @@ function renderReadiness() {
       <div class="readiness-hero">
         <div class="ring ${ring}" style="--p:${score}"><div class="inner"><div class="v">${score}%</div><div class="l">ready</div></div></div>
         <div class="readiness-sum">
-          <p><strong>${met} of ${checks.length} readiness checks met</strong> against ISO/IEC 27001:2022.</p>
-          <p class="muted">A live view of how close the management system is to certification, drawn from the documents, the Statement of Applicability and the registers. Each check links to where it is managed.</p>
+          <p><strong>${met} of ${checks.length} readiness checks met</strong> against ISO/IEC 27001:2022 and ISO/IEC 42001:2023.</p>
+          <p class="muted">A live view of how close the management system is to certification, drawn from the documents, both Statements of Applicability and the registers. Each check links to where it is managed.</p>
           <div class="toolbar"><button id="audit-pack">Generate audit pack</button></div>
         </div>
       </div>
@@ -1135,6 +1141,9 @@ function renderReadiness() {
 function renderReport() {
   const docs = getCollection('documents');
   const soa = getCollection('soa');
+  const aims = getCollection('aimsSoa');
+  const aimsByRef = Object.fromEntries(AIMS_CONTROLS.map((c) => [c.ref, c]));
+  const aimsObjName = Object.fromEntries(AIMS_OBJECTIVES.map((o) => [o.ref, o.name]));
   const ctrlByRef = Object.fromEntries(CONTROLS.map((c) => [c.ref, c]));
   const checks = readinessData();
   const met = checks.filter((c) => c.ok).length;
@@ -1167,6 +1176,12 @@ function renderReport() {
         ${table(
           [{ key: 'ref', label: 'Control' }, { key: 'title', label: 'Title' }, { key: 'app', label: 'Applicable' }, { key: 'status', label: 'Status' }, { key: 'just', label: 'Justification' }],
           soa.map((s) => ({ __html: true, ref: esc(s.ref), title: esc(ctrlByRef[s.ref] ? ctrlByRef[s.ref].title : ''), app: applicablePill(s.applicable), status: s.applicable === true ? pill(s.status, statusKind(s.status)) : '<span class="muted">-</span>', just: esc(s.justification || '') })),
+        )}</section>
+      <section class="report-section break"><h3>AI management Statement of Applicability</h3>
+        <p class="muted">ISO/IEC 42001:2023 Annex A. ${aims.filter((s) => s.applicable === true).length} applicable, ${aims.filter((s) => s.applicable === true && ['Implemented', 'Verified'].includes(s.status)).length} implemented or verified, of ${aims.length} reference controls.</p>
+        ${table(
+          [{ key: 'ref', label: 'Control' }, { key: 'title', label: 'Title' }, { key: 'obj', label: 'Objective' }, { key: 'app', label: 'Applicable' }, { key: 'status', label: 'Status' }, { key: 'just', label: 'Justification' }],
+          aims.map((s) => ({ __html: true, ref: esc(s.ref), title: esc(aimsByRef[s.ref] ? aimsByRef[s.ref].title : ''), obj: esc(aimsByRef[s.ref] ? aimsObjName[aimsByRef[s.ref].objective] : ''), app: applicablePill(s.applicable), status: s.applicable === true ? pill(s.status, statusKind(s.status)) : '<span class="muted">-</span>', just: esc(s.justification || '') })),
         )}</section>
       <section class="report-section break"><h3>Risk summary</h3>
         <div class="matrix-wrap"><div>${riskMatrix(risks)}</div></div>
