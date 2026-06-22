@@ -2,12 +2,12 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=4';
-import { CLAUSES } from './data/clauses.js?v=4';
+import { CONTROLS } from './data/controls.js?v=5';
+import { CLAUSES } from './data/clauses.js?v=5';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, cid, addMonths, nextReference,
-} from './store.js?v=4';
+} from './store.js?v=5';
 
 ensureSeed();
 
@@ -85,6 +85,140 @@ function stackedBar(segments) {
 }
 function metricBar(name, value, total) {
   return `<div class="metric-row"><span class="name">${esc(name)}</span><span class="track"><span style="width:${pct(value, total)}%"></span></span><span class="val">${value}</span></div>`;
+}
+function mini(n, label, kind) { return `<div class="mini ${kind || ''}"><div class="n">${esc(String(n))}</div><div class="l">${esc(label)}</div></div>`; }
+
+// ---- register intelligence -------------------------------------------------
+
+function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function riskScore(e) { return num(e.likelihood) * num(e.impact); }
+function riskLevel(s) {
+  if (s >= 15) return { label: 'Critical', kind: 'danger' };
+  if (s >= 10) return { label: 'High', kind: 'danger' };
+  if (s >= 5) return { label: 'Medium', kind: 'warn' };
+  if (s >= 1) return { label: 'Low', kind: 'ok' };
+  return { label: 'Not scored', kind: 'neutral' };
+}
+function riskStatusKind(s) { return /open|new/i.test(s) ? 'warn' : /treat|clos|accept|mitigat|resolv/i.test(s) ? 'ok' : 'neutral'; }
+function ncStatusKind(s) { return /clos|resolv|verif|complet/i.test(s) ? 'ok' : /progress/i.test(s) ? 'warn' : 'danger'; }
+function auditStatusKind(s) { return /complet|clos/i.test(s) ? 'ok' : /progress/i.test(s) ? 'warn' : 'neutral'; }
+function classKind(c) { return ({ Restricted: 'danger', Confidential: 'warn', Internal: 'info', Public: 'neutral' })[c] || 'neutral'; }
+function isUkEu(loc) { return /\b(uk|eu|united kingdom|ireland|europe|eea|germany|france|netherlands|frankfurt|dublin)\b/i.test(loc || ''); }
+function overdue(iso) { const t = new Date(iso).getTime(); return Number.isFinite(t) && t < Date.now(); }
+function dueSoon(iso) { const t = new Date(iso).getTime(); return Number.isFinite(t) && t >= Date.now() && t <= Date.now() + 30 * 86400000; }
+function reviewCell(iso) {
+  if (!iso) return '<span class="muted">-</span>';
+  if (overdue(iso)) return `<span class="overdue-date">${fmtDate(iso)}</span> ${pill('overdue', 'danger')}`;
+  if (dueSoon(iso)) return `<span class="soon-date">${fmtDate(iso)}</span> ${pill('soon', 'warn')}`;
+  return fmtDate(iso);
+}
+
+function riskMatrix(rows) {
+  const at = (l, i) => rows.filter((r) => num(r.likelihood) === l && num(r.impact) === i).length;
+  let h = '<table class="matrix"><thead><tr><th></th>' + [1, 2, 3, 4, 5].map((l) => `<th>L${l}</th>`).join('') + '</tr></thead><tbody>';
+  for (let i = 5; i >= 1; i--) {
+    h += `<tr><th>I${i}</th>`;
+    for (let l = 1; l <= 5; l++) {
+      const c = at(l, i); const lv = riskLevel(l * i);
+      h += `<td class="heat ${lv.kind} ${c ? '' : 'empty'}" title="Likelihood ${l}, impact ${i}, score ${l * i}">${c || '0'}</td>`;
+    }
+    h += '</tr>';
+  }
+  return h + '</tbody></table>';
+}
+
+// Per register display: the columns shown and how each row is rendered, with an
+// optional default sort. Falls back to the raw fields when a register has no entry.
+const REG_DISPLAY = {
+  risk: {
+    columns: [{ key: 'riskId', label: 'Risk ID' }, { key: 'description', label: 'Description' }, { key: 'l', label: 'L' }, { key: 'i', label: 'I' }, { key: 'score', label: 'Score' }, { key: 'level', label: 'Level' }, { key: 'treatment', label: 'Treatment' }, { key: 'owner', label: 'Owner' }, { key: 'status', label: 'Status' }, { key: 'review', label: 'Review' }],
+    sort: (a, b) => riskScore(b) - riskScore(a),
+    row: (e) => { const s = riskScore(e); const lv = riskLevel(s); return { riskId: esc(e.riskId), description: esc(e.description), l: esc(num(e.likelihood) || '-'), i: esc(num(e.impact) || '-'), score: `<b>${s || '-'}</b>`, level: pill(lv.label, lv.kind), treatment: `<span class="chip">${esc(e.treatment || '-')}</span>`, owner: esc(e.owner), status: pill(e.status || '-', riskStatusKind(e.status)), review: reviewCell(e.reviewDate) }; },
+  },
+  asset: {
+    columns: [{ key: 'assetId', label: 'Asset ID' }, { key: 'name', label: 'Name' }, { key: 'type', label: 'Type' }, { key: 'owner', label: 'Owner' }, { key: 'classification', label: 'Classification' }, { key: 'status', label: 'Status' }],
+    row: (e) => ({ assetId: esc(e.assetId), name: esc(e.name), type: esc(e.type), owner: esc(e.owner), classification: pill(e.classification || '-', classKind(e.classification)), status: esc(e.status) }),
+  },
+  supplier: {
+    columns: [{ key: 'supplierId', label: 'Supplier ID' }, { key: 'name', label: 'Name' }, { key: 'service', label: 'Service' }, { key: 'dataLocation', label: 'Data location' }, { key: 'dpa', label: 'DPA' }, { key: 'review', label: 'Review' }],
+    row: (e) => ({ supplierId: esc(e.supplierId), name: esc(e.name), service: esc(e.service), dataLocation: `${esc(e.dataLocation || '-')} ${isUkEu(e.dataLocation) ? pill('UK or EU', 'ok') : pill('check residency', 'danger')}`, dpa: /^y/i.test(e.dpa || '') ? pill('Yes', 'ok') : pill('No', 'danger'), review: reviewCell(e.reviewDate) }),
+  },
+  nonconformity: {
+    columns: [{ key: 'ncId', label: 'NC ID' }, { key: 'source', label: 'Source' }, { key: 'description', label: 'Description' }, { key: 'reference', label: 'Reference' }, { key: 'owner', label: 'Owner' }, { key: 'due', label: 'Due' }, { key: 'status', label: 'Status' }],
+    row: (e) => ({ ncId: esc(e.ncId), source: esc(e.source), description: esc(e.description), reference: e.reference ? `<span class="chip">${esc(e.reference)}</span>` : '-', owner: esc(e.owner), due: reviewCell(e.dueDate), status: pill(e.status || '-', ncStatusKind(e.status)) }),
+  },
+  audit: {
+    columns: [{ key: 'auditId', label: 'Audit ID' }, { key: 'scope', label: 'Scope' }, { key: 'date', label: 'Date' }, { key: 'auditor', label: 'Auditor' }, { key: 'status', label: 'Status' }],
+    row: (e) => ({ auditId: esc(e.auditId), scope: esc(e.scope), date: esc(fmtDate(e.date)), auditor: esc(e.auditor), status: pill(e.status || '-', auditStatusKind(e.status)) }),
+  },
+  'management-review': {
+    columns: [{ key: 'reviewId', label: 'Review ID' }, { key: 'date', label: 'Date' }, { key: 'attendees', label: 'Attendees' }, { key: 'decisions', label: 'Decisions' }],
+    row: (e) => ({ reviewId: esc(e.reviewId), date: esc(fmtDate(e.date)), attendees: esc(e.attendees), decisions: esc(e.decisions) }),
+  },
+  competence: {
+    columns: [{ key: 'person', label: 'Person' }, { key: 'role', label: 'Role' }, { key: 'training', label: 'Training' }, { key: 'date', label: 'Completed' }],
+    row: (e) => ({ person: esc(e.person), role: esc(e.role), training: esc(e.training), date: esc(fmtDate(e.date)) }),
+  },
+  legal: {
+    columns: [{ key: 'requirement', label: 'Requirement' }, { key: 'source', label: 'Source' }, { key: 'owner', label: 'Owner' }, { key: 'review', label: 'Review' }],
+    row: (e) => ({ requirement: esc(e.requirement), source: esc(e.source), owner: esc(e.owner), review: reviewCell(e.reviewDate) }),
+  },
+  context: {
+    columns: [{ key: 'category', label: 'Category' }, { key: 'item', label: 'Issue or party' }, { key: 'requirements', label: 'Requirements' }, { key: 'climate', label: 'Climate' }],
+    row: (e) => ({ category: esc(e.category), item: esc(e.item), requirements: esc(e.requirements), climate: /^y/i.test(e.climate || '') ? pill('Yes', 'info') : pill('No', 'neutral') }),
+  },
+};
+
+function regSummary(key, rows) {
+  if (key === 'risk') {
+    const lv = (e) => riskLevel(riskScore(e)).label;
+    const seg = [['Critical', 'danger'], ['High', 'danger'], ['Medium', 'warn'], ['Low', 'ok']].map(([l, k]) => ({ label: l, value: rows.filter((e) => lv(e) === l).length, kind: k }));
+    return `<div class="matrix-wrap"><div><div class="matrix-axis" style="margin-bottom:6px">Likelihood across, impact up</div>${riskMatrix(rows)}</div><div style="min-width:260px;flex:1">${stackedBar(seg)}</div></div>`;
+  }
+  if (key === 'supplier') {
+    const dpa = rows.filter((r) => /^y/i.test(r.dpa || '')).length;
+    const due = rows.filter((r) => overdue(r.reviewDate) || dueSoon(r.reviewDate)).length;
+    const offshore = rows.filter((r) => !isUkEu(r.dataLocation)).length;
+    return `<div class="mini-cards">${mini(rows.length, 'Suppliers')}${mini(dpa, 'DPA in place', dpa === rows.length ? 'ok' : 'warn')}${mini(rows.length - dpa, 'DPA missing', rows.length - dpa ? 'danger' : 'ok')}${mini(offshore, 'Outside UK or EU', offshore ? 'danger' : 'ok')}${mini(due, 'Reviews due or overdue', due ? 'warn' : 'ok')}</div>`;
+  }
+  if (key === 'nonconformity') {
+    const open = rows.filter((r) => /open|new/i.test(r.status)).length;
+    const prog = rows.filter((r) => /progress/i.test(r.status)).length;
+    const closed = rows.filter((r) => /clos|resolv|verif|complet/i.test(r.status)).length;
+    const od = rows.filter((r) => overdue(r.dueDate) && !/clos|resolv|verif|complet/i.test(r.status)).length;
+    return `<div class="mini-cards">${mini(rows.length, 'Total')}${mini(open, 'Open', open ? 'danger' : 'ok')}${mini(prog, 'In progress', prog ? 'warn' : 'ok')}${mini(closed, 'Closed', 'ok')}${mini(od, 'Overdue', od ? 'danger' : 'ok')}</div>`;
+  }
+  if (key === 'asset') {
+    const seg = ['Restricted', 'Confidential', 'Internal', 'Public'].map((c) => ({ label: c, value: rows.filter((r) => r.classification === c).length, kind: classKind(c) }));
+    const sensitive = rows.filter((r) => r.classification === 'Restricted' || r.classification === 'Confidential').length;
+    return `<div class="mini-cards" style="margin-bottom:12px">${mini(rows.length, 'Assets')}${mini(sensitive, 'Confidential or restricted', sensitive ? 'warn' : 'ok')}</div>${stackedBar(seg)}`;
+  }
+  if (key === 'audit') {
+    const complete = rows.filter((r) => /complet/i.test(r.status)).length;
+    const planned = rows.filter((r) => /plan|schedul/i.test(r.status)).length;
+    const next = rows.filter((r) => /plan|schedul/i.test(r.status)).map((r) => r.date).filter(Boolean).sort()[0];
+    return `<div class="mini-cards">${mini(rows.length, 'Audits')}${mini(complete, 'Complete', 'ok')}${mini(planned, 'Planned', planned ? 'warn' : 'ok')}${mini(next ? fmtDate(next) : '-', 'Next planned')}</div>`;
+  }
+  if (key === 'management-review') {
+    const dates = rows.map((r) => r.date).filter(Boolean).sort();
+    const last = dates.filter((d) => new Date(d) <= new Date()).pop();
+    const next = dates.find((d) => new Date(d) > new Date());
+    return `<div class="mini-cards">${mini(rows.length, 'Reviews logged')}${mini(last ? fmtDate(last) : '-', 'Last review')}${mini(next ? fmtDate(next) : '-', 'Next scheduled')}</div>`;
+  }
+  if (key === 'competence') {
+    const last = rows.map((r) => r.date).filter(Boolean).sort().pop();
+    return `<div class="mini-cards">${mini(rows.length, 'Training records')}${mini(last ? fmtDate(last) : '-', 'Most recent')}</div>`;
+  }
+  if (key === 'legal') {
+    const due = rows.filter((r) => overdue(r.reviewDate) || dueSoon(r.reviewDate)).length;
+    return `<div class="mini-cards">${mini(rows.length, 'Obligations')}${mini(due, 'Reviews due or overdue', due ? 'warn' : 'ok')}</div>`;
+  }
+  if (key === 'context') {
+    const climate = rows.filter((r) => /^y/i.test(r.climate || '')).length;
+    const parties = rows.filter((r) => /party/i.test(r.category)).length;
+    return `<div class="mini-cards">${mini(rows.length, 'Entries')}${mini(parties, 'Interested parties')}${mini(climate, 'Climate related', climate ? 'info' : '')}</div>`;
+  }
+  return `<div class="mini-cards">${mini(rows.length, 'Entries')}</div>`;
 }
 
 // ---- documents and lifecycle ----------------------------------------------
@@ -170,8 +304,8 @@ function renderDashboard() {
   const dueWindow = now + CONFIG.reviewDueWithinDays * 86400000;
   const published = docs.filter((d) => d.status === 'Published');
   const withReview = published.filter((d) => d.nextReviewDate);
-  const overdue = withReview.filter((d) => new Date(d.nextReviewDate).getTime() < now);
-  const due = withReview.filter((d) => { const t = new Date(d.nextReviewDate).getTime(); return t >= now && t <= dueWindow; });
+  const overdueDocs = withReview.filter((d) => new Date(d.nextReviewDate).getTime() < now);
+  const dueDocs = withReview.filter((d) => { const t = new Date(d.nextReviewDate).getTime(); return t >= now && t <= dueWindow; });
 
   const applicable = soa.filter((s) => s.applicable === true).length;
   const excluded = soa.filter((s) => s.applicable === false).length;
@@ -189,6 +323,17 @@ function renderDashboard() {
   const log = getCollection('audit').slice(0, 10);
   const upcoming = withReview.slice().sort((a, b) => new Date(a.nextReviewDate) - new Date(b.nextReviewDate)).slice(0, 8);
 
+  const risks = getCollection('register.risk');
+  const riskSeg = [['Critical', 'danger'], ['High', 'danger'], ['Medium', 'warn'], ['Low', 'ok']].map(([l, k]) => ({ label: l, value: risks.filter((e) => riskLevel(riskScore(e)).label === l).length, kind: k }));
+  const ncs = getCollection('register.nonconformity');
+  const ncOpen = ncs.filter((r) => !/clos|resolv|verif|complet/i.test(r.status)).length;
+  const ncOverdue = ncs.filter((r) => overdue(r.dueDate) && !/clos|resolv|verif|complet/i.test(r.status)).length;
+  const suppliers = getCollection('register.supplier');
+  const supDue = suppliers.filter((r) => overdue(r.reviewDate) || dueSoon(r.reviewDate)).length;
+  const supNoDpa = suppliers.filter((r) => !/^y/i.test(r.dpa || '')).length;
+  const nextAudit = getCollection('register.audit').filter((r) => /plan|schedul/i.test(r.status)).map((r) => r.date).filter(Boolean).sort()[0];
+  const lastMr = getCollection('register.management-review').map((r) => r.date).filter(Boolean).sort().filter((d) => new Date(d) <= new Date()).pop();
+
   const kpi = (cls, ic, num, label, sub) => `
     <div class="kpi ${cls}"><div class="kpi-top"><span class="label">${esc(label)}</span><span class="kpi-ic">${ic}</span></div>
       <div class="num">${num}</div>${sub ? `<div class="sub">${esc(sub)}</div>` : ''}</div>`;
@@ -199,7 +344,7 @@ function renderDashboard() {
       ${kpi('', ICONS.documents, docs.length, 'Controlled documents', `${published.length} published`)}
       ${kpi('ok', ICONS.soa, `${pct(applicable, soa.length)}%`, 'Controls applicable', `${applicable} of ${soa.length} Annex A`)}
       ${kpi('', ICONS.framework, `${pct(documented, soa.length)}%`, 'Controls documented', `${documented} have a linked document`)}
-      ${kpi(overdue.length ? 'danger' : 'ok', ICONS.audit, overdue.length, 'Reviews overdue', `${due.length} due within ${CONFIG.reviewDueWithinDays} days`)}
+      ${kpi(overdueDocs.length ? 'danger' : 'ok', ICONS.audit, overdueDocs.length, 'Reviews overdue', `${dueDocs.length} due within ${CONFIG.reviewDueWithinDays} days`)}
       ${kpi(gaps.length ? 'warn' : 'ok', ICONS.framework, gaps.length, 'Clause coverage gaps', `${mandatory.length - gaps.length} of ${mandatory.length} clauses covered`)}
     </div>
 
@@ -225,11 +370,29 @@ function renderDashboard() {
         <div class="legend" style="margin-top:14px">${statusCounts.map((x) => `<span class="leg">${pill(x.st, statusKind(x.st))} <b>${x.n}</b></span>`).join('')}</div>
       </div>
       <div class="panel">
-        <div class="panel-head"><h3>Upcoming reviews</h3>${overdue.length ? `<span class="pill danger">${overdue.length} overdue</span>` : '<span class="muted">on track</span>'}</div>
+        <div class="panel-head"><h3>Upcoming reviews</h3>${overdueDocs.length ? `<span class="pill danger">${overdueDocs.length} overdue</span>` : '<span class="muted">on track</span>'}</div>
         ${upcoming.length ? table(
           [{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'due', label: 'Review by' }],
           upcoming.map((d) => ({ __html: true, ref: `<a href="#/documents/${d.id}">${esc(d.ref)}</a>`, title: esc(d.title), due: `${fmtDate(d.nextReviewDate)} ${new Date(d.nextReviewDate).getTime() < now ? pill('overdue', 'danger') : ''}` })),
         ) : '<p class="muted">No published documents carry a review date.</p>'}
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:18px">
+      <div class="panel">
+        <div class="panel-head"><h3>Risk profile</h3><a href="#/registers">Open registers</a></div>
+        ${risks.length ? stackedBar(riskSeg) : '<p class="muted">No risks recorded.</p>'}
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>Governance and obligations</h3></div>
+        <div class="mini-cards">
+          ${mini(ncOpen, 'Open nonconformities', ncOpen ? 'warn' : 'ok')}
+          ${mini(ncOverdue, 'Overdue actions', ncOverdue ? 'danger' : 'ok')}
+          ${mini(supDue, 'Supplier reviews due', supDue ? 'warn' : 'ok')}
+          ${mini(supNoDpa, 'Suppliers without DPA', supNoDpa ? 'danger' : 'ok')}
+          ${mini(nextAudit ? fmtDate(nextAudit) : '-', 'Next internal audit')}
+          ${mini(lastMr ? fmtDate(lastMr) : '-', 'Last management review')}
+        </div>
       </div>
     </div>
 
@@ -477,60 +640,100 @@ function renderSoa() {
 }
 
 let activeRegister = CONFIG.registers[0].key;
+let regFilter = '';
+let regEditingId = null;
 function renderRegisters() {
   const def = CONFIG.registers.find((r) => r.key === activeRegister);
-  const rows = getCollection('register.' + def.key);
   const editable = can('ISMS Manager');
-  const selector = `<select id="reg-select" aria-label="Select register" style="width:300px">${CONFIG.registers.map((r) => `<option value="${r.key}" ${r.key === def.key ? 'selected' : ''}>${r.label}</option>`).join('')}</select>`;
-  const addForm = editable ? `
-    <details class="panel"><summary>Add entry</summary><form id="reg-form"><div class="cards">${def.fields.map((f) => `
-      <div><label for="f-${f.name}">${f.label}</label>${f.type === 'select'
-        ? `<select id="f-${f.name}"><option value=""></option>${f.options.map((o) => `<option>${o}</option>`).join('')}</select>`
-        : `<input id="f-${f.name}" type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" />`}</div>`).join('')}</div>
-      <button type="submit">Save entry</button></form></details>` : '';
-  const cols = def.fields.map((f) => ({ key: f.name, label: f.label }));
-  if (editable) cols.push({ key: '__del', label: '' });
-  const tableRows = rows.map((r) => {
-    const o = { __html: true };
-    for (const f of def.fields) o[f.name] = esc(r[f.name] ?? '');
-    if (editable) o.__del = `<button class="secondary" data-del="${r.id}">Delete</button>`;
-    return o;
-  });
+  const all = getCollection('register.' + def.key);
+  const disp = REG_DISPLAY[def.key];
+
   const counts = CONFIG.registers.map((r) => ({ key: r.key, label: r.label, n: getCollection('register.' + r.key).length }));
   const chips = counts.map((c) => `<button class="reg-chip ${c.key === def.key ? 'active' : ''}" data-reg="${c.key}">${esc(c.label)} <b>${c.n}</b></button>`).join('');
+
+  const columns = (disp ? disp.columns.slice() : def.fields.map((f) => ({ key: f.name, label: f.label })));
+  if (editable) columns.push({ key: '__act', label: '' });
+
+  const editing = regEditingId ? all.find((x) => x.id === regEditingId) : null;
+  const fieldInput = (f) => {
+    const val = editing ? (editing[f.name] ?? '') : '';
+    if (f.type === 'select') return `<select id="f-${f.name}"><option value=""></option>${f.options.map((o) => `<option ${o === val ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+    const t = f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text';
+    return `<input id="f-${f.name}" type="${t}" value="${esc(val)}" />`;
+  };
+  const addForm = editable ? `
+    <details class="panel" ${editing ? 'open' : ''}><summary>${editing ? 'Edit entry' : 'Add entry'}</summary>
+      <form id="reg-form"><div class="cards">${def.fields.map((f) => `<div><label for="f-${f.name}">${esc(f.label)}</label>${fieldInput(f)}</div>`).join('')}</div>
+      <div class="toolbar" style="margin-top:12px"><button type="submit">${editing ? 'Save changes' : 'Save entry'}</button>${editing ? '<button type="button" class="secondary" id="reg-cancel">Cancel</button>' : ''}</div></form>
+    </details>` : '';
+
   viewEl().innerHTML = `<h2>Registers</h2>
     <div class="panel"><div class="panel-head"><h3>All registers</h3><span class="muted">${counts.reduce((a, c) => a + c.n, 0)} entries across ${counts.length} registers</span></div><div class="reg-chips">${chips}</div></div>
-    <div class="toolbar">${selector}<button class="secondary" id="reg-csv">Export this register</button>${editable ? '<button class="secondary" id="reg-load">Load the register set</button>' : ''}</div>
-    ${addForm}<div class="panel table-wrap">${table(cols, tableRows)}</div>`;
+    <div class="panel"><div class="panel-head"><h3>${esc(def.label)}</h3><span class="muted">${all.length} ${all.length === 1 ? 'entry' : 'entries'}</span></div>${regSummary(def.key, all)}</div>
+    <div class="toolbar">
+      <input id="reg-q" placeholder="Filter ${esc(def.label.toLowerCase())}" value="${esc(regFilter)}" style="width:260px" aria-label="Filter register" />
+      <span class="spacer"></span>
+      <button class="secondary" id="reg-csv">Export this register</button>
+      ${editable ? '<button class="secondary" id="reg-load">Load the register set</button>' : ''}
+    </div>
+    ${addForm}
+    <div class="panel table-wrap" id="reg-table"></div>`;
 
-  viewEl().querySelectorAll('[data-reg]').forEach((btn) => btn.addEventListener('click', () => { activeRegister = btn.dataset.reg; renderRegisters(); }));
+  const draw = () => {
+    const q = regFilter.trim().toLowerCase();
+    let rows = all.filter((e) => !q || Object.values(e).join(' ').toLowerCase().includes(q));
+    if (disp && disp.sort) rows = rows.slice().sort(disp.sort);
+    const display = rows.map((e) => {
+      const o = disp ? disp.row(e) : Object.fromEntries(def.fields.map((f) => [f.name, esc(e[f.name] ?? '')]));
+      o.__html = true;
+      if (editable) o.__act = `<div class="row-actions"><button class="secondary btn-sm" data-edit="${e.id}">Edit</button><button class="secondary btn-sm" data-del="${e.id}">Delete</button></div>`;
+      return o;
+    });
+    document.getElementById('reg-table').innerHTML = all.length ? table(columns, display) : '<p class="muted">No entries yet. Use Add entry, or Load the register set for starter content.</p>';
+    document.querySelectorAll('#reg-table [data-del]').forEach((b) => b.addEventListener('click', () => {
+      if (!confirm('Delete this entry?')) return;
+      setCollection('register.' + def.key, getCollection('register.' + def.key).filter((r) => r.id !== b.dataset.del));
+      audit('Deleted', def.label, 'Entry removed');
+      renderRegisters();
+    }));
+    document.querySelectorAll('#reg-table [data-edit]').forEach((b) => b.addEventListener('click', () => { regEditingId = b.dataset.edit; renderRegisters(); }));
+  };
+  draw();
+
+  viewEl().querySelectorAll('[data-reg]').forEach((btn) => btn.addEventListener('click', () => { activeRegister = btn.dataset.reg; regFilter = ''; regEditingId = null; renderRegisters(); }));
+  document.getElementById('reg-q').addEventListener('input', (e) => { regFilter = e.target.value; draw(); });
+  document.getElementById('reg-csv').addEventListener('click', () => {
+    download(def.key + '-register.csv', toCsv(def.fields.map((f) => ({ key: f.name, label: f.label })), all), 'text/csv');
+    audit('Exported', def.label, 'to CSV');
+  });
   const loadBtn = document.getElementById('reg-load');
   if (loadBtn) loadBtn.addEventListener('click', () => {
     if (!confirm('Load the starter content for every register? This replaces the entries currently held in this browser.')) return;
     const n = loadRegisterSet();
     audit('Imported', 'Register', `Loaded the register set (${n} entries)`);
+    regEditingId = null;
     renderRegisters();
-  });
-  document.getElementById('reg-select').addEventListener('change', (e) => { activeRegister = e.target.value; renderRegisters(); });
-  document.getElementById('reg-csv').addEventListener('click', () => {
-    download(def.key + '-register.csv', toCsv(def.fields.map((f) => ({ key: f.name, label: f.label })), rows), 'text/csv');
-    audit('Exported', def.label, 'to CSV');
   });
   const form = document.getElementById('reg-form');
   if (form) form.addEventListener('submit', (e) => {
     e.preventDefault();
-    const entry = { id: cid() };
-    for (const f of def.fields) entry[f.name] = document.getElementById('f-' + f.name).value;
-    rows.unshift(entry);
-    setCollection('register.' + def.key, rows);
-    audit('Created', def.label, 'New entry');
+    const values = {};
+    for (const f of def.fields) values[f.name] = document.getElementById('f-' + f.name).value;
+    const list = getCollection('register.' + def.key);
+    if (regEditingId) {
+      const idx = list.findIndex((x) => x.id === regEditingId);
+      if (idx >= 0) list[idx] = { ...list[idx], ...values };
+      audit('Updated', def.label, `${values[def.fields[0].name] || 'Entry'} updated`);
+      regEditingId = null;
+    } else {
+      list.unshift({ id: cid(), ...values });
+      audit('Created', def.label, 'New entry');
+    }
+    setCollection('register.' + def.key, list);
     renderRegisters();
   });
-  viewEl().querySelectorAll('[data-del]').forEach((btn) => btn.addEventListener('click', () => {
-    setCollection('register.' + def.key, rows.filter((r) => r.id !== btn.dataset.del));
-    audit('Deleted', def.label, 'Entry removed');
-    renderRegisters();
-  }));
+  const cancel = document.getElementById('reg-cancel');
+  if (cancel) cancel.addEventListener('click', () => { regEditingId = null; renderRegisters(); });
 }
 
 function renderAudit() {
