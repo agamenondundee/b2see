@@ -2,12 +2,12 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=7';
-import { CLAUSES } from './data/clauses.js?v=7';
+import { CONTROLS } from './data/controls.js?v=8';
+import { CLAUSES } from './data/clauses.js?v=8';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, cid, addMonths, nextReference,
-} from './store.js?v=7';
+} from './store.js?v=8';
 
 ensureSeed();
 
@@ -111,6 +111,17 @@ function animateCounts(root) {
     const step = (now) => { const p = Math.min(1, (now - start) / dur); el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3))) + suffix; if (p < 1) requestAnimationFrame(step); };
     requestAnimationFrame(step);
   });
+}
+
+let searchIndexPromise = null;
+function loadSearchIndex() {
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=8').then((m) => m.SEARCH_INDEX).catch(() => []);
+  return searchIndexPromise;
+}
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+function snippet(text, i, len) {
+  const start = Math.max(0, i - 60); const end = Math.min(text.length, i + len + 90);
+  return (start > 0 ? '...' : '') + esc(text.slice(start, i)) + '<mark>' + esc(text.slice(i, i + len)) + '</mark>' + esc(text.slice(i + len, end)) + (end < text.length ? '...' : '');
 }
 
 // ---- register intelligence -------------------------------------------------
@@ -809,21 +820,43 @@ function renderAudit() {
 }
 
 function renderSearch() {
-  viewEl().innerHTML = `<h2>Search</h2><div class="toolbar"><input id="q" placeholder="Search documents, clauses and controls" style="width:320px" /></div><div id="results"></div>`;
+  viewEl().innerHTML = `<h2>Search</h2>
+    <div class="toolbar"><input id="q" placeholder="Search documents, their content, controls and clauses" style="width:380px" aria-label="Search" /></div>
+    <div id="results"><p class="muted">Search runs across every document's full content, plus the controls and clauses.</p></div>`;
   const input = document.getElementById('q');
-  const run = () => {
-    const q = input.value.trim().toLowerCase();
+  const docs = getCollection('documents');
+  const byRef = Object.fromEntries(docs.map((d) => [d.ref, d]));
+  const run = async () => {
+    const q = input.value.trim();
+    const ql = q.toLowerCase();
     const results = document.getElementById('results');
-    if (!q) { results.innerHTML = ''; return; }
-    const docs = getCollection('documents').filter((d) => (d.title + ' ' + d.ref).toLowerCase().includes(q));
-    const controls = CONTROLS.filter((c) => (c.title + ' ' + c.ref).toLowerCase().includes(q));
-    const clauses = CLAUSES.filter((c) => (c.title + ' ' + c.number).toLowerCase().includes(q));
+    if (q.length < 2) { results.innerHTML = '<p class="muted">Search runs across every document’s full content, plus the controls and clauses.</p>'; return; }
+    const titleDocs = docs.filter((d) => (d.title + ' ' + d.ref).toLowerCase().includes(ql));
+    const titleRefs = new Set(titleDocs.map((d) => d.ref));
+    const controls = CONTROLS.filter((c) => (c.title + ' ' + c.ref + ' ' + c.theme).toLowerCase().includes(ql));
+    const clauses = CLAUSES.filter((c) => (c.title + ' ' + c.number).toLowerCase().includes(ql));
+    const index = await loadSearchIndex();
+    const contentHits = [];
+    for (const entry of index) {
+      if (titleRefs.has(entry.ref)) continue;
+      const i = entry.text.toLowerCase().indexOf(ql);
+      if (i >= 0) {
+        const d = byRef[entry.ref];
+        contentHits.push(`<div class="hit"><a href="#/documents/${d ? d.id : ''}">${esc(entry.ref)}</a> ${esc(d ? d.title : '')} ${d && d.system ? `<span class="badge">${esc(d.system)}</span>` : ''}<div class="snippet">${snippet(entry.text, i, q.length)}</div></div>`);
+      }
+      if (contentHits.length >= 40) break;
+    }
+    if (input.value.trim() !== q) return;
     results.innerHTML = `
-      <div class="panel"><h3>Documents</h3>${docs.length ? docs.map((d) => `<p><a href="#/documents/${d.id}">${esc(d.ref)}</a> ${esc(d.title)}</p>`).join('') : '<p class="muted">None.</p>'}</div>
+      <div class="panel"><div class="panel-head"><h3>Documents</h3><span class="muted">${titleDocs.length} by title or reference, ${contentHits.length} by content</span></div>
+        ${titleDocs.map((d) => `<p><a href="#/documents/${d.id}">${esc(d.ref)}</a> ${esc(d.title)}</p>`).join('')}
+        ${contentHits.join('')}
+        ${titleDocs.length || contentHits.length ? '' : '<p class="muted">No documents matched.</p>'}</div>
       <div class="panel"><h3>Controls</h3>${controls.map((c) => `<p>${esc(c.ref)} ${esc(c.title)}</p>`).join('') || '<p class="muted">None.</p>'}</div>
       <div class="panel"><h3>Clauses</h3>${clauses.map((c) => `<p>${esc(c.number)} ${esc(c.title)}</p>`).join('') || '<p class="muted">None.</p>'}</div>`;
   };
-  input.addEventListener('input', run);
+  input.addEventListener('input', debounce(run, 160));
+  input.focus();
 }
 
 function renderSettings() {

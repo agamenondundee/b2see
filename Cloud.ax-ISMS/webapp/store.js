@@ -3,9 +3,9 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=7';
-import { DOCUMENTS } from './documents-data.js?v=7';
-import { REGISTER_SEED } from './data/registers.js?v=7';
+import { CONTROLS } from './data/controls.js?v=8';
+import { DOCUMENTS } from './documents-data.js?v=8';
+import { REGISTER_SEED } from './data/registers.js?v=8';
 
 const NS = 'cloudax.isms.';
 const SEED_VERSION = 4;

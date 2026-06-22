@@ -282,6 +282,13 @@ td .soon-date { color: var(--warn); font-weight: 600; }
 .reader tbody tr:hover { background: transparent; }
 .reader img { max-width: 100%; height: auto; }
 
+/* ---- Search ------------------------------------------------------------- */
+
+.hit { padding: 9px 0; border-bottom: 1px solid var(--line-2); }
+.hit:last-child { border-bottom: none; }
+.snippet { color: var(--muted); font-size: 13px; margin-top: 4px; line-height: 1.55; }
+mark { background: #fde68a; color: inherit; padding: 0 2px; border-radius: 3px; }
+
 /* ---- Motion ------------------------------------------------------------- */
 
 @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
