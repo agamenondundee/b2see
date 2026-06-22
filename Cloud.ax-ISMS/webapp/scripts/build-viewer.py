@@ -69,10 +69,16 @@ def from_xlsx(path):
     return "".join(parts)
 
 
+def plain_text(h):
+    t = re.sub(r"(?s)<[^>]+>", " ", h)
+    t = htmlmod.unescape(t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
 def main():
     OUT.mkdir(exist_ok=True)
     recs = records()
-    seen, built, skipped = set(), 0, 0
+    seen, built, skipped, index = set(), 0, 0, []
     for ref, file in recs:
         if ref in seen:
             print(f"warning: duplicate reference {ref}, skipping second", file=sys.stderr)
@@ -93,8 +99,17 @@ def main():
         else:
             continue
         (OUT / f"{ref}.html").write_text(body or "<p>This document has no readable text content.</p>", encoding="utf-8")
+        index.append({"ref": ref, "text": plain_text(body)})
         built += 1
-    print(f"records: {len(recs)} | built: {built} | pdf shown live: {skipped} | viewer files: {len(list(OUT.glob('*.html')))}")
+
+    import json
+    header = (
+        "// Full text search index for the controlled documents, built from the rendered\n"
+        "// content by scripts/build-viewer.py. Loaded on demand by the Search view.\n"
+        "export const SEARCH_INDEX = "
+    )
+    (ROOT / "search-index.js").write_text(header + json.dumps(index, ensure_ascii=False) + ";\n", encoding="utf-8")
+    print(f"records: {len(recs)} | built: {built} | pdf shown live: {skipped} | viewer files: {len(list(OUT.glob('*.html')))} | index entries: {len(index)}")
 
 
 if __name__ == "__main__":
