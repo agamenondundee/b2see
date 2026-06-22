@@ -2,15 +2,15 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=31';
-import { CLAUSES } from './data/clauses.js?v=31';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=31';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=31';
+import { CONTROLS } from './data/controls.js?v=33';
+import { CLAUSES } from './data/clauses.js?v=33';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=33';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=33';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=31';
+} from './store.js?v=33';
 
 ensureSeed();
 applyTheme();
@@ -56,6 +56,7 @@ const ICONS = {
   documents: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8"/></svg>',
   framework: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 8.6 8 11 4.6-2.4 8-6 8-11V5z"/><path d="m9 12 2 2 4-4"/></svg>',
   aims: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="7" width="14" height="12" rx="2"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/><path d="M9 12h.01M15 12h.01M9.5 15.5a3 3 0 0 0 5 0"/></svg>',
+  architecture: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="5"/><rect x="14" y="6" width="7" height="5"/><rect x="8" y="16" width="7" height="5"/><path d="M6.5 8v3a2 2 0 0 0 2 2h3M17.5 11v1a2 2 0 0 1-2 2h-4"/></svg>',
   soa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
   registers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>',
   readiness: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h1V5a1 1 0 0 1 1-1z"/><path d="m9 13 2 2 4-4"/></svg>',
@@ -86,7 +87,7 @@ function toggleTheme() {
 
 const ROUTE_TITLES = {
   dashboard: 'Dashboard', readiness: 'Certification readiness', calendar: 'Compliance calendar', documents: 'Documents', framework: 'Framework', control: 'Control',
-  soa: 'Statement of Applicability', aims: 'AI management (42001)', registers: 'Registers', audits: 'Internal audits', certbody: 'Certification body', audit: 'Audit log',
+  soa: 'Statement of Applicability', aims: 'AI management (42001)', architecture: 'Architecture and data flows', registers: 'Registers', audits: 'Internal audits', certbody: 'Certification body', audit: 'Audit log',
   search: 'Search', settings: 'Settings', report: 'Audit pack',
 };
 
@@ -186,7 +187,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=31').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=33').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -438,7 +439,7 @@ function applyTransition(doc, action) {
 function shell(active) {
   const nav = [
     ['dashboard', 'Dashboard'], ['readiness', 'Readiness'], ['calendar', 'Calendar'], ['documents', 'Documents'], ['framework', 'Framework'],
-    ['soa', 'Statement of Applicability'], ['aims', 'AI management (42001)'], ['registers', 'Registers'], ['audits', 'Internal audits'], ['certbody', 'Certification body'],
+    ['soa', 'Statement of Applicability'], ['aims', 'AI management (42001)'], ['architecture', 'Architecture'], ['registers', 'Registers'], ['audits', 'Internal audits'], ['certbody', 'Certification body'],
   ];
   if (can('ISMS Manager')) nav.push(['audit', 'Audit log']);
   nav.push(['search', 'Search'], ['settings', 'Settings']);
@@ -1766,6 +1767,164 @@ function renderSearch() {
   input.focus();
 }
 
+// ---- architecture and data flows -------------------------------------------
+
+// Greedily wrap a label into lines of at most maxChars, for SVG text that cannot wrap.
+function wrapText(text, maxChars) {
+  const words = String(text).split(' ');
+  const lines = []; let cur = '';
+  for (const w of words) {
+    if (!cur) cur = w;
+    else if ((cur + ' ' + w).length <= maxChars) cur += ' ' + w;
+    else { lines.push(cur); cur = w; }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+// Pick the anchor points on two boxes for a connecting edge, on the sides that face
+// each other, so arrows meet the box edge rather than its centre.
+function flowAnchors(a, b) {
+  const ac = { x: a.x + a.w / 2, y: a.y + a.h / 2 };
+  const bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+  const dx = bc.x - ac.x; const dy = bc.y - ac.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return [{ x: a.x + (dx > 0 ? a.w : 0), y: ac.y }, { x: b.x + (dx > 0 ? 0 : b.w), y: bc.y }];
+  }
+  return [{ x: ac.x, y: a.y + (dy > 0 ? a.h : 0) }, { x: bc.x, y: b.y + (dy > 0 ? 0 : b.h) }];
+}
+// Render a labelled box and arrow diagram as a scalable SVG. Boundary nodes are drawn
+// first as dashed containers, then edges, then the boxes on top.
+function flowSvg(nodes, edges, w, h, extra = '') {
+  const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
+  const boundaries = nodes.filter((n) => n.kind === 'boundary').map((n) => `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="12" class="dfd-boundary"/><text x="${n.x + 13}" y="${n.y + 20}" class="dfd-blabel">${esc(n.title)}</text>`).join('');
+  const edgeSvg = edges.map((e) => {
+    const a = byId[e.from]; const b = byId[e.to]; if (!a || !b) return '';
+    const [s, t] = flowAnchors(a, b);
+    const lbl = e.label ? `<text x="${((s.x + t.x) / 2).toFixed(1)}" y="${((s.y + t.y) / 2 - 4).toFixed(1)}" class="dfd-elabel" text-anchor="middle">${esc(e.label)}</text>` : '';
+    return `<line x1="${s.x.toFixed(1)}" y1="${s.y.toFixed(1)}" x2="${t.x.toFixed(1)}" y2="${t.y.toFixed(1)}" class="dfd-edge${e.dashed ? ' dashed' : ''}" marker-end="url(#dfd-arrow)"/>${lbl}`;
+  }).join('');
+  const boxes = nodes.filter((n) => n.kind !== 'boundary').map((n) => {
+    const cx = (n.x + n.w / 2).toFixed(1);
+    let textSvg;
+    if (n.sub) {
+      textSvg = `<text x="${cx}" y="${(n.y + n.h / 2 - 3).toFixed(1)}" class="dfd-title" text-anchor="middle">${esc(n.title)}</text><text x="${cx}" y="${(n.y + n.h / 2 + 13).toFixed(1)}" class="dfd-sub" text-anchor="middle">${esc(n.sub)}</text>`;
+    } else {
+      const lines = wrapText(n.title, Math.max(8, Math.floor(n.w / 7.4)));
+      const lh = 14; const startY = n.y + n.h / 2 - ((lines.length - 1) * lh) / 2 + 4;
+      textSvg = lines.map((ln, i) => `<text x="${cx}" y="${(startY + i * lh).toFixed(1)}" class="dfd-title" text-anchor="middle">${esc(ln)}</text>`).join('');
+    }
+    const rect = `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="9" class="dfd-node dfd-${n.kind}"/>`;
+    return n.href ? `<a href="${n.href}" class="dfd-link">${rect}${textSvg}</a>` : `${rect}${textSvg}`;
+  }).join('');
+  return `<svg class="dfd" viewBox="0 0 ${w} ${h}" role="img" aria-label="Diagram">
+    <defs><marker id="dfd-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="dfd-arrowhead"/></marker></defs>
+    ${boundaries}${edgeSvg}${boxes}${extra}</svg>`;
+}
+
+function dataFlowDiagram() {
+  const nodes = [
+    { id: 'region', kind: 'boundary', x: 196, y: 36, w: 470, h: 470, title: 'UK / EU region, AWS eu-west-1' },
+    { id: 'customer', kind: 'actor', x: 18, y: 118, w: 132, h: 56, title: 'Customer', sub: 'Conversation data' },
+    { id: 'admin', kind: 'actor', x: 18, y: 320, w: 132, h: 56, title: 'Administrator', sub: 'Console access' },
+    { id: 'webapp', kind: 'system', x: 232, y: 118, w: 150, h: 56, title: 'Web app', sub: 'TLS in transit' },
+    { id: 'gateway', kind: 'system', x: 232, y: 228, w: 150, h: 56, title: 'API gateway', sub: 'AuthN and AuthZ' },
+    { id: 'inference', kind: 'system', x: 232, y: 338, w: 150, h: 56, title: 'AI inference', sub: 'Prompt handling' },
+    { id: 'vault', kind: 'vault', x: 470, y: 118, w: 174, h: 56, title: 'Secrets and key vault', sub: 'Restricted' },
+    { id: 'datastore', kind: 'store', x: 470, y: 228, w: 174, h: 56, title: 'Conversation store', sub: 'PostgreSQL, Confidential' },
+    { id: 'storage', kind: 'store', x: 470, y: 338, w: 174, h: 56, title: 'Object storage', sub: 'Transcripts, Confidential' },
+    { id: 'model', kind: 'external', x: 706, y: 96, w: 178, h: 54, title: 'Model provider', sub: 'EU endpoint' },
+    { id: 'sso', kind: 'external', x: 706, y: 188, w: 178, h: 54, title: 'SSO and identity', sub: 'Okta, EU' },
+    { id: 'obs', kind: 'external', x: 706, y: 280, w: 178, h: 54, title: 'Observability', sub: 'Datadog, EU' },
+    { id: 'msg', kind: 'external', x: 706, y: 372, w: 178, h: 54, title: 'Messaging gateway', sub: 'Twilio, EU and UK' },
+  ];
+  const edges = [
+    { from: 'customer', to: 'webapp', label: 'HTTPS' },
+    { from: 'admin', to: 'gateway', label: 'HTTPS' },
+    { from: 'webapp', to: 'gateway' },
+    { from: 'gateway', to: 'inference' },
+    { from: 'gateway', to: 'sso', label: 'OIDC', dashed: true },
+    { from: 'gateway', to: 'vault', dashed: true },
+    { from: 'inference', to: 'model', label: 'prompt / response', dashed: true },
+    { from: 'inference', to: 'datastore', label: 'store' },
+    { from: 'datastore', to: 'storage', label: 'transcripts' },
+    { from: 'inference', to: 'obs', label: 'logs', dashed: true },
+    { from: 'gateway', to: 'msg', label: 'notify', dashed: true },
+  ];
+  return flowSvg(nodes, edges, 900, 520);
+}
+
+function operatingModelDiagram() {
+  const stages = [
+    ['context', 'Context', 'registers', 'plan'], ['risk', 'Risk assessment', 'registers', 'plan'], ['treat', 'Risk treatment', 'framework', 'plan'],
+    ['soa', 'Statement of Applicability', 'soa', 'do'], ['docs', 'Documents and evidence', 'documents', 'do'],
+    ['audit', 'Internal audit', 'audits', 'check'], ['review', 'Management review', 'registers', 'check'],
+    ['improve', 'Improvement', 'registers', 'act'],
+  ];
+  const n = stages.length; const w = 100; const gap = 8; const total = n * w + (n - 1) * gap; const x0 = (920 - total) / 2; const y = 78; const h = 66;
+  const nodes = stages.map(([id, title, href, band], i) => ({ id, kind: `om ${band}`, x: x0 + i * (w + gap), y, w, h, title, href: '#/' + href }));
+  const edges = stages.slice(1).map((s, i) => ({ from: stages[i][0], to: s[0] }));
+  // Plan, Do, Check, Act band labels above their stage groups.
+  const bandLabel = (label, from, to) => { const a = nodes[from]; const b = nodes[to]; const cx = (a.x + b.x + b.w) / 2; return `<text x="${cx.toFixed(1)}" y="42" class="om-band" text-anchor="middle">${label}</text>`; };
+  const bands = bandLabel('PLAN', 0, 2) + bandLabel('DO', 3, 4) + bandLabel('CHECK', 5, 6) + bandLabel('ACT', 7, 7);
+  // Loop back from Improvement to Context to show the cycle.
+  const last = nodes[n - 1]; const first = nodes[0];
+  const loop = `<path d="M${(last.x + last.w / 2).toFixed(1)},${last.y + last.h} C${last.x + last.w / 2},${last.y + last.h + 70} ${first.x + first.w / 2},${first.y + first.h + 70} ${(first.x + first.w / 2).toFixed(1)},${first.y + first.h}" class="dfd-edge dashed" marker-end="url(#dfd-arrow)"/><text x="460" y="${last.y + last.h + 64}" class="dfd-elabel" text-anchor="middle">Continual improvement</text>`;
+  return flowSvg(nodes, edges, 920, 250, bands + loop);
+}
+
+function controlMosaic() {
+  const soaByRef = Object.fromEntries(getCollection('soa').map((s) => [s.ref, s]));
+  const themes = Array.from(new Set(CONTROLS.map((c) => c.theme)));
+  const cls = (s) => {
+    if (!s || s.applicable === null) return 'undecided';
+    if (s.applicable === false) return 'excluded';
+    return ({ Verified: 'verified', Implemented: 'implemented', 'In progress': 'progress', 'Not started': 'notstarted' })[s.status] || 'notstarted';
+  };
+  return themes.map((th) => {
+    const cs = CONTROLS.filter((c) => c.theme === th);
+    const cells = cs.map((c) => `<a class="mosaic-cell ${cls(soaByRef[c.ref])}" href="#/control/${esc(c.ref)}" title="${esc(c.ref)} ${esc(c.title)}" aria-label="${esc(c.ref)}"></a>`).join('');
+    return `<div class="mosaic-group"><div class="mosaic-th">${esc(th)} <span class="muted">${cs.length}</span></div><div class="mosaic-grid">${cells}</div></div>`;
+  }).join('');
+}
+
+function renderArchitecture() {
+  const suppliers = getCollection('register.supplier');
+  const ukeu = suppliers.filter((s) => isUkEu(s.dataLocation)).length;
+  const assets = getCollection('register.asset');
+  const soa = getCollection('soa');
+  const applicable = soa.filter((s) => s.applicable === true).length;
+  const implemented = soa.filter((s) => s.applicable === true && ['Implemented', 'Verified'].includes(s.status)).length;
+  const legend = (cls, label) => `<span class="leg"><i class="mosaic-cell ${cls}" style="width:14px;height:14px"></i>${esc(label)}</span>`;
+  viewEl().innerHTML = `
+    <h2>Architecture and data flows</h2>
+    <div class="panel">
+      <div class="panel-head"><h3>System data flow</h3><span class="muted">${assets.length} assets, ${suppliers.length} suppliers, ${ukeu} in the UK or EU</span></div>
+      <p class="muted">How conversation data moves through the Cloudax platform. Personal data stays within the UK or EU region. Dashed lines are control or supporting flows. Boxes link to where they are managed.</p>
+      ${dataFlowDiagram()}
+      <div class="legend" style="margin-top:10px">
+        <span class="leg"><i class="dot" style="background:var(--brand)"></i>Actor</span>
+        <span class="leg"><i class="dot" style="background:var(--brand-300)"></i>System component</span>
+        <span class="leg"><i class="dot" style="background:var(--ok-solid)"></i>Data store</span>
+        <span class="leg"><i class="dot" style="background:var(--warn-solid)"></i>Secrets</span>
+        <span class="leg"><i class="dot" style="background:var(--neutral-solid)"></i>External provider</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Management system operating model</h3><span class="muted">Plan, do, check, act</span></div>
+      <p class="muted">The golden thread of the management system, from understanding the context through to continual improvement. Each stage links to where it is run.</p>
+      ${operatingModelDiagram()}
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Annex A control status</h3><span class="muted">${applicable} applicable, ${implemented} implemented or verified</span></div>
+      <p class="muted">Every Annex A control, grouped by theme and coloured by implementation status. Select any control to open it.</p>
+      ${controlMosaic()}
+      <div class="legend" style="margin-top:12px">
+        ${legend('verified', 'Verified')}${legend('implemented', 'Implemented')}${legend('progress', 'In progress')}${legend('notstarted', 'Not started')}${legend('excluded', 'Excluded')}${legend('undecided', 'Undecided')}
+      </div>
+    </div>`;
+}
+
 function renderSettings() {
   const s = getSettings();
   viewEl().innerHTML = `
@@ -1868,7 +2027,7 @@ function renderSettings() {
 
 function paletteItems() {
   const items = [];
-  const navs = [['dashboard', 'Dashboard'], ['readiness', 'Certification readiness'], ['calendar', 'Compliance calendar'], ['documents', 'Documents'], ['framework', 'Framework'], ['soa', 'Statement of Applicability'], ['aims', 'AI management (42001)'], ['registers', 'Registers'], ['audits', 'Internal audits'], ['certbody', 'Certification body'], ['search', 'Search'], ['settings', 'Settings']];
+  const navs = [['dashboard', 'Dashboard'], ['readiness', 'Certification readiness'], ['calendar', 'Compliance calendar'], ['documents', 'Documents'], ['framework', 'Framework'], ['soa', 'Statement of Applicability'], ['aims', 'AI management (42001)'], ['architecture', 'Architecture and data flows'], ['registers', 'Registers'], ['audits', 'Internal audits'], ['certbody', 'Certification body'], ['search', 'Search'], ['settings', 'Settings']];
   for (const [k, l] of navs) items.push({ group: 'Go to', label: l, icon: ICONS[k] || '', run: () => go(k) });
   items.push({ group: 'Actions', label: 'Generate audit pack', icon: ICONS.readiness, run: () => go('report') });
   items.push({ group: 'Actions', label: `Switch to ${currentTheme() === 'dark' ? 'light' : 'dark'} mode`, icon: currentTheme() === 'dark' ? ICONS.sun : ICONS.moon, run: () => { toggleTheme(); navigate(); } });
@@ -1984,7 +2143,7 @@ function navigate() {
   shell(route);
   const views = {
     dashboard: renderDashboard, readiness: renderReadiness, calendar: renderCalendar, documents: () => (param ? renderDocumentDetail(param) : renderDocuments()),
-    framework: renderFramework, control: () => (param ? renderControlDetail(param) : renderFramework()), soa: renderSoa, aims: renderAims, registers: renderRegisters,
+    framework: renderFramework, control: () => (param ? renderControlDetail(param) : renderFramework()), soa: renderSoa, aims: renderAims, architecture: renderArchitecture, registers: renderRegisters,
     audits: () => (param ? renderAuditDetail(param) : renderInternalAudits()),
     certbody: () => (param ? renderCertBodyDetail(param) : renderCertBodies()), audit: renderAudit,
     search: renderSearch, settings: renderSettings, report: renderReport,
