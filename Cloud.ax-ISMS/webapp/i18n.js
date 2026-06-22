@@ -31,6 +31,7 @@ export const STRINGS = {
     'dash.docsBySystem': 'Documents by system', 'dash.upcomingReviews': 'Upcoming reviews', 'dash.riskProfile': 'Risk profile',
     'dash.governance': 'Governance and obligations', 'dash.recentActivity': 'Recent activity',
     'report.scope': 'Scope', 'report.generated': 'Generated', 'report.classification': 'Classification: Internal',
+    'btn.print': 'Print or save as PDF', 'btn.save': 'Save changes', 'btn.export': 'Export spreadsheet (CSV)', 'btn.generatePack': 'Generate audit pack',
   },
   fr: {
     'nav.dashboard': 'Tableau de bord', 'nav.readiness': 'Préparation', 'nav.calendar': 'Calendrier', 'nav.documents': 'Documents',
@@ -51,6 +52,7 @@ export const STRINGS = {
     'dash.docsBySystem': 'Documents par système', 'dash.upcomingReviews': 'Revues à venir', 'dash.riskProfile': 'Profil de risque',
     'dash.governance': 'Gouvernance et obligations', 'dash.recentActivity': 'Activité récente',
     'report.scope': 'Périmètre', 'report.generated': 'Généré le', 'report.classification': 'Classification : Interne',
+    'btn.print': 'Imprimer ou enregistrer en PDF', 'btn.save': 'Enregistrer les modifications', 'btn.export': 'Exporter le tableur (CSV)', 'btn.generatePack': "Générer le dossier d'audit",
   },
   de: {
     'nav.dashboard': 'Übersicht', 'nav.readiness': 'Bereitschaft', 'nav.calendar': 'Kalender', 'nav.documents': 'Dokumente',
@@ -71,6 +73,7 @@ export const STRINGS = {
     'dash.docsBySystem': 'Dokumente nach System', 'dash.upcomingReviews': 'Anstehende Überprüfungen', 'dash.riskProfile': 'Risikoprofil',
     'dash.governance': 'Governance und Pflichten', 'dash.recentActivity': 'Letzte Aktivität',
     'report.scope': 'Geltungsbereich', 'report.generated': 'Erstellt am', 'report.classification': 'Klassifizierung: Intern',
+    'btn.print': 'Drucken oder als PDF speichern', 'btn.save': 'Änderungen speichern', 'btn.export': 'Tabelle exportieren (CSV)', 'btn.generatePack': 'Audit-Paket erstellen',
   },
   es: {
     'nav.dashboard': 'Panel', 'nav.readiness': 'Preparación', 'nav.calendar': 'Calendario', 'nav.documents': 'Documentos',
@@ -91,5 +94,6 @@ export const STRINGS = {
     'dash.docsBySystem': 'Documentos por sistema', 'dash.upcomingReviews': 'Próximas revisiones', 'dash.riskProfile': 'Perfil de riesgo',
     'dash.governance': 'Gobernanza y obligaciones', 'dash.recentActivity': 'Actividad reciente',
     'report.scope': 'Alcance', 'report.generated': 'Generado el', 'report.classification': 'Clasificación: Interno',
+    'btn.print': 'Imprimir o guardar como PDF', 'btn.save': 'Guardar cambios', 'btn.export': 'Exportar hoja de cálculo (CSV)', 'btn.generatePack': 'Generar paquete de auditoría',
   },
 };

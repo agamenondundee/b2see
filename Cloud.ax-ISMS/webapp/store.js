@@ -3,12 +3,12 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=47';
-import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=47';
-import { DOCUMENTS } from './documents-data.js?v=47';
-import { REGISTER_SEED } from './data/registers.js?v=47';
-import { AUDIT_SEED } from './data/audits.js?v=47';
-import { CERT_BODY_SEED } from './data/cert-bodies.js?v=47';
+import { CONTROLS } from './data/controls.js?v=49';
+import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=49';
+import { DOCUMENTS } from './documents-data.js?v=49';
+import { REGISTER_SEED } from './data/registers.js?v=49';
+import { AUDIT_SEED } from './data/audits.js?v=49';
+import { CERT_BODY_SEED } from './data/cert-bodies.js?v=49';
 
 const NS = 'cloudax.isms.';
 const SEED_VERSION = 12;
