@@ -2,15 +2,15 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=24';
-import { CLAUSES } from './data/clauses.js?v=24';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=24';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=24';
+import { CONTROLS } from './data/controls.js?v=27';
+import { CLAUSES } from './data/clauses.js?v=27';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=27';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=27';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=24';
+} from './store.js?v=27';
 
 ensureSeed();
 applyTheme();
@@ -83,7 +83,7 @@ function toggleTheme() {
 }
 
 const ROUTE_TITLES = {
-  dashboard: 'Dashboard', readiness: 'Certification readiness', calendar: 'Compliance calendar', documents: 'Documents', framework: 'Framework',
+  dashboard: 'Dashboard', readiness: 'Certification readiness', calendar: 'Compliance calendar', documents: 'Documents', framework: 'Framework', control: 'Control',
   soa: 'Statement of Applicability', aims: 'AI management (42001)', registers: 'Registers', audits: 'Internal audits', certbody: 'Certification body', audit: 'Audit log',
   search: 'Search', settings: 'Settings', report: 'Audit pack',
 };
@@ -184,7 +184,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=24').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=27').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -803,7 +803,7 @@ function renderFramework() {
       return true;
     }).map((c) => {
       const s = soaByRef[c.ref]; const linked = linkedControl(c.ref);
-      return { __html: true, ref: esc(c.ref), title: esc(c.title), theme: esc(c.theme), type: (c.types || []).map((t) => `<span class="chip">${esc(t)}</span>`).join('') || '-',
+      return { __html: true, ref: `<a href="#/control/${esc(c.ref)}">${esc(c.ref)}</a>`, title: esc(c.title), theme: esc(c.theme), type: (c.types || []).map((t) => `<span class="chip">${esc(t)}</span>`).join('') || '-',
         app: s ? applicablePill(s.applicable) : '<span class="muted">-</span>',
         impl: s && s.applicable === true ? pill(s.status, statusKind(s.status)) : '<span class="muted">-</span>',
         docs: linked.length ? linked.map(chip).join('') : '<span class="muted">none</span>' };
@@ -816,6 +816,57 @@ function renderFramework() {
   document.getElementById('fw-impl').addEventListener('change', (e) => { fwFilter.impl = e.target.value; draw(); });
   document.getElementById('fw-q').addEventListener('input', (e) => { fwFilter.q = e.target.value; draw(); });
   draw();
+}
+
+// A single Annex A control in full: its attributes, the applicability decision recorded
+// in the Statement of Applicability, the controlled documents that address it and the
+// risks it treats. This is the golden thread an auditor follows, in one place.
+function renderControlDetail(ref) {
+  const c = CONTROLS.find((x) => x.ref === ref);
+  if (!c) { viewEl().innerHTML = `<h2>Control not found</h2><div class="panel"><p>No Annex A control has the reference ${esc(ref)}.</p><p><a href="#/framework">Back to the framework</a></p></div>`; return; }
+  const s = Object.fromEntries(getCollection('soa').map((x) => [x.ref, x]))[ref];
+  const docs = getCollection('documents').filter((d) => (d.controlRefs || []).includes(ref));
+  const parse = (v) => String(v || '').split(/[,;]/).map((x) => x.trim()).filter(Boolean);
+  const risks = getCollection('register.risk').filter((r) => parse(r.relatedControls).includes(ref));
+  const idx = CONTROLS.findIndex((x) => x.ref === ref);
+  const prev = idx > 0 ? CONTROLS[idx - 1] : null;
+  const next = idx < CONTROLS.length - 1 ? CONTROLS[idx + 1] : null;
+  const chips = (arr) => (arr || []).map((a) => `<span class="chip">${esc(a)}</span>`).join('') || '<span class="muted">-</span>';
+  viewEl().innerHTML = `
+    <p class="muted"><a href="#/framework">Framework</a> <span aria-hidden="true">/</span> ${esc(c.ref)}</p>
+    <h2>${esc(c.ref)} ${esc(c.title)}</h2>
+    <div class="panel">
+      <p>${s ? applicablePill(s.applicable) : '<span class="muted">No decision</span>'} ${s && s.applicable === true ? pill(s.status, statusKind(s.status)) : ''} <span class="badge">${esc(c.theme)}</span></p>
+      <table class="spec"><tbody>
+        <tr><th>Control type</th><td>${chips(c.types)}</td></tr>
+        <tr><th>Security properties</th><td>${chips(c.properties)}</td></tr>
+        <tr><th>Cybersecurity concepts</th><td>${chips(c.concepts)}</td></tr>
+      </tbody></table>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Applicability decision</h3><a href="#/soa">Edit in the Statement of Applicability</a></div>
+      ${s ? `<table class="spec"><tbody>
+        <tr><th>Applicable</th><td>${applicablePill(s.applicable)}</td></tr>
+        <tr><th>Implementation</th><td>${s.applicable === true ? pill(s.status, statusKind(s.status)) : '<span class="muted">-</span>'}</td></tr>
+        <tr><th>Owner</th><td>${esc(s.owner) || '<span class="muted">not set</span>'}</td></tr>
+        <tr><th>Justification</th><td>${esc(s.justification) || '<span class="muted">none recorded</span>'}</td></tr>
+      </tbody></table>` : '<p class="muted">This control is not yet in the Statement of Applicability.</p>'}
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Documents addressing this control</h3><span class="muted">${docs.length}</span></div>
+      ${docs.length ? table(
+        [{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'status', label: 'Status' }, { key: 'review', label: 'Review by' }],
+        docs.map((d) => ({ __html: true, ref: `<a href="#/documents/${d.id}">${esc(d.ref)}</a>`, title: esc(d.title), status: pill(d.status), review: esc(fmtDate(d.nextReviewDate) || '-') })),
+      ) : '<p class="muted">No controlled document is linked to this control yet.</p>'}
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Risks treated by this control</h3><span class="muted">${risks.length}</span></div>
+      ${risks.length ? table(
+        [{ key: 'id', label: 'Risk' }, { key: 'desc', label: 'Description' }, { key: 'inh', label: 'Inherent' }, { key: 'res', label: 'Residual' }, { key: 'treat', label: 'Treatment' }, { key: 'owner', label: 'Owner' }],
+        risks.map((r) => { const sc = riskScore(r); const lv = riskLevel(sc); const rsc = residualScore(r); const rlv = riskLevel(rsc); return { __html: true, id: `<a href="#/registers">${esc(r.riskId)}</a>`, desc: esc(r.description), inh: `<b>${sc}</b> ${pill(lv.label, lv.kind)}`, res: rsc ? `<b>${rsc}</b> ${pill(rlv.label, rlv.kind)}` : '-', treat: `<span class="chip">${esc(r.treatment || '-')}</span>`, owner: esc(r.owner) }; }),
+      ) : '<p class="muted">No risk on the register names this control in its treatment.</p>'}
+    </div>
+    <div class="toolbar">${prev ? `<a class="chip" href="#/control/${esc(prev.ref)}">Previous ${esc(prev.ref)}</a>` : ''}${next ? `<a class="chip" href="#/control/${esc(next.ref)}">Next ${esc(next.ref)}</a>` : ''}<span class="spacer"></span><a class="chip" href="#/framework">All controls</a></div>`;
 }
 
 const soaFilter = { theme: 'All', app: 'All', impl: 'All', q: '' };
@@ -868,7 +919,7 @@ function renderSoa() {
       const c = byRef[s.ref] || {};
       const applicableValue = s.applicable === null ? '' : s.applicable ? 'yes' : 'no';
       return `<tr>
-        <td><b>${esc(s.ref)}</b></td>
+        <td><a href="#/control/${esc(s.ref)}"><b>${esc(s.ref)}</b></a></td>
         <td>${esc(c.title || '')}</td>
         <td>${cell('applicable', applicableValue, [{ v: '', t: 'Undecided' }, { v: 'yes', t: 'Yes' }, { v: 'no', t: 'No' }], s.ref)}</td>
         <td><input data-ref="${esc(s.ref)}" data-field="justification" value="${esc(s.justification)}" ${editable ? '' : 'disabled'} /></td>
@@ -1766,7 +1817,7 @@ function paletteItems() {
   items.push({ group: 'Actions', label: 'Print this page', icon: ICONS.documents, run: () => window.print() });
   for (const d of getCollection('documents')) items.push({ group: 'Documents', label: `${d.ref} ${d.title}`, meta: d.system, icon: ICONS.documents, run: () => go('documents/' + d.id) });
   for (const a of getCollection('audits')) items.push({ group: 'Internal audits', label: `${a.ref} ${a.scope}`, meta: a.status, icon: ICONS.audits, run: () => go('audits/' + a.id) });
-  for (const c of CONTROLS) items.push({ group: 'Controls', label: `${c.ref} ${c.title}`, meta: c.theme, icon: ICONS.framework, run: () => go('framework') });
+  for (const c of CONTROLS) items.push({ group: 'Controls', label: `${c.ref} ${c.title}`, meta: c.theme, icon: ICONS.framework, run: () => go('control/' + c.ref) });
   for (const c of AIMS_CONTROLS) items.push({ group: 'AI controls', label: `${c.ref} ${c.title}`, meta: 'ISO 42001', icon: ICONS.aims, run: () => go('aims') });
   for (const c of CLAUSES) items.push({ group: 'Clauses', label: `${c.number} ${c.title}`, icon: ICONS.soa, run: () => go('framework') });
   return items;
@@ -1834,7 +1885,7 @@ function navigate() {
   shell(route);
   const views = {
     dashboard: renderDashboard, readiness: renderReadiness, calendar: renderCalendar, documents: () => (param ? renderDocumentDetail(param) : renderDocuments()),
-    framework: renderFramework, soa: renderSoa, aims: renderAims, registers: renderRegisters,
+    framework: renderFramework, control: () => (param ? renderControlDetail(param) : renderFramework()), soa: renderSoa, aims: renderAims, registers: renderRegisters,
     audits: () => (param ? renderAuditDetail(param) : renderInternalAudits()),
     certbody: () => (param ? renderCertBodyDetail(param) : renderCertBodies()), audit: renderAudit,
     search: renderSearch, settings: renderSettings, report: renderReport,

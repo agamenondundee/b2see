@@ -255,6 +255,10 @@ td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line-2
 tbody tr { transition: background 0.1s ease; }
 tbody tr:hover { background: var(--brand-50); }
 tbody tr:last-child td { border-bottom: none; }
+/* Key and value specification tables on detail pages. */
+.spec th { position: static; background: none; top: auto; z-index: 0; width: 210px; text-align: left; padding: 10px 12px; color: var(--muted); font-weight: 600; text-transform: none; letter-spacing: 0; font-size: 13.5px; vertical-align: top; border-bottom: 1px solid var(--line-2); }
+.spec tbody tr:hover { background: none; }
+.spec tbody tr:last-child th, .spec tbody tr:last-child td { border-bottom: none; }
 .table-wrap { overflow: auto; }
 /* Inside a horizontal scroll container the header sticks to the top of the wrap,
    not 60px down, otherwise it would cover the first row. */
