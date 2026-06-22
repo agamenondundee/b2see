@@ -44,4 +44,14 @@ export const AUDIT_SEED = [
     plannedDate: '2026-09-10', completedDate: '', auditor: 'Internal audit team', status: 'Planned',
     summary: '', clauseRefs: [], controlRefs: ['A.5.19', 'A.5.20', 'A.5.21', 'A.5.22'], findings: [],
   },
+  {
+    ref: 'IA-2026-06', scope: 'Incident management and business continuity', standard: 'ISO/IEC 27001:2022',
+    plannedDate: '2026-10-15', completedDate: '', auditor: 'Internal audit team', status: 'Planned',
+    summary: '', clauseRefs: [], controlRefs: ['A.5.24', 'A.5.25', 'A.5.26', 'A.5.29', 'A.5.30', 'A.8.14'], findings: [],
+  },
+  {
+    ref: 'IA-2026-07', scope: 'Management review inputs and corrective action follow up', standard: 'ISO/IEC 27001:2022',
+    plannedDate: '2026-11-19', completedDate: '', auditor: 'Internal audit team', status: 'Planned',
+    summary: '', clauseRefs: ['9.1', '9.3', '10.1', '10.2'], controlRefs: [], findings: [],
+  },
 ];

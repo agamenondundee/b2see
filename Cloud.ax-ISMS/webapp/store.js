@@ -3,15 +3,15 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=41';
-import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=41';
-import { DOCUMENTS } from './documents-data.js?v=41';
-import { REGISTER_SEED } from './data/registers.js?v=41';
-import { AUDIT_SEED } from './data/audits.js?v=41';
-import { CERT_BODY_SEED } from './data/cert-bodies.js?v=41';
+import { CONTROLS } from './data/controls.js?v=42';
+import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=42';
+import { DOCUMENTS } from './documents-data.js?v=42';
+import { REGISTER_SEED } from './data/registers.js?v=42';
+import { AUDIT_SEED } from './data/audits.js?v=42';
+import { CERT_BODY_SEED } from './data/cert-bodies.js?v=42';
 
 const NS = 'cloudax.isms.';
-const SEED_VERSION = 11;
+const SEED_VERSION = 12;
 
 export const CONFIG = {
   prefixes: { Policy: 'POL', Procedure: 'PROC', Standard: 'STD', Guideline: 'GUI', Plan: 'PLAN', Register: 'REG', Record: 'REC', Form: 'FORM' },
@@ -319,6 +319,13 @@ export function ensureSeed() {
   if ((s.seedVersion || 0) < 11 && read('register.evidence', []).length === 0) {
     const seed = REGISTER_SEED.evidence || [];
     if (seed.length) write('register.evidence', seed.map((e) => ({ id: cid(), ...e })));
+  }
+  // Append any audits added to the programme seed that are not already present, matched
+  // by reference, so the annual schedule fills out without disturbing existing audits.
+  if ((s.seedVersion || 0) < 12 && read('audits', null) !== null) {
+    const have = new Set(read('audits', []).map((a) => a.ref));
+    const add = AUDIT_SEED.filter((a) => !have.has(a.ref)).map((a) => ({ id: cid(), ...a, findings: (a.findings || []).map((f) => ({ id: cid(), ...f })) }));
+    if (add.length) write('audits', read('audits', []).concat(add));
   }
   if (s.seedVersion !== SEED_VERSION) setSettings({ ...s, seedVersion: SEED_VERSION });
 }

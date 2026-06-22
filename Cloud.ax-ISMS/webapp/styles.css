@@ -442,6 +442,18 @@ mark { background: #fde68a; color: inherit; padding: 0 2px; border-radius: 3px; 
 .rr-link { stroke: var(--neutral-solid); stroke-width: 3; opacity: 0.45; stroke-linecap: round; }
 .rr-inh { fill: var(--danger-solid); }
 .rr-res { fill: var(--ok-solid); }
+/* Timeline and annual audit schedule */
+.tl { width: 100%; height: auto; display: block; margin-top: 6px; }
+.tl-grid { stroke: var(--line-2); stroke-width: 1; }
+.tl-axis { fill: var(--muted); font-size: 10px; }
+.tl-lane { fill: var(--ink-2); font-size: 11px; font-weight: 600; }
+.tl-base { stroke: var(--line-2); stroke-width: 1; }
+.tl-today { stroke: var(--brand); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.gantt-bar { opacity: 0.4; }
+.gantt-bar.ok, .gantt-dot.ok { fill: var(--ok-solid); }
+.gantt-bar.warn, .gantt-dot.warn { fill: var(--warn-solid); }
+.gantt-bar.info, .gantt-dot.info { fill: var(--info-solid); }
+.dfd-link:hover .gantt-dot { stroke: var(--brand); stroke-width: 2.5; }
 
 /* Control status mosaic */
 .mosaic-group { margin-bottom: 14px; }
