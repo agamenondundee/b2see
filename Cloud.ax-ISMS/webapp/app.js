@@ -2,16 +2,16 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=43';
-import { CLAUSES } from './data/clauses.js?v=43';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=43';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=43';
-import { LANGUAGES, STRINGS } from './i18n.js?v=43';
+import { CONTROLS } from './data/controls.js?v=44';
+import { CLAUSES } from './data/clauses.js?v=44';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=44';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=44';
+import { LANGUAGES, STRINGS } from './i18n.js?v=44';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=43';
+} from './store.js?v=44';
 
 // Interface language. t(key) returns the string for the current language, falling back
 // to English, then to the key itself, so a missing translation never breaks the page.
@@ -210,7 +210,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=43').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=44').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -370,6 +370,30 @@ function riskReductionChart(risks) {
   return `<svg class="rr" viewBox="0 0 ${W} ${H}" role="img" aria-label="Risk reduction from inherent to residual score">${grid}${series}</svg>`;
 }
 
+// Group suppliers by where they process data, so the data residency picture is clear at
+// a glance. Anything outside the UK or EU is shown in a danger column.
+function dataResidency(suppliers) {
+  const bucket = (loc) => {
+    const s = String(loc || '');
+    if (!isUkEu(loc)) return 'Outside UK or EU';
+    const uk = /\buk\b|united kingdom|britain/i.test(s);
+    const eu = /\beu\b|eea|europe|ireland|germany|france|netherlands|spain|frankfurt|dublin/i.test(s);
+    if (uk && eu) return 'UK and EU';
+    if (uk) return 'UK';
+    if (eu) return 'EU';
+    return 'UK or EU';
+  };
+  const order = ['UK', 'EU', 'UK and EU', 'UK or EU', 'Outside UK or EU'];
+  const groups = {};
+  for (const s of suppliers) { const b = bucket(s.dataLocation); (groups[b] = groups[b] || []).push(s); }
+  const cols = order.filter((o) => groups[o]).map((region) => {
+    const danger = region === 'Outside UK or EU';
+    const items = groups[region].map((s) => `<div class="res-item"><span>${esc(s.name)}</span>${/^y/i.test(s.dpa || '') ? pill('DPA', 'ok') : pill('No DPA', 'danger')}</div>`).join('');
+    return `<div class="res-col${danger ? ' danger' : ''}"><div class="res-head">${esc(region)} <span class="badge">${groups[region].length}</span></div>${items}</div>`;
+  }).join('');
+  return cols ? `<div class="res-grid">${cols}</div>` : '';
+}
+
 function regSummary(key, rows) {
   if (key === 'risk') {
     const levels = [['Critical', 'danger'], ['High', 'danger'], ['Medium', 'warn'], ['Low', 'ok']];
@@ -392,7 +416,9 @@ function regSummary(key, rows) {
     const dpa = rows.filter((r) => /^y/i.test(r.dpa || '')).length;
     const due = rows.filter((r) => overdue(r.reviewDate) || dueSoon(r.reviewDate)).length;
     const offshore = rows.filter((r) => !isUkEu(r.dataLocation)).length;
-    return `<div class="mini-cards">${mini(rows.length, 'Suppliers')}${mini(dpa, 'DPA in place', dpa === rows.length ? 'ok' : 'warn')}${mini(rows.length - dpa, 'DPA missing', rows.length - dpa ? 'danger' : 'ok')}${mini(offshore, 'Outside UK or EU', offshore ? 'danger' : 'ok')}${mini(due, 'Reviews due or overdue', due ? 'warn' : 'ok')}</div>`;
+    return `<div class="mini-cards">${mini(rows.length, 'Suppliers')}${mini(dpa, 'DPA in place', dpa === rows.length ? 'ok' : 'warn')}${mini(rows.length - dpa, 'DPA missing', rows.length - dpa ? 'danger' : 'ok')}${mini(offshore, 'Outside UK or EU', offshore ? 'danger' : 'ok')}${mini(due, 'Reviews due or overdue', due ? 'warn' : 'ok')}</div>
+      <div class="panel-head" style="margin-top:16px"><h3 style="margin:0">Data residency</h3><span class="muted">Where each sub-processor processes data</span></div>
+      ${dataResidency(rows)}`;
   }
   if (key === 'evidence') {
     const linked = rows.filter((e) => CONTROL_REFS.has(String(e.controlRef || '').trim())).length;
