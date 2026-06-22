@@ -59,6 +59,14 @@ production, multi user, defensible deployment, use the full application in the p
 folder (a Node and TypeScript API, PostgreSQL and an identity provider), which
 implements those controls. The browser version can be backed by that API later.
 
+## Branding
+
+The application carries the Cloudax brand: the interlocking loop logo and the brand
+blue. The logo and the favicon mark live in `assets/`, taken from the controlled
+documents themselves. The white lockup sits on the navy sidebar, the blue lockup is
+used on printed output, and the brand blue is applied through the colour variables at
+the top of `styles.css`.
+
 Control titles are the official ISO short titles. Control descriptions and guidance
 are in the licensed standard and are not reproduced. Control attributes are derived
 from ISO/IEC 27002:2022 and should be validated against the licensed standard.

@@ -1,11 +1,12 @@
 :root {
-  --ink: #14201b;
-  --muted: #5b6b64;
-  --line: #d7e0db;
+  --ink: #0c1126;
+  --muted: #58607a;
+  --line: #dadeef;
   --panel: #ffffff;
-  --bg: #f3f6f4;
-  --brand: #0b3d2e;
-  --accent: #1f7a5a;
+  --bg: #f4f6fd;
+  --brand: #0000ff;
+  --brand-deep: #0a1050;
+  --accent: #1a1aff;
   --warn: #b23b3b;
 }
 
@@ -16,12 +17,13 @@ a { color: var(--accent); }
 
 .app { display: grid; grid-template-columns: 230px 1fr; min-height: 100vh; }
 
-.sidebar { background: var(--brand); color: #eaf2ee; padding: 20px 14px; }
-.sidebar h1 { font-size: 17px; margin: 0 0 2px; }
-.sidebar .org { font-size: 12px; opacity: 0.8; margin-bottom: 18px; }
-.sidebar nav a { display: block; padding: 9px 10px; border-radius: 8px; color: #eaf2ee; text-decoration: none; font-size: 14px; margin-bottom: 2px; }
-.sidebar nav a:hover { background: rgba(255, 255, 255, 0.1); }
-.sidebar nav a.active { background: rgba(255, 255, 255, 0.18); font-weight: 600; }
+.sidebar { background: var(--brand-deep); color: #eef1ff; padding: 20px 14px; }
+.sidebar h1 { font-size: 17px; margin: 0 0 6px; line-height: 0; }
+.sidebar .logo { display: block; width: 150px; max-width: 60vw; height: auto; }
+.sidebar .org { font-size: 12px; opacity: 0.85; margin-bottom: 18px; }
+.sidebar nav a { display: block; padding: 9px 10px; border-radius: 8px; color: #eef1ff; text-decoration: none; font-size: 14px; margin-bottom: 2px; }
+.sidebar nav a:hover { background: rgba(255, 255, 255, 0.10); }
+.sidebar nav a.active { background: var(--brand); color: #fff; font-weight: 600; }
 .sidebar .who { margin-top: 22px; font-size: 12px; }
 .sidebar .who label { display: block; margin-bottom: 4px; opacity: 0.85; }
 .sidebar .who select { width: 100%; }
@@ -43,7 +45,7 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); }
 
-.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #e7efea; color: var(--brand); margin-right: 4px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #e7ebff; color: var(--brand); margin-right: 4px; }
 
 label { display: block; font-size: 13px; margin: 8px 0 4px; }
 input, select, textarea { width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: #fff; }
@@ -66,4 +68,5 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   .sidebar, .toolbar { display: none; }
   .app { display: block; }
   .panel { border: none; padding: 0; }
+  .main::before { content: ""; display: block; height: 40px; margin-bottom: 12px; background: url(assets/cloudax-logo-blue.png) left center / auto 36px no-repeat; }
 }
