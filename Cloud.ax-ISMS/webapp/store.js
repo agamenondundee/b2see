@@ -3,11 +3,11 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js';
-import { DOCUMENTS } from './documents-data.js';
+import { CONTROLS } from './data/controls.js?v=3';
+import { DOCUMENTS } from './documents-data.js?v=3';
 
 const NS = 'cloudax.isms.';
-const SEED_VERSION = 2;
+const SEED_VERSION = 3;
 
 export const CONFIG = {
   prefixes: { Policy: 'POL', Procedure: 'PROC', Standard: 'STD', Guideline: 'GUI', Plan: 'PLAN', Register: 'REG', Record: 'REC', Form: 'FORM' },
@@ -137,6 +137,36 @@ export function loadDocumentSet() {
   return docs.length;
 }
 
+// Populate the Statement of Applicability from the controlled document set. For each
+// Annex A control addressed by a published document, the control is marked applicable,
+// the documents are recorded against it, the owner is taken from the lead document and
+// the implementation status is set to Implemented. Decisions already recorded in the
+// browser are preserved: only blank fields are filled.
+export function populateSoaFromDocuments() {
+  const published = read('documents', []).filter((d) => d.status === 'Published');
+  const byControl = {};
+  for (const d of published) {
+    for (const ref of d.controlRefs || []) (byControl[ref] = byControl[ref] || []).push(d);
+  }
+  const soa = read('soa', []);
+  let changed = 0;
+  for (const entry of soa) {
+    const hits = byControl[entry.ref];
+    if (!hits || !hits.length) continue;
+    const refs = Array.from(new Set(hits.map((d) => d.ref)));
+    entry.docRefs = Array.from(new Set([...(entry.docRefs || []), ...refs]));
+    if (entry.applicable === null) entry.applicable = true;
+    if (!entry.owner) entry.owner = hits[0].owner || '';
+    if (entry.status === 'Not started') entry.status = 'Implemented';
+    if (!(entry.justification || '').trim()) {
+      entry.justification = `Applicable. Addressed by the controlled documents ${refs.join(', ')}. Confirm during review.`;
+    }
+    changed += 1;
+  }
+  write('soa', soa);
+  return changed;
+}
+
 export function ensureSeed() {
   const s = getSettings();
   if (!read('soa', null)) {
@@ -149,6 +179,10 @@ export function ensureSeed() {
   if ((s.seedVersion || 0) < 2 && read('documents', []).length === 0) {
     write('documents', DOCUMENTS.map(toDocumentShape));
   }
+  // Populate the Statement of Applicability from the controlled documents, so the
+  // controls they address are marked applicable and linked. Runs once when the seed
+  // version is raised; it fills only blanks and does not overwrite recorded decisions.
+  if ((s.seedVersion || 0) < 3) populateSoaFromDocuments();
   if (s.seedVersion !== SEED_VERSION) setSettings({ ...s, seedVersion: SEED_VERSION });
 }
 
