@@ -2,13 +2,13 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=18';
-import { CLAUSES } from './data/clauses.js?v=18';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=18';
+import { CONTROLS } from './data/controls.js?v=19';
+import { CLAUSES } from './data/clauses.js?v=19';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=19';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
-} from './store.js?v=18';
+} from './store.js?v=19';
 
 ensureSeed();
 applyTheme();
@@ -157,7 +157,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=18').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=19').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -706,6 +706,7 @@ function renderDocumentDetail(id) {
   }));
 }
 
+const fwFilter = { theme: 'All', app: 'All', impl: 'All', q: '' };
 function renderFramework() {
   const docs = getCollection('documents');
   const soaByRef = Object.fromEntries(getCollection('soa').map((s) => [s.ref, s]));
@@ -714,30 +715,56 @@ function renderFramework() {
   const linkedControl = (ref) => docs.filter((d) => (d.controlRefs || []).includes(ref)).map((d) => d.ref);
   const gaps = CLAUSES.filter((c) => c.mandatory.length > 0 && !linkedClause.has(c.number));
   const chip = (ref) => (docById[ref] ? `<a class="chip" href="#/documents/${docById[ref]}">${esc(ref)}</a>` : `<span class="chip">${esc(ref)}</span>`);
-  const controlsRows = CONTROLS.map((c) => {
-    const s = soaByRef[c.ref];
-    const linked = linkedControl(c.ref);
-    return { __html: true, ref: esc(c.ref), title: esc(c.title), theme: esc(c.theme),
-      app: s ? applicablePill(s.applicable) : '<span class="muted">-</span>',
-      impl: s && s.applicable === true ? pill(s.status, statusKind(s.status)) : '<span class="muted">-</span>',
-      docs: linked.length ? linked.map(chip).join('') : '<span class="muted">none</span>' };
-  });
+  const themes = ['All', ...Array.from(new Set(CONTROLS.map((c) => c.theme)))];
+  const appOf = (s) => (s && s.applicable === true ? 'Applicable' : s && s.applicable === false ? 'Excluded' : 'Undecided');
   const covered = CONTROLS.filter((c) => linkedControl(c.ref).length > 0).length;
   const applicable = getCollection('soa').filter((s) => s.applicable === true).length;
+  const sel = (id, opts, cur) => `<select id="${id}" aria-label="${id}">${opts.map((o) => `<option ${o === cur ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
   viewEl().innerHTML = `
     <h2>ISO/IEC 27001:2022 framework</h2>
     <div class="panel"><div class="panel-head"><h3>Coverage gaps</h3>${gaps.length ? `<span class="pill warn">${gaps.length} open</span>` : '<span class="pill ok">none</span>'}</div><p class="muted">Clauses that require documented information but have no linked document.</p>${gaps.length ? table(
       [{ key: 'number', label: 'Clause' }, { key: 'title', label: 'Title' }, { key: 'mandatory', label: 'Mandatory documented information' }],
       gaps.map((g) => ({ number: g.number, title: g.title, mandatory: g.mandatory.join('; ') })),
     ) : '<p>No coverage gaps.</p>'}</div>
-    <div class="panel"><div class="panel-head"><h3>Annex A controls (93)</h3><span class="muted">${applicable} applicable | ${covered} of ${CONTROLS.length} with a linked document</span></div>${table(
-      [{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'theme', label: 'Theme' }, { key: 'app', label: 'Applicable' }, { key: 'impl', label: 'Implementation' }, { key: 'docs', label: 'Documents' }],
-      controlsRows,
-    )}</div>
+    <div class="panel">
+      <div class="panel-head"><h3>Annex A controls</h3><span class="muted">${applicable} applicable, ${covered} of ${CONTROLS.length} with a linked document</span></div>
+      <div class="toolbar">
+        ${sel('fw-theme', themes, fwFilter.theme)}
+        ${sel('fw-app', ['All', 'Applicable', 'Excluded', 'Undecided'], fwFilter.app)}
+        ${sel('fw-impl', ['All', ...CONFIG.implementationStatuses], fwFilter.impl)}
+        <input id="fw-q" placeholder="Filter by reference, title or attribute" value="${esc(fwFilter.q)}" style="width:240px" aria-label="Filter controls" />
+        <span class="spacer"></span><span class="badge" id="fw-count"></span>
+      </div>
+      <div class="table-wrap" id="fw-controls"></div>
+    </div>
     <div class="panel"><h3>Management clauses</h3>${table(
       [{ key: 'number', label: 'Clause' }, { key: 'title', label: 'Title' }, { key: 'mandatory', label: 'Mandatory documented information' }],
       CLAUSES.map((c) => ({ number: c.number + (c.climate ? ' (climate)' : ''), title: c.title, mandatory: c.mandatory.join('; ') || '-' })),
     )}</div>`;
+  const draw = () => {
+    const q = fwFilter.q.trim().toLowerCase();
+    const rows = CONTROLS.filter((c) => {
+      const s = soaByRef[c.ref];
+      if (fwFilter.theme !== 'All' && c.theme !== fwFilter.theme) return false;
+      if (fwFilter.app !== 'All' && appOf(s) !== fwFilter.app) return false;
+      if (fwFilter.impl !== 'All' && !(s && s.applicable === true && s.status === fwFilter.impl)) return false;
+      if (q && !(`${c.ref} ${c.title} ${c.theme} ${(c.types || []).join(' ')} ${(c.properties || []).join(' ')} ${(c.concepts || []).join(' ')}`).toLowerCase().includes(q)) return false;
+      return true;
+    }).map((c) => {
+      const s = soaByRef[c.ref]; const linked = linkedControl(c.ref);
+      return { __html: true, ref: esc(c.ref), title: esc(c.title), theme: esc(c.theme), type: (c.types || []).map((t) => `<span class="chip">${esc(t)}</span>`).join('') || '-',
+        app: s ? applicablePill(s.applicable) : '<span class="muted">-</span>',
+        impl: s && s.applicable === true ? pill(s.status, statusKind(s.status)) : '<span class="muted">-</span>',
+        docs: linked.length ? linked.map(chip).join('') : '<span class="muted">none</span>' };
+    });
+    document.getElementById('fw-controls').innerHTML = table([{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'theme', label: 'Theme' }, { key: 'type', label: 'Type' }, { key: 'app', label: 'Applicable' }, { key: 'impl', label: 'Implementation' }, { key: 'docs', label: 'Documents' }], rows);
+    document.getElementById('fw-count').textContent = `${rows.length} of ${CONTROLS.length}`;
+  };
+  document.getElementById('fw-theme').addEventListener('change', (e) => { fwFilter.theme = e.target.value; draw(); });
+  document.getElementById('fw-app').addEventListener('change', (e) => { fwFilter.app = e.target.value; draw(); });
+  document.getElementById('fw-impl').addEventListener('change', (e) => { fwFilter.impl = e.target.value; draw(); });
+  document.getElementById('fw-q').addEventListener('input', (e) => { fwFilter.q = e.target.value; draw(); });
+  draw();
 }
 
 function renderSoa() {
