@@ -18,6 +18,8 @@
   --line-2: #eef1f6;
   --bg: #f4f6f9;
   --panel: #ffffff;
+  --field: #ffffff;
+  --field-disabled: #f1f4f8;
   --heading: var(--surface-dark);
   --topbar-bg: rgba(255, 255, 255, 0.85);
   --skel-1: #eef1f6; --skel-2: #e3e7ee;
@@ -73,6 +75,8 @@ html[data-theme="dark"] {
   --line-2: #1b2436;
   --bg: #0b101e;
   --panel: #131a2b;
+  --field: #0d1424;
+  --field-disabled: #1a2233;
   --heading: #eaedf7;
   --topbar-bg: rgba(13, 18, 32, 0.82);
   --skel-1: #1b2436; --skel-2: #243049;
@@ -143,7 +147,9 @@ html[data-theme="dark"] mark { background: #6b5d12; color: #fff7d6; }
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .topbar-search:hover { border-color: var(--brand); }
-.topbar-search .sk { margin-left: auto; display: inline-flex; gap: 2px; }
+.topbar-search svg { width: 16px; height: 16px; flex: none; }
+.topbar-search > span:not(.sk) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar-search .sk { margin-left: auto; display: inline-flex; gap: 2px; flex: none; }
 .topbar-search kbd, .cmdk kbd { font: inherit; font-size: 11px; background: var(--neutral-bg); color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
 .icon-btn { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--panel); color: var(--ink-2); cursor: pointer; }
 .icon-btn:hover { border-color: var(--brand); color: var(--brand-700); background: var(--panel); }
@@ -277,9 +283,12 @@ a.chip:hover { background: var(--brand); color: #fff; }
 label { display: block; font-size: 13px; font-weight: 500; color: var(--ink-2); margin: 10px 0 5px; }
 input, select, textarea {
   width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--r-sm);
-  font: inherit; color: var(--ink); background: #fff; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  font: inherit; color: var(--ink); background: var(--field); transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-50); }
+input:disabled, select:disabled, textarea:disabled { background: var(--field-disabled); color: var(--muted); cursor: not-allowed; -webkit-text-fill-color: var(--muted); opacity: 1; }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.8; }
+select option { background: var(--panel); color: var(--ink); }
 button {
   font: inherit; font-weight: 600; padding: 9px 15px; border-radius: var(--r-sm);
   border: 1px solid var(--brand); background: var(--brand); color: #fff; cursor: pointer;
@@ -287,7 +296,7 @@ button {
 }
 button:hover { background: var(--brand-700); border-color: var(--brand-700); box-shadow: var(--shadow-sm); }
 button:active { transform: translateY(1px); }
-button.secondary { background: #fff; color: var(--brand-700); }
+button.secondary { background: var(--panel); color: var(--brand-700); }
 button.secondary:hover { background: var(--brand-50); }
 button:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
