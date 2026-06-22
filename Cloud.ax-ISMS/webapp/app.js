@@ -2,16 +2,16 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=46';
-import { CLAUSES } from './data/clauses.js?v=46';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=46';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=46';
-import { LANGUAGES, STRINGS } from './i18n.js?v=46';
+import { CONTROLS } from './data/controls.js?v=47';
+import { CLAUSES } from './data/clauses.js?v=47';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=47';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=47';
+import { LANGUAGES, STRINGS } from './i18n.js?v=47';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=46';
+} from './store.js?v=47';
 
 // Interface language. t(key) returns the string for the current language, falling back
 // to English, then to the key itself, so a missing translation never breaks the page.
@@ -95,7 +95,7 @@ function toggleTheme() {
 const ROUTE_TITLES = {
   dashboard: 'Dashboard', readiness: 'Certification readiness', calendar: 'Compliance calendar', documents: 'Documents', framework: 'Framework', control: 'Control',
   soa: 'Statement of Applicability', aims: 'AI management (42001)', architecture: 'Architecture and data flows', registers: 'Registers', audits: 'Internal audits', certbody: 'Certification body', audit: 'Audit log',
-  search: 'Search', settings: 'Settings', report: 'Audit pack',
+  search: 'Search', settings: 'Settings', report: 'Audit pack', review: 'Management review',
 };
 // The localised title for a route, falling back to the English route title.
 function routeTitle(route) { return (STRINGS[lang()] && STRINGS[lang()]['title.' + route]) || ROUTE_TITLES[route] || STRINGS.en['title.' + route] || 'Dashboard'; }
@@ -210,7 +210,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=46').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=47').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -329,7 +329,7 @@ const REG_DISPLAY = {
   },
   'management-review': {
     columns: [{ key: 'reviewId', label: 'Review ID' }, { key: 'date', label: 'Date' }, { key: 'attendees', label: 'Attendees' }, { key: 'decisions', label: 'Decisions' }],
-    row: (e) => ({ reviewId: esc(e.reviewId), date: esc(fmtDate(e.date)), attendees: esc(e.attendees), decisions: esc(e.decisions) }),
+    row: (e) => ({ __html: true, reviewId: e.id ? `<a href="#/review/${esc(e.id)}">${esc(e.reviewId)}</a>` : esc(e.reviewId), date: esc(fmtDate(e.date)), attendees: esc(e.attendees), decisions: esc(e.decisions) }),
   },
   competence: {
     columns: [{ key: 'person', label: 'Person' }, { key: 'role', label: 'Role' }, { key: 'training', label: 'Training' }, { key: 'date', label: 'Completed' }],
@@ -1560,6 +1560,60 @@ function renderCalendar() {
     ${monthKeys.length ? monthKeys.map((k) => { const items = groups[k].items; const shown = items.slice(0, 25); return `<div class="panel"><div class="panel-head"><h3>${esc(groups[k].label)}</h3><span class="muted">${items.length} item${items.length === 1 ? '' : 's'}</span></div>${table(cols, shown.map(evRow))}${items.length > 25 ? `<p class="muted">and ${items.length - 25} more this month.</p>` : ''}</div>`; }).join('') : '<div class="panel"><p class="muted">No scheduled obligations in the next year.</p></div>'}`;
 }
 
+// A management review record structured around clause 9.3. The required inputs are
+// assembled live from across the management system at the review date, and the recorded
+// outputs and decisions are shown. This serves as the minutes and the evidence pack.
+function renderManagementReview(id) {
+  const reviews = getCollection('register.management-review');
+  const r = reviews.find((x) => x.id === id);
+  if (!r) { viewEl().innerHTML = `<h2>Management review not found</h2><div class="panel"><p>No management review with that reference.</p><p><a href="#/registers">Back to the registers</a></p></div>`; return; }
+  const date = r.date ? new Date(r.date) : null;
+  const held = date && date <= new Date();
+  const prev = reviews.filter((x) => x.id !== id && x.date && (!date || new Date(x.date) < date)).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const ncs = getCollection('register.nonconformity');
+  const ncOpen = ncs.filter((n) => !/clos|resolv|verif|complet/i.test(n.status));
+  const ncOverdue = ncOpen.filter((n) => overdue(n.dueDate));
+  const audits = getCollection('audits');
+  const completedAudits = audits.filter((a) => /complet/i.test(a.status));
+  const findings = audits.flatMap((a) => a.findings || []);
+  const openFindings = findings.filter((f) => !/clos/i.test(f.status));
+  const opportunities = findings.filter((f) => /opportun/i.test(f.type));
+  const checks = readinessData(); const ready = pct(checks.filter((c) => c.ok).length, checks.length);
+  const risks = getCollection('register.risk');
+  const riskSeg = [['Critical', 'danger'], ['High', 'danger'], ['Medium', 'warn'], ['Low', 'ok']].map(([l, k]) => ({ label: l, value: risks.filter((e) => riskLevel(residualScore(e) || riskScore(e)).label === l).length, kind: k }));
+  const suppliers = getCollection('register.supplier');
+  const supNoDpa = suppliers.filter((s) => !/^y/i.test(s.dpa || '')).length;
+  const supOffshore = suppliers.filter((s) => !isUkEu(s.dataLocation)).length;
+  const ctx = getCollection('register.context');
+  const climate = ctx.filter((c) => /^y/i.test(c.climate || '')).length;
+  const section = (letter, title, body) => `<section class="report-section"><h3>${letter}. ${esc(title)}</h3>${body}</section>`;
+  viewEl().innerHTML = `
+    <p class="muted"><a href="#/registers">Registers</a> <span aria-hidden="true">/</span> ${esc(r.reviewId)}</p>
+    <h2>${esc(routeTitle('review'))}: ${esc(r.reviewId)}</h2>
+    <div class="toolbar"><button class="secondary" id="mr-print">Print or save as PDF</button><span class="spacer"></span><a class="chip" href="#/registers">Back to the register</a></div>
+    <div class="report">
+      <div class="panel">
+        <p>${held ? pill('Held', 'ok') : pill('Scheduled', 'warn')} <span class="muted">${date ? fmtDate(r.date) : 'date not set'}</span></p>
+        <table class="spec"><tbody>
+          <tr><th>Attendees</th><td>${esc(r.attendees) || '<span class="muted">not recorded</span>'}</td></tr>
+          <tr><th>Standard</th><td>ISO/IEC 27001:2022 clause 9.3, ISO/IEC 42001:2023 clause 9.3</td></tr>
+        </tbody></table>
+        <p class="muted">The required inputs below are assembled from the management system as it stands now. Record the outputs and decisions in the management review register.</p>
+      </div>
+      ${section('a', 'Status of actions from previous management reviews', prev.length ? table(
+        [{ key: 'reviewId', label: 'Review' }, { key: 'date', label: 'Date' }, { key: 'decisions', label: 'Decisions and actions' }],
+        prev.map((p) => ({ reviewId: p.reviewId, date: fmtDate(p.date), decisions: p.decisions || '-' })),
+      ) : '<p class="muted">This is the first recorded management review.</p>')}
+      ${section('b', 'Changes in external and internal issues', `<div class="mini-cards">${mini(ctx.length, 'Context entries')}${mini(ctx.filter((c) => /interested/i.test(c.category)).length, 'Interested parties')}${mini(climate, 'Climate related', climate ? 'info' : '')}</div>`)}
+      ${section('c', 'Performance: nonconformities, monitoring, audits and objectives', `<div class="mini-cards">${mini(ncOpen.length, 'Open nonconformities', ncOpen.length ? 'warn' : 'ok')}${mini(ncOverdue.length, 'Overdue actions', ncOverdue.length ? 'danger' : 'ok')}${mini(ready + '%', 'Certification readiness', ready >= 90 ? 'ok' : 'warn')}${mini(completedAudits.length, 'Audits completed', 'ok')}${mini(openFindings.length, 'Open audit findings', openFindings.length ? 'warn' : 'ok')}</div>${openFindings.length ? table([{ key: 'ref', label: 'Reference' }, { key: 'desc', label: 'Finding' }, { key: 'owner', label: 'Owner' }, { key: 'due', label: 'Due' }], openFindings.slice(0, 12).map((f) => ({ ref: f.reference || '-', desc: f.description, owner: f.owner || '-', due: fmtDate(f.dueDate) || '-' }))) : ''}`)}
+      ${section('d', 'Feedback from interested parties', `<div class="mini-cards">${mini(suppliers.length, 'Suppliers')}${mini(supNoDpa, 'Without a DPA', supNoDpa ? 'danger' : 'ok')}${mini(supOffshore, 'Outside UK or EU', supOffshore ? 'danger' : 'ok')}</div>`)}
+      ${section('e', 'Results of risk assessment and risk treatment', `<p class="muted">Residual risk levels across ${risks.length} risks.</p>${risks.length ? stackedBar(riskSeg) : '<p class="muted">No risks recorded.</p>'}`)}
+      ${section('f', 'Opportunities for continual improvement', opportunities.length ? table([{ key: 'ref', label: 'Reference' }, { key: 'desc', label: 'Opportunity' }, { key: 'owner', label: 'Owner' }], opportunities.map((f) => ({ ref: f.reference || '-', desc: f.description, owner: f.owner || '-' }))) : '<p class="muted">No improvement opportunities are currently open from audits.</p>')}
+      <section class="report-section"><h3>Outputs: decisions and actions</h3>${r.decisions ? `<p>${esc(r.decisions)}</p>` : '<p class="muted">No decisions recorded yet. Add them to this review in the management review register.</p>'}</section>
+    </div>`;
+  const p = document.getElementById('mr-print'); if (p) p.addEventListener('click', () => window.print());
+}
+
 // ---- internal audits -------------------------------------------------------
 
 function findingPill(f) {
@@ -2392,6 +2446,7 @@ function navigate() {
     audits: () => (param ? renderAuditDetail(param) : renderInternalAudits()),
     certbody: () => (param ? renderCertBodyDetail(param) : renderCertBodies()), audit: renderAudit,
     search: renderSearch, settings: renderSettings, report: renderReport,
+    review: () => (param ? renderManagementReview(param) : renderRegisters()),
   };
   (views[route] || renderDashboard)();
   viewEl().focus();
