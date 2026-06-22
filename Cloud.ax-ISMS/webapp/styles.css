@@ -318,6 +318,17 @@ mark { background: #fde68a; color: inherit; padding: 0 2px; border-radius: 3px; 
 .ring.sm .inner { inset: 8px; }
 .ring.sm .v { font-size: 17px; }
 
+a.kpi { text-decoration: none; color: inherit; }
+.attn { display: flex; flex-direction: column; gap: 2px; }
+.attn-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13.5px; padding: 8px 0; border-bottom: 1px solid var(--line-2); }
+.attn-row:last-child { border-bottom: none; }
+.email-btn { display: inline-block; font-weight: 600; padding: 9px 15px; border-radius: var(--r-sm); border: 1px solid var(--brand); background: var(--brand); color: #fff; text-decoration: none; transition: background 0.15s ease; }
+.email-btn:hover { background: var(--brand-700); color: #fff; }
+.feed { padding: 9px 0; border-bottom: 1px solid var(--line-2); }
+.feed:last-child { border-bottom: none; }
+.feed-name { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin-bottom: 5px; }
+.feed-item { margin: 4px 0; font-size: 13.5px; line-height: 1.5; }
+
 .report h1 { font-size: 24px; margin: 0 0 2px; }
 .report .cover h2 { margin: 0 0 8px; color: var(--brand-700); }
 .report-section { margin-bottom: 24px; }
