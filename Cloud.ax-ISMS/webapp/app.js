@@ -2,12 +2,12 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=9';
-import { CLAUSES } from './data/clauses.js?v=9';
+import { CONTROLS } from './data/controls.js?v=10';
+import { CLAUSES } from './data/clauses.js?v=10';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
-  resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, cid, addMonths, nextReference,
-} from './store.js?v=9';
+  resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, cid, addMonths, nextReference,
+} from './store.js?v=10';
 
 ensureSeed();
 
@@ -52,6 +52,8 @@ const ICONS = {
   soa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
   registers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>',
   readiness: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h1V5a1 1 0 0 1 1-1z"/><path d="m9 13 2 2 4-4"/></svg>',
+  audits: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/><circle cx="6.5" cy="7" r="0.5" fill="currentColor"/></svg>',
+  certbody: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5 7 22l5-3 5 3-1.5-9.5"/></svg>',
   audit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
@@ -59,7 +61,7 @@ const ICONS = {
 
 const ROUTE_TITLES = {
   dashboard: 'Dashboard', readiness: 'Certification readiness', documents: 'Documents', framework: 'Framework',
-  soa: 'Statement of Applicability', registers: 'Registers', audit: 'Audit log',
+  soa: 'Statement of Applicability', registers: 'Registers', audits: 'Internal audits', audit: 'Audit log',
   search: 'Search', settings: 'Settings', report: 'Audit pack',
 };
 
@@ -116,7 +118,7 @@ function animateCounts(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=9').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=10').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -188,10 +190,6 @@ const REG_DISPLAY = {
   nonconformity: {
     columns: [{ key: 'ncId', label: 'NC ID' }, { key: 'source', label: 'Source' }, { key: 'description', label: 'Description' }, { key: 'reference', label: 'Reference' }, { key: 'owner', label: 'Owner' }, { key: 'due', label: 'Due' }, { key: 'status', label: 'Status' }],
     row: (e) => ({ ncId: esc(e.ncId), source: esc(e.source), description: esc(e.description), reference: e.reference ? `<span class="chip">${esc(e.reference)}</span>` : '-', owner: esc(e.owner), due: reviewCell(e.dueDate), status: pill(e.status || '-', ncStatusKind(e.status)) }),
-  },
-  audit: {
-    columns: [{ key: 'auditId', label: 'Audit ID' }, { key: 'scope', label: 'Scope' }, { key: 'date', label: 'Date' }, { key: 'auditor', label: 'Auditor' }, { key: 'status', label: 'Status' }],
-    row: (e) => ({ auditId: esc(e.auditId), scope: esc(e.scope), date: esc(fmtDate(e.date)), auditor: esc(e.auditor), status: pill(e.status || '-', auditStatusKind(e.status)) }),
   },
   'management-review': {
     columns: [{ key: 'reviewId', label: 'Review ID' }, { key: 'date', label: 'Date' }, { key: 'attendees', label: 'Attendees' }, { key: 'decisions', label: 'Decisions' }],
@@ -307,7 +305,7 @@ function applyTransition(doc, action) {
 function shell(active) {
   const nav = [
     ['dashboard', 'Dashboard'], ['readiness', 'Readiness'], ['documents', 'Documents'], ['framework', 'Framework'],
-    ['soa', 'Statement of Applicability'], ['registers', 'Registers'],
+    ['soa', 'Statement of Applicability'], ['registers', 'Registers'], ['audits', 'Internal audits'],
   ];
   if (can('ISMS Manager')) nav.push(['audit', 'Audit log']);
   nav.push(['search', 'Search'], ['settings', 'Settings']);
@@ -373,7 +371,7 @@ function renderDashboard() {
   const suppliers = getCollection('register.supplier');
   const supDue = suppliers.filter((r) => overdue(r.reviewDate) || dueSoon(r.reviewDate)).length;
   const supNoDpa = suppliers.filter((r) => !/^y/i.test(r.dpa || '')).length;
-  const nextAudit = getCollection('register.audit').filter((r) => /plan|schedul/i.test(r.status)).map((r) => r.date).filter(Boolean).sort()[0];
+  const nextAudit = getCollection('audits').filter((a) => /plan|schedul/i.test(a.status)).map((a) => a.plannedDate).filter(Boolean).sort()[0];
   const lastMr = getCollection('register.management-review').map((r) => r.date).filter(Boolean).sort().filter((d) => new Date(d) <= new Date()).pop();
 
   const kpi = (cls, ic, num, label, sub) => `
@@ -827,9 +825,10 @@ function readinessData() {
   const risks = getCollection('register.risk');
   const risksUntreated = risks.filter((r) => !(r.treatment || '').trim() || !(r.owner || '').trim()).length;
   const ncOverdue = getCollection('register.nonconformity').filter((r) => r.dueDate && new Date(r.dueDate).getTime() < now && !/clos|resolv|verif|complet/i.test(r.status)).length;
-  const audits = getCollection('register.audit');
+  const audits = getCollection('audits');
   const auditDone = audits.some((a) => /complet/i.test(a.status));
   const auditPlanned = audits.some((a) => /plan|schedul/i.test(a.status));
+  const openFindings = audits.flatMap((a) => a.findings || []).filter((f) => !/clos/i.test(f.status)).length;
   const mrDates = getCollection('register.management-review').map((r) => r.date).filter(Boolean).sort();
   const lastMr = mrDates.filter((d) => new Date(d) <= new Date()).pop();
   const mrCurrent = lastMr && (now - new Date(lastMr).getTime()) < 366 * 86400000;
@@ -846,7 +845,8 @@ function readinessData() {
     C('Document reviews current', overdueDocs === 0, 'danger', overdueDocs === 0 ? 'No published document is overdue for review' : `${overdueDocs} documents overdue for review`, 'documents'),
     C('Risk treatment recorded', risks.length > 0 && risksUntreated === 0, 'warn', `${risks.length - risksUntreated} of ${risks.length} risks have an owner and a treatment`, 'registers'),
     C('Corrective actions on track', ncOverdue === 0, 'danger', ncOverdue === 0 ? 'No corrective action is overdue' : `${ncOverdue} corrective actions overdue`, 'registers'),
-    C('Internal audit programme', auditDone && auditPlanned, 'warn', `${auditDone ? 'A completed audit is recorded' : 'No completed audit recorded'}; ${auditPlanned ? 'a future audit is planned' : 'no future audit planned'}`, 'registers'),
+    C('Internal audit programme', auditDone && auditPlanned, 'warn', `${auditDone ? 'A completed audit is recorded' : 'No completed audit recorded'}; ${auditPlanned ? 'a future audit is planned' : 'no future audit planned'}`, 'audits'),
+    C('Audit findings addressed', openFindings === 0, 'warn', openFindings === 0 ? 'All audit findings are closed' : `${openFindings} audit findings open`, 'audits'),
     C('Management review current', !!mrCurrent, 'danger', lastMr ? `Last management review ${fmtDate(lastMr)}` : 'No management review recorded', 'registers'),
     C('Supplier assurance', supNoDpa === 0 && supOverdue === 0, 'warn', `${supNoDpa} without a data processing agreement, ${supOverdue} reviews overdue`, 'registers'),
     C('Context and interested parties', ctx > 0, 'warn', `${ctx} context entries recorded`, 'registers'),
@@ -894,7 +894,7 @@ function renderReport() {
   const risks = getCollection('register.risk').slice().sort((a, b) => riskScore(b) - riskScore(a));
   const linkedClause = new Set(docs.flatMap((d) => d.clauseRefs || []));
   const gaps = CLAUSES.filter((c) => c.mandatory.length > 0 && !linkedClause.has(c.number));
-  const audits = getCollection('register.audit');
+  const audits = getCollection('audits');
   const mrs = getCollection('register.management-review');
   const today = new Date().toISOString().slice(0, 10);
   viewEl().innerHTML = `
@@ -924,7 +924,7 @@ function renderReport() {
           risks.map((r) => { const sc = riskScore(r); const lv = riskLevel(sc); return { __html: true, id: esc(r.riskId), desc: esc(r.description), score: `<b>${sc}</b>`, level: pill(lv.label, lv.kind), treat: esc(r.treatment), ctrls: esc(r.relatedControls || ''), owner: esc(r.owner) }; }),
         )}</section>
       <section class="report-section break"><h3>Mandatory documented information</h3>${gaps.length ? table([{ key: 'number', label: 'Clause' }, { key: 'title', label: 'Title' }, { key: 'rec', label: 'Required record' }], gaps.map((g) => ({ number: g.number, title: g.title, rec: g.mandatory.join('; ') }))) : '<p>No gaps. Every clause that requires documented information has a linked document.</p>'}</section>
-      <section class="report-section break"><h3>Internal audit programme</h3>${table([{ key: 'auditId', label: 'Audit' }, { key: 'scope', label: 'Scope' }, { key: 'date', label: 'Date' }, { key: 'auditor', label: 'Auditor' }, { key: 'status', label: 'Status' }], audits.map((a) => ({ auditId: a.auditId, scope: a.scope, date: fmtDate(a.date), auditor: a.auditor, status: a.status })))}</section>
+      <section class="report-section break"><h3>Internal audit programme</h3>${table([{ key: 'ref', label: 'Audit' }, { key: 'scope', label: 'Scope' }, { key: 'standard', label: 'Standard' }, { key: 'date', label: 'Date' }, { key: 'auditor', label: 'Auditor' }, { key: 'status', label: 'Status' }, { key: 'findings', label: 'Findings' }], audits.map((a) => ({ ref: a.ref, scope: a.scope, standard: a.standard, date: fmtDate(a.completedDate || a.plannedDate), auditor: a.auditor, status: a.status, findings: String((a.findings || []).length) })))}</section>
       <section class="report-section"><h3>Management review log</h3>${table([{ key: 'reviewId', label: 'Review' }, { key: 'date', label: 'Date' }, { key: 'attendees', label: 'Attendees' }, { key: 'decisions', label: 'Decisions' }], mrs.map((m) => ({ reviewId: m.reviewId, date: fmtDate(m.date), attendees: m.attendees, decisions: m.decisions })))}</section>
       <section class="report-section break"><h3>Controlled document register</h3>${table([{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'sys', label: 'System' }, { key: 'ver', label: 'Version' }, { key: 'status', label: 'Status' }, { key: 'review', label: 'Review by' }], docs.map((d) => ({ __html: true, ref: esc(d.ref), title: esc(d.title), sys: esc(d.system || ''), ver: esc(d.currentVersion || ''), status: pill(d.status), review: esc(fmtDate(d.nextReviewDate) || '-') })))}</section>
     </div>`;
@@ -932,6 +932,179 @@ function renderReport() {
   if (back) back.addEventListener('click', () => go('readiness'));
   const p = document.getElementById('print-pack');
   if (p) p.addEventListener('click', () => window.print());
+}
+
+// ---- internal audits -------------------------------------------------------
+
+function findingPill(f) {
+  if (/nonconform/i.test(f.type)) return pill(`${f.severity || 'Minor'} nonconformity`, /major/i.test(f.severity) ? 'danger' : 'warn');
+  if (/opportun/i.test(f.type)) return pill('Opportunity', 'info');
+  return pill('Observation', 'neutral');
+}
+function auditStats(audits) {
+  const f = audits.flatMap((a) => a.findings || []);
+  return {
+    total: audits.length,
+    complete: audits.filter((a) => /complet/i.test(a.status)).length,
+    planned: audits.filter((a) => /plan|schedul/i.test(a.status)).length,
+    open: f.filter((x) => !/clos/i.test(x.status)).length,
+    major: f.filter((x) => /nonconform/i.test(x.type) && /major/i.test(x.severity)).length,
+    minor: f.filter((x) => /nonconform/i.test(x.type) && /minor/i.test(x.severity)).length,
+  };
+}
+
+const AUDIT_TRANSITIONS = {
+  start: { from: ['Planned'], to: 'In progress', label: 'Start audit' },
+  complete: { from: ['In progress'], to: 'Complete', label: 'Complete audit' },
+  reopen: { from: ['Complete'], to: 'In progress', label: 'Reopen' },
+};
+let auditAdding = false;
+let auditEditing = false;
+
+function renderInternalAudits() {
+  auditAdding = (typeof auditAdding === 'boolean') ? auditAdding : false;
+  auditEditing = false;
+  const audits = getCollection('audits');
+  const editable = can('ISMS Manager');
+  const s = auditStats(audits);
+  const covered = new Set(audits.flatMap((a) => [...(a.clauseRefs || []), ...(a.controlRefs || [])]));
+  const addForm = editable && auditAdding ? `
+    <details class="panel" open><summary>Plan an audit</summary>
+      <form id="audit-form"><div class="cards">
+        <div><label for="a-scope">Scope</label><input id="a-scope" required /></div>
+        <div><label for="a-standard">Standard</label><select id="a-standard"><option>ISO/IEC 27001:2022</option><option>ISO/IEC 42001:2023</option></select></div>
+        <div><label for="a-planned">Planned date</label><input id="a-planned" type="date" /></div>
+        <div><label for="a-auditor">Auditor</label><input id="a-auditor" /></div>
+      </div><div class="toolbar" style="margin-top:12px"><button type="submit">Add audit</button><button type="button" class="secondary" id="audit-cancel">Cancel</button></div></form>
+    </details>` : '';
+  const rows = audits.map((a) => {
+    const fc = a.findings || [];
+    const open = fc.filter((f) => !/clos/i.test(f.status)).length;
+    return { __html: true,
+      ref: `<a href="#/audits/${a.id}">${esc(a.ref)}</a>`, scope: esc(a.scope), standard: esc(a.standard || ''),
+      planned: esc(fmtDate(a.plannedDate) || '-'), completed: esc(fmtDate(a.completedDate) || '-'),
+      auditor: esc(a.auditor || ''), status: pill(a.status || '-', auditStatusKind(a.status)),
+      findings: fc.length ? `${fc.length} (${open} open)` : '<span class="muted">none</span>' };
+  });
+  viewEl().innerHTML = `<h2>Internal audits</h2>
+    <div class="panel"><div class="panel-head"><h3>Programme</h3><span class="muted">${covered.size} clauses and controls audited</span></div>
+      <div class="mini-cards">${mini(s.total, 'Audits')}${mini(s.complete, 'Complete', 'ok')}${mini(s.planned, 'Planned', s.planned ? 'warn' : 'ok')}${mini(s.open, 'Open findings', s.open ? 'warn' : 'ok')}${mini(s.major, 'Major nonconformities', s.major ? 'danger' : 'ok')}${mini(s.minor, 'Minor nonconformities', s.minor ? 'warn' : 'ok')}</div>
+    </div>
+    <div class="toolbar">${editable ? '<button id="audit-plan">Plan an audit</button>' : ''}<span class="spacer"></span><button class="secondary" id="audit-csv">Export programme</button></div>
+    ${addForm}
+    <div class="panel table-wrap">${table(
+      [{ key: 'ref', label: 'Reference' }, { key: 'scope', label: 'Scope' }, { key: 'standard', label: 'Standard' }, { key: 'planned', label: 'Planned' }, { key: 'completed', label: 'Completed' }, { key: 'auditor', label: 'Auditor' }, { key: 'status', label: 'Status' }, { key: 'findings', label: 'Findings' }],
+      rows,
+    )}</div>`;
+  const plan = document.getElementById('audit-plan');
+  if (plan) plan.addEventListener('click', () => { auditAdding = true; renderInternalAudits(); });
+  const cancel = document.getElementById('audit-cancel');
+  if (cancel) cancel.addEventListener('click', () => { auditAdding = false; renderInternalAudits(); });
+  document.getElementById('audit-csv').addEventListener('click', () => {
+    const cols = [{ key: 'ref', label: 'Reference' }, { key: 'scope', label: 'Scope' }, { key: 'standard', label: 'Standard' }, { key: 'planned', label: 'Planned' }, { key: 'completed', label: 'Completed' }, { key: 'auditor', label: 'Auditor' }, { key: 'status', label: 'Status' }, { key: 'findings', label: 'Findings' }];
+    download('internal-audits.csv', toCsv(cols, audits.map((a) => ({ ref: a.ref, scope: a.scope, standard: a.standard, planned: fmtDate(a.plannedDate), completed: fmtDate(a.completedDate), auditor: a.auditor, status: a.status, findings: (a.findings || []).length }))), 'text/csv');
+    audit('Exported', 'InternalAudit', 'Programme to CSV');
+  });
+  const form = document.getElementById('audit-form');
+  if (form) form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const list = getCollection('audits');
+    const yr = new Date().getFullYear();
+    const n = list.filter((a) => (a.ref || '').includes('IA-' + yr)).length + 1;
+    const a = { id: cid(), ref: `IA-${yr}-${String(n).padStart(2, '0')}`, scope: document.getElementById('a-scope').value.trim(), standard: document.getElementById('a-standard').value, plannedDate: document.getElementById('a-planned').value, completedDate: '', auditor: document.getElementById('a-auditor').value.trim(), status: 'Planned', summary: '', clauseRefs: [], controlRefs: [], findings: [] };
+    list.unshift(a);
+    setCollection('audits', list);
+    audit('Created', 'InternalAudit', `${a.ref} planned`);
+    auditAdding = false;
+    go('audits/' + a.id);
+    toast('Audit planned.');
+  });
+}
+
+function renderAuditDetail(id) {
+  const audits = getCollection('audits');
+  const a = audits.find((x) => x.id === id);
+  if (!a) { viewEl().innerHTML = '<p class="error">Audit not found.</p>'; return; }
+  const editable = can('ISMS Manager');
+  const coverage = [...(a.clauseRefs || []), ...(a.controlRefs || [])];
+  const actions = editable ? Object.entries(AUDIT_TRANSITIONS).filter(([, t]) => t.from.includes(a.status)).map(([k, t]) => `<button class="secondary" data-aud="${k}">${t.label}</button>`).join(' ') : '';
+  const cols = [{ key: 'type', label: 'Type' }, { key: 'description', label: 'Description' }, { key: 'reference', label: 'Reference' }, { key: 'owner', label: 'Owner' }, { key: 'due', label: 'Due' }, { key: 'status', label: 'Status' }];
+  if (editable) cols.push({ key: 'act', label: '' });
+  const findingsRows = (a.findings || []).map((f) => ({ __html: true,
+    type: findingPill(f), description: esc(f.description), reference: f.reference ? `<span class="chip">${esc(f.reference)}</span>` : '-', owner: esc(f.owner || ''), due: reviewCell(f.dueDate), status: pill(/clos/i.test(f.status) ? 'Closed' : 'Open', /clos/i.test(f.status) ? 'ok' : 'warn'),
+    act: editable ? `<div class="row-actions">${/clos/i.test(f.status) ? `<button class="secondary btn-sm" data-reopen="${f.id}">Reopen</button>` : `<button class="secondary btn-sm" data-close="${f.id}">Close</button>`}<button class="secondary btn-sm" data-fdel="${f.id}">Delete</button></div>` : '' }));
+  const editForm = editable && auditEditing ? `
+    <details class="panel" open><summary>Edit audit details</summary>
+      <form id="audit-edit"><div class="cards">
+        <div><label for="e-scope">Scope</label><input id="e-scope" value="${esc(a.scope)}" /></div>
+        <div><label for="e-standard">Standard</label><select id="e-standard"><option ${a.standard === 'ISO/IEC 27001:2022' ? 'selected' : ''}>ISO/IEC 27001:2022</option><option ${a.standard === 'ISO/IEC 42001:2023' ? 'selected' : ''}>ISO/IEC 42001:2023</option></select></div>
+        <div><label for="e-planned">Planned date</label><input id="e-planned" type="date" value="${esc(a.plannedDate || '')}" /></div>
+        <div><label for="e-completed">Completed date</label><input id="e-completed" type="date" value="${esc(a.completedDate || '')}" /></div>
+        <div><label for="e-auditor">Auditor</label><input id="e-auditor" value="${esc(a.auditor || '')}" /></div>
+      </div>
+      <label for="e-clauses">Clauses covered (comma separated)</label><input id="e-clauses" value="${esc((a.clauseRefs || []).join(', '))}" />
+      <label for="e-controls">Controls covered (comma separated)</label><input id="e-controls" value="${esc((a.controlRefs || []).join(', '))}" />
+      <label for="e-summary">Summary</label><input id="e-summary" value="${esc(a.summary || '')}" />
+      <div class="toolbar" style="margin-top:12px"><button type="submit">Save</button><button type="button" class="secondary" id="edit-cancel">Cancel</button></div></form>
+    </details>` : '';
+  viewEl().innerHTML = `
+    <h2>${esc(a.ref)} ${esc(a.scope)}</h2>
+    <div class="panel">
+      <p>${pill(a.status, auditStatusKind(a.status))} <span class="muted">${esc(a.standard || '')} | Auditor: ${esc(a.auditor) || 'not set'}</span></p>
+      <p class="muted">Planned: ${fmtDate(a.plannedDate) || '-'} ${a.completedDate ? '| Completed: ' + fmtDate(a.completedDate) : ''}</p>
+      ${a.summary ? `<p>${esc(a.summary)}</p>` : ''}
+      ${coverage.length ? `<p class="muted">Coverage: ${coverage.map((r) => `<span class="chip">${esc(r)}</span>`).join('')}</p>` : ''}
+      <div class="toolbar">${actions}${editable ? '<button class="secondary" data-aud="edit">Edit details</button>' : ''}<span class="spacer"></span><a href="#/audits">Back to programme</a></div>
+    </div>
+    ${editForm}
+    <div class="panel"><div class="panel-head"><h3>Findings</h3><span class="muted">${(a.findings || []).length} recorded</span></div>
+      ${table(cols, findingsRows)}
+      ${editable ? `<details class="panel" style="margin-top:12px"><summary>Add finding</summary>
+        <form id="finding-form"><div class="cards">
+          <div><label for="f-type">Type</label><select id="f-type"><option>Nonconformity</option><option>Observation</option><option>Opportunity for improvement</option></select></div>
+          <div><label for="f-sev">Severity</label><select id="f-sev"><option value="">Not applicable</option><option>Minor</option><option>Major</option></select></div>
+          <div><label for="f-ref">Reference</label><input id="f-ref" placeholder="A.8.13 or 9.2" /></div>
+          <div><label for="f-owner">Owner</label><input id="f-owner" /></div>
+          <div><label for="f-due">Due date</label><input id="f-due" type="date" /></div>
+        </div><label for="f-desc">Description</label><input id="f-desc" required />
+        <div class="toolbar" style="margin-top:12px"><button type="submit">Add finding</button></div></form></details>` : ''}
+    </div>`;
+  const save = () => setCollection('audits', audits);
+  viewEl().querySelectorAll('[data-aud]').forEach((b) => b.addEventListener('click', () => {
+    const k = b.dataset.aud;
+    if (k === 'edit') { auditEditing = true; renderAuditDetail(id); return; }
+    const t = AUDIT_TRANSITIONS[k];
+    if (!t || !t.from.includes(a.status)) return;
+    a.status = t.to;
+    if (k === 'complete' && !a.completedDate) a.completedDate = new Date().toISOString().slice(0, 10);
+    save(); audit('StatusChanged', 'InternalAudit', `${a.ref} ${a.status}`); renderAuditDetail(id); toast(`${a.ref} is now ${a.status}.`);
+  }));
+  const ec = document.getElementById('edit-cancel');
+  if (ec) ec.addEventListener('click', () => { auditEditing = false; renderAuditDetail(id); });
+  const ef = document.getElementById('audit-edit');
+  if (ef) ef.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const parse = (v) => v.split(',').map((x) => x.trim()).filter(Boolean);
+    a.scope = document.getElementById('e-scope').value.trim();
+    a.standard = document.getElementById('e-standard').value;
+    a.plannedDate = document.getElementById('e-planned').value;
+    a.completedDate = document.getElementById('e-completed').value;
+    a.auditor = document.getElementById('e-auditor').value.trim();
+    a.clauseRefs = parse(document.getElementById('e-clauses').value);
+    a.controlRefs = parse(document.getElementById('e-controls').value);
+    a.summary = document.getElementById('e-summary').value.trim();
+    save(); audit('Updated', 'InternalAudit', `${a.ref} details`); auditEditing = false; renderAuditDetail(id); toast('Audit updated.');
+  });
+  const ff = document.getElementById('finding-form');
+  if (ff) ff.addEventListener('submit', (e) => {
+    e.preventDefault();
+    a.findings = a.findings || [];
+    a.findings.push({ id: cid(), type: document.getElementById('f-type').value, severity: document.getElementById('f-sev').value, description: document.getElementById('f-desc').value.trim(), reference: document.getElementById('f-ref').value.trim(), owner: document.getElementById('f-owner').value.trim(), dueDate: document.getElementById('f-due').value, status: 'Open' });
+    save(); audit('Created', 'AuditFinding', `${a.ref} finding`); renderAuditDetail(id); toast('Finding added.');
+  });
+  viewEl().querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => { const f = a.findings.find((x) => x.id === b.dataset.close); if (f) { f.status = 'Closed'; save(); renderAuditDetail(id); toast('Finding closed.'); } }));
+  viewEl().querySelectorAll('[data-reopen]').forEach((b) => b.addEventListener('click', () => { const f = a.findings.find((x) => x.id === b.dataset.reopen); if (f) { f.status = 'Open'; save(); renderAuditDetail(id); } }));
+  viewEl().querySelectorAll('[data-fdel]').forEach((b) => b.addEventListener('click', () => { if (!confirm('Delete this finding?')) return; a.findings = a.findings.filter((x) => x.id !== b.dataset.fdel); save(); renderAuditDetail(id); }));
 }
 
 function renderAudit() {
@@ -1058,7 +1231,8 @@ function navigate() {
   shell(route);
   const views = {
     dashboard: renderDashboard, readiness: renderReadiness, documents: () => (param ? renderDocumentDetail(param) : renderDocuments()),
-    framework: renderFramework, soa: renderSoa, registers: renderRegisters, audit: renderAudit,
+    framework: renderFramework, soa: renderSoa, registers: renderRegisters,
+    audits: () => (param ? renderAuditDetail(param) : renderInternalAudits()), audit: renderAudit,
     search: renderSearch, settings: renderSettings, report: renderReport,
   };
   (views[route] || renderDashboard)();

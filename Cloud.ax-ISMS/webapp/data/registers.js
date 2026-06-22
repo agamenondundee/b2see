@@ -42,13 +42,6 @@ export const REGISTER_SEED = {
     { ncId: 'NC-004', source: 'Internal audit', description: 'Starter and leaver records were incomplete for three contractors', reference: 'A.6.5', owner: 'IT Manager', dueDate: '2026-09-15', status: 'Open' },
     { ncId: 'NC-005', source: 'AIMS audit', description: 'An AI system impact assessment was not recorded for a new feature', reference: 'ISO 42001 clause 8.4', owner: 'AI Governance Lead', dueDate: '2026-08-31', status: 'In progress' },
   ],
-  audit: [
-    { auditId: 'AUD-2026-01', scope: 'ISMS clauses 4 to 7', date: '2026-03-12', auditor: 'Internal audit team', status: 'Complete' },
-    { auditId: 'AUD-2026-02', scope: 'Annex A organisational and people controls', date: '2026-04-23', auditor: 'External auditor', status: 'Complete' },
-    { auditId: 'AUD-2026-03', scope: 'Annex A technological and physical controls', date: '2026-06-04', auditor: 'Internal audit team', status: 'Complete' },
-    { auditId: 'AUD-2026-04', scope: 'AIMS clauses and Annex A of ISO 42001', date: '2026-07-16', auditor: 'Internal audit team', status: 'Planned' },
-    { auditId: 'AUD-2026-05', scope: 'Supplier management and data residency', date: '2026-09-10', auditor: 'Internal audit team', status: 'Planned' },
-  ],
   'management-review': [
     { reviewId: 'MR-2026-Q1', date: '2026-02-20', attendees: 'Chief Executive, Information Security Lead, Head of Engineering, Data Protection Officer', decisions: 'Approved the revised risk treatment plan and the 2026 internal audit programme.' },
     { reviewId: 'MR-2026-Q2', date: '2026-05-22', attendees: 'Chief Executive, Information Security Lead, Head of Platform, AI Governance Lead', decisions: 'Agreed additional investment in regional failover and approved the AIMS scope.' },
