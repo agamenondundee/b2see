@@ -356,7 +356,21 @@ a.kpi { text-decoration: none; color: inherit; }
   .bar .seg { transform-origin: left; animation: growX 0.7s var(--ease) both; }
   .track > span { transform-origin: left; animation: growX 0.85s var(--ease) both; }
   .matrix .heat { animation: pop 0.32s var(--ease) both; }
+  .cb-cards .cb-card { animation: fadeUp 0.4s var(--ease) both; }
+  .cb-cards .cb-card:nth-child(2) { animation-delay: 0.07s; }
+  .cb-cards .cb-card:nth-child(3) { animation-delay: 0.14s; }
+  .cb-cards .cb-card:nth-child(4) { animation-delay: 0.21s; }
+  .checks .check { animation: fadeUp 0.35s var(--ease) both; }
+  .checks .check:nth-child(even) { animation-delay: 0.06s; }
+  .sidebar h1 { animation: fadeUp 0.5s var(--ease) both; }
+  .sidebar .logo { animation: float 6s ease-in-out 0.5s infinite; }
+  .pill.pulse { animation: pulse 1.8s ease-in-out infinite; }
 }
+
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); } 50% { box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.18); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid var(--line); border-top-color: var(--brand); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: -2px; margin-right: 7px; }
 
 .sidebar nav a { transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease; }
 .sidebar nav a:hover { transform: translateX(3px); }

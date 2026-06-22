@@ -2,13 +2,13 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=14';
-import { CLAUSES } from './data/clauses.js?v=14';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=14';
+import { CONTROLS } from './data/controls.js?v=15';
+import { CLAUSES } from './data/clauses.js?v=15';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=15';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
-} from './store.js?v=14';
+} from './store.js?v=15';
 
 ensureSeed();
 
@@ -117,9 +117,28 @@ function animateCounts(root) {
   });
 }
 
+// Fill each score ring from zero to its value, counting the number up with it.
+function animateRings(root) {
+  root.querySelectorAll('.ring').forEach((r) => {
+    const vEl = r.querySelector('.v');
+    const m = vEl && /^(\d+)(%?)$/.exec(vEl.textContent.trim());
+    const target = m ? Number(m[1]) : 0; const suffix = m ? m[2] : '';
+    if (reducedMotion() || !m) { r.style.setProperty('--p', target); return; }
+    const dur = 900; const start = performance.now();
+    const step = (now) => {
+      const p = Math.min(1, (now - start) / dur); const val = target * (1 - Math.pow(1 - p, 3));
+      r.style.setProperty('--p', val.toFixed(1));
+      vEl.textContent = Math.round(val) + suffix;
+      if (p < 1) requestAnimationFrame(step);
+    };
+    r.style.setProperty('--p', '0');
+    requestAnimationFrame(step);
+  });
+}
+
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=14').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=15').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -436,7 +455,7 @@ function renderDashboard() {
       </div>
       <div class="panel">
         <div class="panel-head"><h3>Regulatory and standards updates</h3><a href="#/settings">Sources</a></div>
-        ${feeds.map((f) => `<div class="feed"><div class="feed-name">${esc(f.label || f.name)}</div><div class="feed-body" data-feed="${esc(f.name)}"><p class="muted">Loading the latest...</p></div></div>`).join('')}
+        ${feeds.map((f) => `<div class="feed"><div class="feed-name">${esc(f.label || f.name)}</div><div class="feed-body" data-feed="${esc(f.name)}"><p class="muted"><span class="spinner"></span>Loading the latest...</p></div></div>`).join('')}
       </div>
     </div>
 
@@ -926,12 +945,13 @@ function renderReadiness() {
     <div class="panel"><div class="panel-head"><h3>Readiness checks</h3><span class="muted">${met} met, ${checks.length - met} to address</span></div>
       <div class="checks">${checks.map((c) => `
         <a class="check" href="#/${c.view}">
-          <span class="pill ${c.sev}">${c.ok ? 'Met' : c.sev === 'danger' ? 'Gap' : 'Action'}</span>
+          <span class="pill ${c.sev}${!c.ok && c.sev === 'danger' ? ' pulse' : ''}">${c.ok ? 'Met' : c.sev === 'danger' ? 'Gap' : 'Action'}</span>
           <span class="check-body"><span class="check-label">${esc(c.label)}</span><span class="check-detail">${esc(c.detail)}</span></span>
         </a>`).join('')}</div>
     </div>`;
   const btn = document.getElementById('audit-pack');
   if (btn) btn.addEventListener('click', () => go('report'));
+  animateRings(viewEl());
 }
 
 function renderReport() {
@@ -1215,6 +1235,7 @@ function renderCertBodies() {
     const b = { id: cid(), name: document.getElementById('cb-name').value.trim(), accreditation: document.getElementById('cb-acc').value.trim(), scopes: document.getElementById('cb-scopes').value.split(',').map((x) => x.trim()).filter(Boolean), notes: '', scores: {} };
     list.push(b); setCollection('certBodies', list); audit('Created', 'CertBody', b.name); cbAdding = false; go('certbody/' + b.id); toast('Certification body added.');
   });
+  animateRings(viewEl());
 }
 
 function renderCertBodyDetail(id) {
@@ -1259,6 +1280,7 @@ function renderCertBodyDetail(id) {
     b.notes = document.getElementById('cb-notes').value.trim();
     setCollection('certBodies', bodies); audit('Updated', 'CertBody', `${b.name} scorecard`); renderCertBodyDetail(id); toast('Scorecard saved.');
   });
+  animateRings(viewEl());
 }
 
 function renderAudit() {
