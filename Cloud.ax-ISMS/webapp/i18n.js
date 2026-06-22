@@ -1,0 +1,67 @@
+// Interface localisation. These strings cover the application frame: the navigation,
+// the breadcrumbs and page titles, and the chrome around the views. The managed content
+// of the management system (control titles, documents, register entries and so on) is
+// kept in the language it was entered in and is not translated here. English is the
+// source and the fallback for any key a translation is missing.
+
+export const LANGUAGES = [
+  { code: 'en', name: 'English' },
+  { code: 'fr', name: 'Français' },
+  { code: 'de', name: 'Deutsch' },
+  { code: 'es', name: 'Español' },
+];
+
+export const STRINGS = {
+  en: {
+    'nav.dashboard': 'Dashboard', 'nav.readiness': 'Readiness', 'nav.calendar': 'Calendar', 'nav.documents': 'Documents',
+    'nav.framework': 'Framework', 'nav.soa': 'Statement of Applicability', 'nav.aims': 'AI management (42001)', 'nav.architecture': 'Architecture',
+    'nav.registers': 'Registers', 'nav.audits': 'Internal audits', 'nav.certbody': 'Certification body', 'nav.audit': 'Audit log',
+    'nav.search': 'Search', 'nav.settings': 'Settings',
+    'title.dashboard': 'Dashboard', 'title.readiness': 'Certification readiness', 'title.calendar': 'Compliance calendar', 'title.documents': 'Documents',
+    'title.framework': 'Framework', 'title.soa': 'Statement of Applicability', 'title.aims': 'AI management (42001)', 'title.architecture': 'Architecture and data flows',
+    'title.registers': 'Registers', 'title.audits': 'Internal audits', 'title.certbody': 'Certification body', 'title.audit': 'Audit log',
+    'title.search': 'Search', 'title.settings': 'Settings', 'title.report': 'Audit pack', 'title.control': 'Control',
+    'chrome.org': 'Information Security Management System', 'chrome.search': 'Search or jump to', 'chrome.actingAs': 'Acting as',
+    'chrome.language': 'Language', 'chrome.footer': 'ISO/IEC 27001:2022 and ISO/IEC 42001:2023. Data is held in this browser only; role checks here are a convenience, not server enforced.',
+    'settings.language': 'Interface language', 'settings.languageNote': 'Sets the language of the navigation and the application frame. The managed content of the management system stays in the language it was entered in.',
+  },
+  fr: {
+    'nav.dashboard': 'Tableau de bord', 'nav.readiness': 'Préparation', 'nav.calendar': 'Calendrier', 'nav.documents': 'Documents',
+    'nav.framework': 'Référentiel', 'nav.soa': "Déclaration d'applicabilité", 'nav.aims': "Gestion de l'IA (42001)", 'nav.architecture': 'Architecture',
+    'nav.registers': 'Registres', 'nav.audits': 'Audits internes', 'nav.certbody': 'Organisme de certification', 'nav.audit': "Journal d'audit",
+    'nav.search': 'Recherche', 'nav.settings': 'Paramètres',
+    'title.dashboard': 'Tableau de bord', 'title.readiness': 'Préparation à la certification', 'title.calendar': 'Calendrier de conformité', 'title.documents': 'Documents',
+    'title.framework': 'Référentiel', 'title.soa': "Déclaration d'applicabilité", 'title.aims': "Gestion de l'IA (42001)", 'title.architecture': 'Architecture et flux de données',
+    'title.registers': 'Registres', 'title.audits': 'Audits internes', 'title.certbody': 'Organisme de certification', 'title.audit': "Journal d'audit",
+    'title.search': 'Recherche', 'title.settings': 'Paramètres', 'title.report': "Dossier d'audit", 'title.control': 'Mesure',
+    'chrome.org': "Système de management de la sécurité de l'information", 'chrome.search': 'Rechercher ou accéder à', 'chrome.actingAs': 'Agir en tant que',
+    'chrome.language': 'Langue', 'chrome.footer': "ISO/IEC 27001:2022 et ISO/IEC 42001:2023. Les données sont conservées uniquement dans ce navigateur ; les contrôles de rôle ici sont une commodité, non appliqués par un serveur.",
+    'settings.language': "Langue de l'interface", 'settings.languageNote': "Définit la langue de la navigation et du cadre de l'application. Le contenu géré du système de management reste dans la langue dans laquelle il a été saisi.",
+  },
+  de: {
+    'nav.dashboard': 'Übersicht', 'nav.readiness': 'Bereitschaft', 'nav.calendar': 'Kalender', 'nav.documents': 'Dokumente',
+    'nav.framework': 'Rahmenwerk', 'nav.soa': 'Erklärung zur Anwendbarkeit', 'nav.aims': 'KI-Management (42001)', 'nav.architecture': 'Architektur',
+    'nav.registers': 'Register', 'nav.audits': 'Interne Audits', 'nav.certbody': 'Zertifizierungsstelle', 'nav.audit': 'Audit-Protokoll',
+    'nav.search': 'Suche', 'nav.settings': 'Einstellungen',
+    'title.dashboard': 'Übersicht', 'title.readiness': 'Zertifizierungsbereitschaft', 'title.calendar': 'Compliance-Kalender', 'title.documents': 'Dokumente',
+    'title.framework': 'Rahmenwerk', 'title.soa': 'Erklärung zur Anwendbarkeit', 'title.aims': 'KI-Management (42001)', 'title.architecture': 'Architektur und Datenflüsse',
+    'title.registers': 'Register', 'title.audits': 'Interne Audits', 'title.certbody': 'Zertifizierungsstelle', 'title.audit': 'Audit-Protokoll',
+    'title.search': 'Suche', 'title.settings': 'Einstellungen', 'title.report': 'Audit-Paket', 'title.control': 'Maßnahme',
+    'chrome.org': 'Informationssicherheits-Managementsystem', 'chrome.search': 'Suchen oder springen zu', 'chrome.actingAs': 'Angemeldet als',
+    'chrome.language': 'Sprache', 'chrome.footer': 'ISO/IEC 27001:2022 und ISO/IEC 42001:2023. Die Daten werden nur in diesem Browser gespeichert; die Rollenprüfungen hier dienen der Bequemlichkeit und werden nicht serverseitig durchgesetzt.',
+    'settings.language': 'Sprache der Oberfläche', 'settings.languageNote': 'Legt die Sprache der Navigation und des Anwendungsrahmens fest. Die verwalteten Inhalte des Managementsystems bleiben in der Sprache, in der sie eingegeben wurden.',
+  },
+  es: {
+    'nav.dashboard': 'Panel', 'nav.readiness': 'Preparación', 'nav.calendar': 'Calendario', 'nav.documents': 'Documentos',
+    'nav.framework': 'Marco', 'nav.soa': 'Declaración de aplicabilidad', 'nav.aims': 'Gestión de IA (42001)', 'nav.architecture': 'Arquitectura',
+    'nav.registers': 'Registros', 'nav.audits': 'Auditorías internas', 'nav.certbody': 'Organismo de certificación', 'nav.audit': 'Registro de auditoría',
+    'nav.search': 'Búsqueda', 'nav.settings': 'Configuración',
+    'title.dashboard': 'Panel', 'title.readiness': 'Preparación para la certificación', 'title.calendar': 'Calendario de cumplimiento', 'title.documents': 'Documentos',
+    'title.framework': 'Marco', 'title.soa': 'Declaración de aplicabilidad', 'title.aims': 'Gestión de IA (42001)', 'title.architecture': 'Arquitectura y flujos de datos',
+    'title.registers': 'Registros', 'title.audits': 'Auditorías internas', 'title.certbody': 'Organismo de certificación', 'title.audit': 'Registro de auditoría',
+    'title.search': 'Búsqueda', 'title.settings': 'Configuración', 'title.report': 'Paquete de auditoría', 'title.control': 'Control',
+    'chrome.org': 'Sistema de gestión de seguridad de la información', 'chrome.search': 'Buscar o ir a', 'chrome.actingAs': 'Actuando como',
+    'chrome.language': 'Idioma', 'chrome.footer': 'ISO/IEC 27001:2022 e ISO/IEC 42001:2023. Los datos se guardan solo en este navegador; las comprobaciones de rol aquí son una comodidad, no se aplican en el servidor.',
+    'settings.language': 'Idioma de la interfaz', 'settings.languageNote': 'Establece el idioma de la navegación y del marco de la aplicación. El contenido gestionado del sistema de gestión permanece en el idioma en que se introdujo.',
+  },
+};
