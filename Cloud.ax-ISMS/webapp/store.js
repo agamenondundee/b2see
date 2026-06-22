@@ -3,12 +3,13 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=9';
-import { DOCUMENTS } from './documents-data.js?v=9';
-import { REGISTER_SEED } from './data/registers.js?v=9';
+import { CONTROLS } from './data/controls.js?v=10';
+import { DOCUMENTS } from './documents-data.js?v=10';
+import { REGISTER_SEED } from './data/registers.js?v=10';
+import { AUDIT_SEED } from './data/audits.js?v=10';
 
 const NS = 'cloudax.isms.';
-const SEED_VERSION = 5;
+const SEED_VERSION = 6;
 
 export const CONFIG = {
   prefixes: { Policy: 'POL', Procedure: 'PROC', Standard: 'STD', Guideline: 'GUI', Plan: 'PLAN', Register: 'REG', Record: 'REC', Form: 'FORM' },
@@ -38,10 +39,6 @@ export const CONFIG = {
     { key: 'nonconformity', label: 'Nonconformity and corrective action', fields: [
       { name: 'ncId', label: 'NC ID' }, { name: 'source', label: 'Source' }, { name: 'description', label: 'Description' },
       { name: 'reference', label: 'Clause or control' }, { name: 'owner', label: 'Owner' }, { name: 'dueDate', label: 'Due date', type: 'date' }, { name: 'status', label: 'Status' },
-    ] },
-    { key: 'audit', label: 'Internal audit register', fields: [
-      { name: 'auditId', label: 'Audit ID' }, { name: 'scope', label: 'Scope' }, { name: 'date', label: 'Date', type: 'date' },
-      { name: 'auditor', label: 'Auditor' }, { name: 'status', label: 'Status' },
     ] },
     { key: 'management-review', label: 'Management review log', fields: [
       { name: 'reviewId', label: 'Review ID' }, { name: 'date', label: 'Date', type: 'date' }, { name: 'attendees', label: 'Attendees' }, { name: 'decisions', label: 'Decisions' },
@@ -139,6 +136,13 @@ export function loadDocumentSet() {
   return docs.length;
 }
 
+// Fill the internal audit programme with its starter content, with ids assigned.
+export function loadAuditSet() {
+  const a = AUDIT_SEED.map((x) => ({ id: cid(), ...x, findings: (x.findings || []).map((f) => ({ id: cid(), ...f })) }));
+  write('audits', a);
+  return a.length;
+}
+
 // Fill every register with its starter content. Replaces what is held in the browser.
 export function loadRegisterSet() {
   let n = 0;
@@ -206,6 +210,10 @@ export function ensureSeed() {
       }
     }
   }
+  // Seed the internal audit programme once.
+  if ((s.seedVersion || 0) < 6 && read('audits', null) === null) {
+    write('audits', AUDIT_SEED.map((a) => ({ id: cid(), ...a, findings: (a.findings || []).map((f) => ({ id: cid(), ...f })) })));
+  }
   // Backfill the controls that treat each risk onto existing risk entries, matched by
   // risk identifier, without disturbing any other recorded values.
   if ((s.seedVersion || 0) < 5) {
@@ -219,7 +227,7 @@ export function ensureSeed() {
 }
 
 export function resetAll() {
-  for (const k of ['documents', 'soa', 'audit', 'settings']) localStorage.removeItem(NS + k);
+  for (const k of ['documents', 'soa', 'audit', 'audits', 'settings']) localStorage.removeItem(NS + k);
   for (const r of CONFIG.registers) localStorage.removeItem(NS + 'register.' + r.key);
   ensureSeed();
 }

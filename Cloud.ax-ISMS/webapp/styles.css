@@ -72,10 +72,10 @@ h3 { font-size: 15px; letter-spacing: -0.005em; margin: 0 0 12px; }
   height: 100vh;
 }
 .sidebar h1 { margin: 0 0 4px; line-height: 0; }
-.sidebar .logo { display: block; width: 156px; max-width: 64vw; height: auto; }
+.sidebar .logo { display: block; width: 117px; max-width: 48vw; height: auto; }
 .sidebar .org {
   font-size: 11px; letter-spacing: 0.02em; text-transform: uppercase;
-  color: #aab2ee; margin: 0 4px 20px; line-height: 1.4;
+  color: #aab2ee; margin: 12px 4px 20px; line-height: 1.4;
 }
 .sidebar nav { display: flex; flex-direction: column; gap: 2px; }
 .sidebar nav a {
