@@ -365,6 +365,14 @@ mark { background: #fde68a; color: inherit; padding: 0 2px; border-radius: 3px; 
 .ring .v { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
 .ring .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .readiness-sum { flex: 1; min-width: 260px; }
+.spark { width: 100%; height: auto; display: block; margin-top: 6px; }
+.spark-line { fill: none; stroke: var(--brand); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.spark-dot { fill: var(--brand); }
+.spark-dot.last { stroke: var(--panel); stroke-width: 2.5; }
+.spark-grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; }
+.spark-y { fill: var(--muted); font-size: 10px; }
+.spark-x { fill: var(--muted); font-size: 11px; }
+.spark-val { fill: var(--brand-700); font-size: 14px; font-weight: 700; }
 .checks { display: flex; flex-direction: column; gap: 8px; }
 .check { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-sm); text-decoration: none; color: inherit; background: var(--panel); transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease; }
 .check:hover { border-color: var(--brand); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
