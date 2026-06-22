@@ -2,12 +2,12 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js';
-import { CLAUSES } from './data/clauses.js';
+import { CONTROLS } from './data/controls.js?v=3';
+import { CLAUSES } from './data/clauses.js?v=3';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
-  resetAll, exportAll, importAll, loadDocumentSet, cid, addMonths, nextReference,
-} from './store.js';
+  resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, cid, addMonths, nextReference,
+} from './store.js?v=3';
 
 ensureSeed();
 
@@ -41,6 +41,50 @@ function toCsv(columns, rows) {
   const head = columns.map((c) => cell(c.label)).join(',');
   const body = rows.map((r) => columns.map((c) => cell(r[c.key])).join(',')).join('\n');
   return head + '\n' + body;
+}
+
+// ---- presentation helpers --------------------------------------------------
+
+const ICONS = {
+  dashboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>',
+  documents: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8"/></svg>',
+  framework: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 8.6 8 11 4.6-2.4 8-6 8-11V5z"/><path d="m9 12 2 2 4-4"/></svg>',
+  soa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+  registers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>',
+  audit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
+  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+};
+
+const ROUTE_TITLES = {
+  dashboard: 'Dashboard', documents: 'Documents', framework: 'Framework',
+  soa: 'Statement of Applicability', registers: 'Registers', audit: 'Audit log',
+  search: 'Search', settings: 'Settings',
+};
+
+function pct(n, d) { return d ? Math.round((n / d) * 100) : 0; }
+
+function statusKind(status) {
+  return ({
+    Published: 'ok', Verified: 'ok', Implemented: 'info', Approved: 'info',
+    'In Review': 'warn', 'Under Revision': 'warn', 'In progress': 'warn',
+    Draft: 'neutral', 'Not started': 'neutral', Superseded: 'neutral',
+    Retired: 'danger',
+  })[status] || 'neutral';
+}
+function pill(text, kind) { return `<span class="pill ${kind || statusKind(text)}">${esc(text)}</span>`; }
+function applicablePill(value) {
+  return value === true ? pill('Yes', 'ok') : value === false ? pill('No', 'neutral') : pill('Undecided', 'warn');
+}
+
+function stackedBar(segments) {
+  const total = segments.reduce((a, s) => a + s.value, 0) || 1;
+  const bar = segments.map((s) => (s.value ? `<span class="seg ${s.kind}" style="width:${(s.value / total) * 100}%" title="${esc(s.label)}: ${s.value}"></span>` : '')).join('');
+  const legend = segments.map((s) => `<span class="leg"><i class="dot ${s.kind}"></i>${esc(s.label)} <b>${s.value}</b></span>`).join('');
+  return `<div class="bar">${bar}</div><div class="legend">${legend}</div>`;
+}
+function metricBar(name, value, total) {
+  return `<div class="metric-row"><span class="name">${esc(name)}</span><span class="track"><span style="width:${pct(value, total)}%"></span></span><span class="val">${value}</span></div>`;
 }
 
 // ---- documents and lifecycle ----------------------------------------------
@@ -91,20 +135,25 @@ function shell(active) {
   ];
   if (can('ISMS Manager')) nav.push(['audit', 'Audit log']);
   nav.push(['search', 'Search'], ['settings', 'Settings']);
-  const links = nav.map(([key, label]) => `<a href="#/${key}" class="${active === key ? 'active' : ''}">${label}</a>`).join('');
+  const links = nav.map(([key, label]) => `<a href="#/${key}" class="${active === key ? 'active' : ''}"><span class="nav-ic">${ICONS[key] || ''}</span>${label}</a>`).join('');
   const roleOptions = CONFIG.roles.map((r) => `<option ${r === role() ? 'selected' : ''}>${r}</option>`).join('');
   app.innerHTML = `
     <aside class="sidebar">
       <h1><img class="logo" src="assets/cloudax-logo-white.png" alt="Cloudax" /></h1>
       <div class="org">Information Security Management System</div>
       <nav aria-label="Primary">${links}</nav>
-      <div class="who">
-        <label for="role">Acting as</label>
-        <select id="role" aria-label="Acting as role">${roleOptions}</select>
-        <p class="hint">Single user demonstration. Role checks here are a convenience, not server enforced.</p>
-      </div>
+      <div class="foot">ISO/IEC 27001:2022 and ISO/IEC 42001:2023. Data is held in this browser only; role checks here are a convenience, not server enforced.</div>
     </aside>
-    <main class="main" id="view" tabindex="-1"></main>`;
+    <div class="content">
+      <header class="topbar">
+        <div class="crumb">Cloudax ISMS <span aria-hidden="true">/</span> <b>${esc(ROUTE_TITLES[active] || 'Dashboard')}</b></div>
+        <div class="topbar-actions">
+          <label for="role">Acting as</label>
+          <select id="role" aria-label="Acting as role">${roleOptions}</select>
+        </div>
+      </header>
+      <main class="main" id="view" tabindex="-1"></main>
+    </div>`;
   document.getElementById('role').addEventListener('change', (e) => {
     setSettings({ ...getSettings(), role: e.target.value });
     audit('RoleChanged', 'Settings', `Acting as ${e.target.value}`);
@@ -119,33 +168,78 @@ function renderDashboard() {
   const soa = getCollection('soa');
   const now = Date.now();
   const dueWindow = now + CONFIG.reviewDueWithinDays * 86400000;
-  const published = docs.filter((d) => d.status === 'Published' && d.nextReviewDate);
-  const overdue = published.filter((d) => new Date(d.nextReviewDate).getTime() < now);
-  const due = published.filter((d) => { const t = new Date(d.nextReviewDate).getTime(); return t >= now && t <= dueWindow; });
+  const published = docs.filter((d) => d.status === 'Published');
+  const withReview = published.filter((d) => d.nextReviewDate);
+  const overdue = withReview.filter((d) => new Date(d.nextReviewDate).getTime() < now);
+  const due = withReview.filter((d) => { const t = new Date(d.nextReviewDate).getTime(); return t >= now && t <= dueWindow; });
+
   const applicable = soa.filter((s) => s.applicable === true).length;
   const excluded = soa.filter((s) => s.applicable === false).length;
+  const undecided = soa.length - applicable - excluded;
+  const documented = soa.filter((s) => (s.docRefs || []).length > 0).length;
+  const implCounts = CONFIG.implementationStatuses.map((st) => ({ label: st, value: soa.filter((s) => s.applicable === true && s.status === st).length, kind: statusKind(st) }));
+
+  const bySystem = {};
+  for (const d of docs) bySystem[d.system || 'Other'] = (bySystem[d.system || 'Other'] || 0) + 1;
+  const statusCounts = CONFIG.statuses.map((st) => ({ st, n: docs.filter((d) => d.status === st).length })).filter((x) => x.n);
+
   const linkedRefs = new Set(docs.flatMap((d) => d.clauseRefs || []));
-  const gaps = CLAUSES.filter((c) => c.mandatory.length > 0 && !linkedRefs.has(c.number));
-  const log = getCollection('audit').slice(0, 12);
+  const mandatory = CLAUSES.filter((c) => c.mandatory.length > 0);
+  const gaps = mandatory.filter((c) => !linkedRefs.has(c.number));
+  const log = getCollection('audit').slice(0, 10);
+  const upcoming = withReview.slice().sort((a, b) => new Date(a.nextReviewDate) - new Date(b.nextReviewDate)).slice(0, 8);
+
+  const kpi = (cls, ic, num, label, sub) => `
+    <div class="kpi ${cls}"><div class="kpi-top"><span class="label">${esc(label)}</span><span class="kpi-ic">${ic}</span></div>
+      <div class="num">${num}</div>${sub ? `<div class="sub">${esc(sub)}</div>` : ''}</div>`;
 
   viewEl().innerHTML = `
     <h2>Dashboard</h2>
     <div class="cards">
-      <div class="card warn"><div class="num">${overdue.length}</div><div class="label">Reviews overdue</div></div>
-      <div class="card"><div class="num">${due.length}</div><div class="label">Reviews due soon</div></div>
-      <div class="card"><div class="num">${applicable}</div><div class="label">Applicable controls</div></div>
-      <div class="card"><div class="num">${excluded}</div><div class="label">Excluded controls</div></div>
-      <div class="card warn"><div class="num">${gaps.length}</div><div class="label">Coverage gaps</div></div>
-      <div class="card"><div class="num">${docs.length}</div><div class="label">Documents</div></div>
+      ${kpi('', ICONS.documents, docs.length, 'Controlled documents', `${published.length} published`)}
+      ${kpi('ok', ICONS.soa, `${pct(applicable, soa.length)}%`, 'Controls applicable', `${applicable} of ${soa.length} Annex A`)}
+      ${kpi('', ICONS.framework, `${pct(documented, soa.length)}%`, 'Controls documented', `${documented} have a linked document`)}
+      ${kpi(overdue.length ? 'danger' : 'ok', ICONS.audit, overdue.length, 'Reviews overdue', `${due.length} due within ${CONFIG.reviewDueWithinDays} days`)}
+      ${kpi(gaps.length ? 'warn' : 'ok', ICONS.framework, gaps.length, 'Clause coverage gaps', `${mandatory.length - gaps.length} of ${mandatory.length} clauses covered`)}
     </div>
-    <div class="panel"><h3>Documents overdue for review</h3>${overdue.length ? table(
-      [{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'nextReviewDate', label: 'Review by' }],
-      overdue.map((d) => ({ ref: d.ref, title: d.title, nextReviewDate: fmtDate(d.nextReviewDate) })),
-    ) : '<p class="muted">None.</p>'}</div>
-    <div class="panel"><h3>Recent activity</h3>${table(
-      [{ key: 'ts', label: 'When' }, { key: 'actor', label: 'Who' }, { key: 'action', label: 'Action' }, { key: 'detail', label: 'Detail' }],
-      log.map((a) => ({ ts: a.ts.slice(0, 16).replace('T', ' '), actor: a.actor, action: `${a.action} ${a.entity}`, detail: a.detail })),
-    )}</div>`;
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><h3>Annex A control applicability</h3><span class="muted">${soa.length} controls</span></div>
+        ${stackedBar([
+          { label: 'Applicable', value: applicable, kind: 'ok' },
+          { label: 'Excluded', value: excluded, kind: 'neutral' },
+          { label: 'Undecided', value: undecided, kind: 'warn' },
+        ])}
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>Implementation of applicable controls</h3><span class="muted">${applicable} applicable</span></div>
+        ${applicable ? stackedBar(implCounts) : '<p class="muted">No controls are marked applicable yet.</p>'}
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:18px">
+      <div class="panel">
+        <div class="panel-head"><h3>Documents by system</h3><a href="#/documents">Open</a></div>
+        ${Object.entries(bySystem).map(([k, v]) => metricBar(k, v, docs.length)).join('') || '<p class="muted">No documents.</p>'}
+        <div class="legend" style="margin-top:14px">${statusCounts.map((x) => `<span class="leg">${pill(x.st, statusKind(x.st))} <b>${x.n}</b></span>`).join('')}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>Upcoming reviews</h3>${overdue.length ? `<span class="pill danger">${overdue.length} overdue</span>` : '<span class="muted">on track</span>'}</div>
+        ${upcoming.length ? table(
+          [{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'due', label: 'Review by' }],
+          upcoming.map((d) => ({ __html: true, ref: `<a href="#/documents/${d.id}">${esc(d.ref)}</a>`, title: esc(d.title), due: `${fmtDate(d.nextReviewDate)} ${new Date(d.nextReviewDate).getTime() < now ? pill('overdue', 'danger') : ''}` })),
+        ) : '<p class="muted">No published documents carry a review date.</p>'}
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:18px">
+      <div class="panel-head"><h3>Recent activity</h3><a href="#/audit">View all</a></div>
+      ${table(
+        [{ key: 'ts', label: 'When' }, { key: 'actor', label: 'Who' }, { key: 'action', label: 'Action' }, { key: 'detail', label: 'Detail' }],
+        log.map((a) => ({ ts: a.ts.slice(0, 16).replace('T', ' '), actor: a.actor, action: `${a.action} ${a.entity}`, detail: a.detail })),
+      )}
+    </div>`;
 }
 
 function table(columns, rows) {
@@ -188,7 +282,7 @@ function renderDocuments() {
       ref: `<a href="#/documents/${d.id}">${esc(d.ref)}</a>`,
       system: esc(d.system || '-'),
       title: esc(d.title), type: esc(d.type), classification: esc(d.classification),
-      status: `<span class="badge">${esc(d.status)}</span>`, version: esc(d.currentVersion || '-'),
+      status: pill(d.status), version: esc(d.currentVersion || '-'),
       review: fmtDate(d.nextReviewDate) || '-',
     }));
     document.getElementById('docs-table').innerHTML = table(columns, rows);
@@ -224,17 +318,33 @@ function renderDocumentDetail(id) {
     .filter(([, t]) => t.from.includes(doc.status) && can(...t.roles))
     .map(([key, t]) => `<button class="secondary" data-act="${key}">${t.label}</button>`).join(' ');
   const allRefs = CONTROLS.map((c) => c.ref);
+  const soaByRef = Object.fromEntries(getCollection('soa').map((s) => [s.ref, s]));
+  const ctrlByRef = Object.fromEntries(CONTROLS.map((c) => [c.ref, c]));
+  const controlsAddressed = (doc.controlRefs || []).length ? `
+    <div class="panel">
+      <div class="panel-head"><h3>Controls addressed</h3><span class="muted">${doc.controlRefs.length} Annex A controls, applicability from the Statement of Applicability</span></div>
+      ${table(
+        [{ key: 'ref', label: 'Control' }, { key: 'title', label: 'Title' }, { key: 'app', label: 'Applicable' }, { key: 'impl', label: 'Implementation' }],
+        doc.controlRefs.map((ref) => {
+          const s = soaByRef[ref];
+          return { __html: true, ref: esc(ref), title: esc(ctrlByRef[ref] ? ctrlByRef[ref].title : ''),
+            app: s ? applicablePill(s.applicable) : '<span class="muted">-</span>',
+            impl: s && s.applicable === true ? pill(s.status, statusKind(s.status)) : '<span class="muted">-</span>' };
+        }),
+      )}
+    </div>` : '';
   viewEl().innerHTML = `
     <h2>${esc(doc.ref)} ${esc(doc.title)}</h2>
     <div class="panel">
-      <p><span class="badge">${esc(doc.status)}</span> ${doc.system ? `<span class="badge">${esc(doc.system)}</span>` : ''} <span class="muted">${esc(doc.type)} | ${esc(doc.classification)} | version ${esc(doc.currentVersion || '1.0')} | reviewed every ${doc.reviewMonths} months</span></p>
+      <p>${pill(doc.status)} ${doc.system ? `<span class="badge">${esc(doc.system)}</span>` : ''} <span class="muted">${esc(doc.type)} | ${esc(doc.classification)} | version ${esc(doc.currentVersion || '1.0')} | reviewed every ${doc.reviewMonths} months</span></p>
       <p class="muted">Owner: ${esc(doc.owner) || 'not set'} | Author: ${esc(doc.author) || 'not set'} ${doc.nextReviewDate ? '| Next review: ' + fmtDate(doc.nextReviewDate) : ''}</p>
       ${doc.file ? `<p><a href="${encodeURI(doc.file)}" target="_blank" rel="noopener">Open source document</a> <span class="muted">${esc(doc.file.split('/').pop())}</span></p>` : ''}
       <div class="toolbar">${actions || '<span class="muted">No actions available for your role at this status.</span>'}</div>
     </div>
+    ${controlsAddressed}
     <div class="panel"><h3>Versions</h3>${table(
       [{ key: 'number', label: 'Version' }, { key: 'status', label: 'Status' }, { key: 'change', label: 'Change summary' }, { key: 'published', label: 'Published' }],
-      doc.versions.map((v) => ({ number: v.number, status: v.status, change: v.changeSummary || '-', published: fmtDate(v.publishedAt) || '-' })),
+      doc.versions.map((v) => ({ __html: true, number: esc(v.number), status: pill(v.status), change: esc(v.changeSummary || '-'), published: esc(fmtDate(v.publishedAt) || '-') })),
     )}</div>
     <div class="panel">
       <h3>Mapping to the framework</h3>
@@ -267,19 +377,30 @@ function renderDocumentDetail(id) {
 
 function renderFramework() {
   const docs = getCollection('documents');
+  const soaByRef = Object.fromEntries(getCollection('soa').map((s) => [s.ref, s]));
+  const docById = Object.fromEntries(docs.map((d) => [d.ref, d.id]));
   const linkedClause = new Set(docs.flatMap((d) => d.clauseRefs || []));
   const linkedControl = (ref) => docs.filter((d) => (d.controlRefs || []).includes(ref)).map((d) => d.ref);
   const gaps = CLAUSES.filter((c) => c.mandatory.length > 0 && !linkedClause.has(c.number));
-  const controlsRows = CONTROLS.map((c) => ({ ref: c.ref, title: c.title, theme: c.theme, types: c.types.join(', '), docs: linkedControl(c.ref).join(', ') || 'none' }));
+  const chip = (ref) => (docById[ref] ? `<a class="chip" href="#/documents/${docById[ref]}">${esc(ref)}</a>` : `<span class="chip">${esc(ref)}</span>`);
+  const controlsRows = CONTROLS.map((c) => {
+    const s = soaByRef[c.ref];
+    const linked = linkedControl(c.ref);
+    return { __html: true, ref: esc(c.ref), title: esc(c.title), theme: esc(c.theme),
+      app: s ? applicablePill(s.applicable) : '<span class="muted">-</span>',
+      impl: s && s.applicable === true ? pill(s.status, statusKind(s.status)) : '<span class="muted">-</span>',
+      docs: linked.length ? linked.map(chip).join('') : '<span class="muted">none</span>' };
+  });
   const covered = CONTROLS.filter((c) => linkedControl(c.ref).length > 0).length;
+  const applicable = getCollection('soa').filter((s) => s.applicable === true).length;
   viewEl().innerHTML = `
     <h2>ISO/IEC 27001:2022 framework</h2>
-    <div class="panel"><h3>Coverage gaps</h3><p class="muted">Clauses that require documented information but have no linked document.</p>${gaps.length ? table(
+    <div class="panel"><div class="panel-head"><h3>Coverage gaps</h3>${gaps.length ? `<span class="pill warn">${gaps.length} open</span>` : '<span class="pill ok">none</span>'}</div><p class="muted">Clauses that require documented information but have no linked document.</p>${gaps.length ? table(
       [{ key: 'number', label: 'Clause' }, { key: 'title', label: 'Title' }, { key: 'mandatory', label: 'Mandatory documented information' }],
       gaps.map((g) => ({ number: g.number, title: g.title, mandatory: g.mandatory.join('; ') })),
     ) : '<p>No coverage gaps.</p>'}</div>
-    <div class="panel"><h3>Annex A controls (93)</h3><p class="muted">Controls with at least one linked document: ${covered} of ${CONTROLS.length}.</p>${table(
-      [{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'theme', label: 'Theme' }, { key: 'types', label: 'Type' }, { key: 'docs', label: 'Documents' }],
+    <div class="panel"><div class="panel-head"><h3>Annex A controls (93)</h3><span class="muted">${applicable} applicable | ${covered} of ${CONTROLS.length} with a linked document</span></div>${table(
+      [{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'theme', label: 'Theme' }, { key: 'app', label: 'Applicable' }, { key: 'impl', label: 'Implementation' }, { key: 'docs', label: 'Documents' }],
       controlsRows,
     )}</div>
     <div class="panel"><h3>Management clauses</h3>${table(
@@ -305,17 +426,25 @@ function renderSoa() {
   }).join('');
   const applicable = soa.filter((s) => s.applicable === true).length;
   const excluded = soa.filter((s) => s.applicable === false).length;
+  const undecided = soa.length - applicable - excluded;
   viewEl().innerHTML = `
     <h2>Statement of Applicability</h2>
+    <div class="panel">
+      <div class="panel-head"><h3>Applicability across Annex A</h3><span class="muted">${soa.length} controls</span></div>
+      ${stackedBar([
+        { label: 'Applicable', value: applicable, kind: 'ok' },
+        { label: 'Excluded', value: excluded, kind: 'neutral' },
+        { label: 'Undecided', value: undecided, kind: 'warn' },
+      ])}
+    </div>
     <div class="toolbar">
       <button class="secondary" id="soa-csv">Export spreadsheet (CSV)</button>
       <button class="secondary" id="soa-print">Print or save as PDF</button>
-      <span class="badge">Applicable: ${applicable}</span>
-      <span class="badge">Excluded: ${excluded}</span>
-      <span class="badge">Undecided: ${soa.length - applicable - excluded}</span>
+      ${editable ? '<button class="secondary" id="soa-populate">Populate from the document set</button>' : ''}
+      <span class="spacer"></span>
       ${editable ? '<button id="soa-save">Save changes</button>' : ''}
     </div>
-    <div class="panel"><table><thead><tr><th>Control</th><th>Applicable</th><th>Justification</th><th>Status</th><th>Owner</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="panel table-wrap"><table><thead><tr><th>Control</th><th>Applicable</th><th>Justification</th><th>Status</th><th>Owner</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 
   document.getElementById('soa-csv').addEventListener('click', () => {
     const cols = [{ key: 'ref', label: 'Control' }, { key: 'title', label: 'Title' }, { key: 'theme', label: 'Theme' }, { key: 'applicable', label: 'Applicable' }, { key: 'justification', label: 'Justification' }, { key: 'status', label: 'Implementation status' }, { key: 'owner', label: 'Owner' }];
@@ -324,6 +453,13 @@ function renderSoa() {
     audit('Exported', 'SoaEntry', 'Statement of Applicability to CSV');
   });
   document.getElementById('soa-print').addEventListener('click', () => window.print());
+  const populate = document.getElementById('soa-populate');
+  if (populate) populate.addEventListener('click', () => {
+    const n = populateSoaFromDocuments();
+    audit('Updated', 'SoaEntry', `Populated ${n} controls from the document set`);
+    alert(`Updated ${n} controls from the controlled documents.`);
+    renderSoa();
+  });
   const save = document.getElementById('soa-save');
   if (save) save.addEventListener('click', () => {
     viewEl().querySelectorAll('[data-ref]').forEach((input) => {
