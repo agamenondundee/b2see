@@ -257,6 +257,25 @@ td .soon-date { color: var(--warn); font-weight: 600; }
 .matrix-wrap { display: flex; flex-wrap: wrap; gap: 22px; align-items: center; }
 .matrix-axis { font-size: 12px; color: var(--muted); }
 
+/* ---- Document reader ---------------------------------------------------- */
+
+.reader { max-height: 74vh; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 22px 26px; background: #fff; color: var(--ink); line-height: 1.6; font-size: 14px; }
+.reader-frame { width: 100%; height: 78vh; border: 1px solid var(--line); border-radius: var(--r-sm); background: #fff; }
+.reader h1 { font-size: 20px; }
+.reader h2 { font-size: 17px; }
+.reader h3 { font-size: 15px; }
+.reader h1, .reader h2, .reader h3, .reader h4 { letter-spacing: -0.01em; margin: 18px 0 8px; line-height: 1.3; }
+.reader p { margin: 0 0 10px; }
+.reader ul, .reader ol { margin: 0 0 12px 20px; }
+.reader li { margin: 3px 0; }
+.reader a { color: var(--brand-700); }
+.reader strong { font-weight: 700; }
+.reader table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+.reader th, .reader td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; vertical-align: top; }
+.reader th, .reader thead th { position: static; top: auto; background: var(--brand-50); color: var(--ink); text-transform: none; letter-spacing: 0; font-weight: 700; }
+.reader tbody tr:hover { background: transparent; }
+.reader img { max-width: 100%; height: auto; }
+
 /* ---- Responsive --------------------------------------------------------- */
 
 @media (max-width: 860px) {
@@ -281,5 +300,7 @@ td .soon-date { color: var(--warn); font-weight: 600; }
   .content { display: block; }
   .panel { border: none; box-shadow: none; padding: 0; margin-bottom: 16px; }
   thead th { position: static; }
+  .reader { max-height: none; overflow: visible; border: none; padding: 0; }
+  .reader-frame { height: 92vh; }
   .main::before { content: ""; display: block; height: 40px; margin-bottom: 14px; background: url(assets/cloudax-logo-blue.png) left center / auto 36px no-repeat; }
 }

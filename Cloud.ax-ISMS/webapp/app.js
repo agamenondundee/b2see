@@ -2,12 +2,12 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=5';
-import { CLAUSES } from './data/clauses.js?v=5';
+import { CONTROLS } from './data/controls.js?v=6';
+import { CLAUSES } from './data/clauses.js?v=6';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, cid, addMonths, nextReference,
-} from './store.js?v=5';
+} from './store.js?v=6';
 
 ensureSeed();
 
@@ -496,14 +496,22 @@ function renderDocumentDetail(id) {
         }),
       )}
     </div>` : '';
+  const isPdf = /\.pdf$/i.test(doc.file || '');
+  const readerPanel = doc.file ? `
+    <div class="panel">
+      <div class="panel-head"><h3>Document content</h3><a href="${encodeURI(doc.file)}" download>Download original</a></div>
+      ${isPdf
+        ? `<iframe class="reader-frame" src="${encodeURI(doc.file)}#view=FitH" title="${esc(doc.title)} document"></iframe>`
+        : '<div class="reader" id="doc-reader"><p class="muted">Loading the document...</p></div>'}
+    </div>` : '';
   viewEl().innerHTML = `
     <h2>${esc(doc.ref)} ${esc(doc.title)}</h2>
     <div class="panel">
       <p>${pill(doc.status)} ${doc.system ? `<span class="badge">${esc(doc.system)}</span>` : ''} <span class="muted">${esc(doc.type)} | ${esc(doc.classification)} | version ${esc(doc.currentVersion || '1.0')} | reviewed every ${doc.reviewMonths} months</span></p>
-      <p class="muted">Owner: ${esc(doc.owner) || 'not set'} | Author: ${esc(doc.author) || 'not set'} ${doc.nextReviewDate ? '| Next review: ' + fmtDate(doc.nextReviewDate) : ''}</p>
-      ${doc.file ? `<p><a href="${encodeURI(doc.file)}" target="_blank" rel="noopener">Open source document</a> <span class="muted">${esc(doc.file.split('/').pop())}</span></p>` : ''}
+      <p class="muted">Owner: ${esc(doc.owner) || 'not set'} | Author: ${esc(doc.author) || 'not set'} ${doc.nextReviewDate ? '| Next review: ' + fmtDate(doc.nextReviewDate) : ''}${doc.file ? ' | Source file: ' + esc(doc.file.split('/').pop()) : ''}</p>
       <div class="toolbar">${actions || '<span class="muted">No actions available for your role at this status.</span>'}</div>
     </div>
+    ${readerPanel}
     ${controlsAddressed}
     <div class="panel"><h3>Versions</h3>${table(
       [{ key: 'number', label: 'Version' }, { key: 'status', label: 'Status' }, { key: 'change', label: 'Change summary' }, { key: 'published', label: 'Published' }],
@@ -518,6 +526,13 @@ function renderDocumentDetail(id) {
       ${can('Document Owner', 'ISMS Manager') ? '<p><button data-act="save-links">Save mapping</button></p>' : ''}
       <p class="muted">Known controls: ${allRefs.length}. Use the references exactly as shown in the Framework view.</p>
     </div>`;
+  const readerEl = document.getElementById('doc-reader');
+  if (readerEl) {
+    fetch(`viewer/${encodeURIComponent(doc.ref)}.html`)
+      .then((r) => { if (!r.ok) throw new Error('not found'); return r.text(); })
+      .then((html) => { readerEl.innerHTML = html; })
+      .catch(() => { readerEl.innerHTML = '<p class="muted">A readable preview is not available for this document. Use Download original above to open the source file.</p>'; });
+  }
   viewEl().querySelectorAll('[data-act]').forEach((btn) => btn.addEventListener('click', () => {
     const act = btn.dataset.act;
     try {
