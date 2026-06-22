@@ -3,11 +3,12 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=3';
-import { DOCUMENTS } from './documents-data.js?v=3';
+import { CONTROLS } from './data/controls.js?v=4';
+import { DOCUMENTS } from './documents-data.js?v=4';
+import { REGISTER_SEED } from './data/registers.js?v=4';
 
 const NS = 'cloudax.isms.';
-const SEED_VERSION = 3;
+const SEED_VERSION = 4;
 
 export const CONFIG = {
   prefixes: { Policy: 'POL', Procedure: 'PROC', Standard: 'STD', Guideline: 'GUI', Plan: 'PLAN', Register: 'REG', Record: 'REC', Form: 'FORM' },
@@ -137,6 +138,17 @@ export function loadDocumentSet() {
   return docs.length;
 }
 
+// Fill every register with its starter content. Replaces what is held in the browser.
+export function loadRegisterSet() {
+  let n = 0;
+  for (const r of CONFIG.registers) {
+    const seed = REGISTER_SEED[r.key] || [];
+    write('register.' + r.key, seed.map((e) => ({ id: cid(), ...e })));
+    n += seed.length;
+  }
+  return n;
+}
+
 // Populate the Statement of Applicability from the controlled document set. For each
 // Annex A control addressed by a published document, the control is marked applicable,
 // the documents are recorded against it, the owner is taken from the lead document and
@@ -183,6 +195,16 @@ export function ensureSeed() {
   // controls they address are marked applicable and linked. Runs once when the seed
   // version is raised; it fills only blanks and does not overwrite recorded decisions.
   if ((s.seedVersion || 0) < 3) populateSoaFromDocuments();
+  // Fill the registers with their starter content, but only those still empty, so a
+  // register a user has cleared or edited is left as it is.
+  if ((s.seedVersion || 0) < 4) {
+    for (const r of CONFIG.registers) {
+      const seed = REGISTER_SEED[r.key] || [];
+      if (seed.length && read('register.' + r.key, []).length === 0) {
+        write('register.' + r.key, seed.map((e) => ({ id: cid(), ...e })));
+      }
+    }
+  }
   if (s.seedVersion !== SEED_VERSION) setSettings({ ...s, seedVersion: SEED_VERSION });
 }
 
