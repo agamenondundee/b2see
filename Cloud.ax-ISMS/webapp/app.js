@@ -2,15 +2,16 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=15';
-import { CLAUSES } from './data/clauses.js?v=15';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=15';
+import { CONTROLS } from './data/controls.js?v=16';
+import { CLAUSES } from './data/clauses.js?v=16';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=16';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
-} from './store.js?v=15';
+} from './store.js?v=16';
 
 ensureSeed();
+applyTheme();
 
 const app = document.getElementById('app');
 
@@ -58,7 +59,24 @@ const ICONS = {
   audit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
 };
+
+const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+function applyTheme(t) {
+  const theme = (t || getSettings().theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', theme === 'dark' ? '#0a1326' : '#0000ff');
+  return theme;
+}
+function currentTheme() { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
+function toggleTheme() {
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  setSettings({ ...getSettings(), theme: next });
+  applyTheme(next);
+}
 
 const ROUTE_TITLES = {
   dashboard: 'Dashboard', readiness: 'Certification readiness', documents: 'Documents', framework: 'Framework',
@@ -138,7 +156,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=15').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=16').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -362,8 +380,12 @@ function shell(active) {
     </aside>
     <div class="content">
       <header class="topbar">
-        <div class="crumb">Cloudax ISMS <span aria-hidden="true">/</span> <b>${esc(ROUTE_TITLES[active] || 'Dashboard')}</b></div>
+        <div class="topbar-left">
+          <div class="crumb">Cloudax ISMS <span aria-hidden="true">/</span> <b>${esc(ROUTE_TITLES[active] || 'Dashboard')}</b></div>
+        </div>
         <div class="topbar-actions">
+          <button class="topbar-search" id="cmdk-open" aria-label="Search or jump to anything">${ICONS.search}<span>Search or jump to</span><span class="sk"><kbd>${IS_MAC ? 'Cmd' : 'Ctrl'}</kbd><kbd>K</kbd></span></button>
+          <button class="icon-btn" id="theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">${currentTheme() === 'dark' ? ICONS.sun : ICONS.moon}</button>
           <label for="role">Acting as</label>
           <select id="role" aria-label="Acting as role">${roleOptions}</select>
         </div>
@@ -375,6 +397,8 @@ function shell(active) {
     audit('RoleChanged', 'Settings', `Acting as ${e.target.value}`);
     navigate();
   });
+  const ck = document.getElementById('cmdk-open'); if (ck) ck.addEventListener('click', openPalette);
+  const tt = document.getElementById('theme-toggle'); if (tt) tt.addEventListener('click', () => { toggleTheme(); navigate(); });
 }
 
 function viewEl() { return document.getElementById('view'); }
@@ -1419,6 +1443,77 @@ function renderSettings() {
   });
   document.getElementById('reset').addEventListener('click', () => { if (confirm('Reset all data in this browser to the seeded starting point?')) { resetAll(); navigate(); } });
 }
+
+// ---- command palette -------------------------------------------------------
+
+function paletteItems() {
+  const items = [];
+  const navs = [['dashboard', 'Dashboard'], ['readiness', 'Certification readiness'], ['documents', 'Documents'], ['framework', 'Framework'], ['soa', 'Statement of Applicability'], ['registers', 'Registers'], ['audits', 'Internal audits'], ['certbody', 'Certification body'], ['search', 'Search'], ['settings', 'Settings']];
+  for (const [k, l] of navs) items.push({ group: 'Go to', label: l, icon: ICONS[k] || '', run: () => go(k) });
+  items.push({ group: 'Actions', label: 'Generate audit pack', icon: ICONS.readiness, run: () => go('report') });
+  items.push({ group: 'Actions', label: `Switch to ${currentTheme() === 'dark' ? 'light' : 'dark'} mode`, icon: currentTheme() === 'dark' ? ICONS.sun : ICONS.moon, run: () => { toggleTheme(); navigate(); } });
+  items.push({ group: 'Actions', label: 'Print this page', icon: ICONS.documents, run: () => window.print() });
+  for (const d of getCollection('documents')) items.push({ group: 'Documents', label: `${d.ref} ${d.title}`, meta: d.system, icon: ICONS.documents, run: () => go('documents/' + d.id) });
+  for (const a of getCollection('audits')) items.push({ group: 'Internal audits', label: `${a.ref} ${a.scope}`, meta: a.status, icon: ICONS.audits, run: () => go('audits/' + a.id) });
+  for (const c of CONTROLS) items.push({ group: 'Controls', label: `${c.ref} ${c.title}`, meta: c.theme, icon: ICONS.framework, run: () => go('framework') });
+  for (const c of CLAUSES) items.push({ group: 'Clauses', label: `${c.number} ${c.title}`, icon: ICONS.soa, run: () => go('framework') });
+  return items;
+}
+
+let paletteEl = null;
+function openPalette() {
+  if (paletteEl) return;
+  const all = paletteItems();
+  paletteEl = document.createElement('div');
+  paletteEl.className = 'cmdk-overlay';
+  paletteEl.innerHTML = '<div class="cmdk" role="dialog" aria-modal="true" aria-label="Command palette"><input class="cmdk-input" placeholder="Search documents, controls, clauses, or jump to a section" aria-label="Command palette" autocomplete="off" spellcheck="false" /><div class="cmdk-list" id="cmdk-list"></div></div>';
+  document.body.appendChild(paletteEl);
+  const input = paletteEl.querySelector('.cmdk-input');
+  const list = paletteEl.querySelector('#cmdk-list');
+  let filtered = [];
+  let active = 0;
+  const markActive = () => { list.querySelectorAll('.cmdk-item').forEach((el) => el.classList.toggle('active', Number(el.dataset.i) === active)); const a = list.querySelector('.cmdk-item.active'); if (a) a.scrollIntoView({ block: 'nearest' }); };
+  const choose = (i) => { const it = filtered[i]; if (!it) return; closePalette(); it.run(); };
+  const render = () => {
+    const q = input.value.trim().toLowerCase();
+    const terms = q ? q.split(/\s+/) : [];
+    let pool = q ? all.filter((it) => { const t = (it.group + ' ' + it.label).toLowerCase(); return terms.every((w) => t.includes(w)); }) : all.filter((it) => it.group === 'Go to' || it.group === 'Actions');
+    const caps = {};
+    filtered = pool.filter((it) => { caps[it.group] = (caps[it.group] || 0) + 1; return caps[it.group] <= (q ? 8 : 20); });
+    if (active >= filtered.length) active = Math.max(0, filtered.length - 1);
+    if (!filtered.length) { list.innerHTML = '<div class="cmdk-empty">No matches.</div>'; return; }
+    let html = ''; let lastGroup = null; let i = -1;
+    for (const it of filtered) {
+      if (it.group !== lastGroup) { html += `<div class="cmdk-group">${esc(it.group)}</div>`; lastGroup = it.group; }
+      i++;
+      html += `<div class="cmdk-item ${i === active ? 'active' : ''}" data-i="${i}"><span class="ic">${it.icon || ''}</span><span class="lab">${esc(it.label)}</span>${it.meta ? `<span class="meta">${esc(it.meta)}</span>` : ''}</div>`;
+    }
+    list.innerHTML = html;
+    list.querySelectorAll('.cmdk-item').forEach((el) => {
+      el.addEventListener('mousemove', () => { if (active !== Number(el.dataset.i)) { active = Number(el.dataset.i); markActive(); } });
+      el.addEventListener('click', () => choose(Number(el.dataset.i)));
+    });
+  };
+  input.addEventListener('input', () => { active = 0; render(); });
+  paletteEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); closePalette(); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, filtered.length - 1); markActive(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); markActive(); }
+    else if (e.key === 'Enter') { e.preventDefault(); choose(active); }
+  });
+  paletteEl.addEventListener('mousedown', (e) => { if (e.target === paletteEl) closePalette(); });
+  render();
+  input.focus();
+}
+function closePalette() { if (paletteEl) { paletteEl.remove(); paletteEl = null; } }
+
+window.addEventListener('keydown', (e) => {
+  if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (paletteEl) closePalette(); else openPalette(); return; }
+  if (e.key === '/' && !paletteEl) {
+    const t = document.activeElement;
+    if (!t || !(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) { e.preventDefault(); openPalette(); }
+  }
+});
 
 // ---- routing ---------------------------------------------------------------
 
