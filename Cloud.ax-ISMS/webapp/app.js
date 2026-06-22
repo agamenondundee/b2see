@@ -2,15 +2,15 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=40';
-import { CLAUSES } from './data/clauses.js?v=40';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=40';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=40';
+import { CONTROLS } from './data/controls.js?v=41';
+import { CLAUSES } from './data/clauses.js?v=41';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=41';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=41';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=40';
+} from './store.js?v=41';
 
 ensureSeed();
 applyTheme();
@@ -201,7 +201,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=40').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=41').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -341,6 +341,26 @@ const REG_DISPLAY = {
   },
 };
 
+// A dumbbell chart of risk reduction: for each risk a line from its inherent score to
+// its residual score, so the effect of treatment is visible at a glance. Sorted by
+// inherent score so the largest risks are at the top.
+function riskReductionChart(risks) {
+  const rows = risks.map((r) => ({ id: r.riskId, inh: riskScore(r), res: residualScore(r) || riskScore(r) })).filter((r) => r.inh > 0).sort((a, b) => b.inh - a.inh);
+  if (!rows.length) return '';
+  const W = 720; const left = 70; const right = 26; const top = 10; const rh = 26; const H = top + rows.length * rh + 24;
+  const plotW = W - left - right; const maxS = 25;
+  const x = (v) => left + (Math.max(0, Math.min(maxS, v)) / maxS) * plotW;
+  const grid = [0, 5, 10, 15, 20, 25].map((v) => `<line x1="${x(v).toFixed(1)}" y1="${top}" x2="${x(v).toFixed(1)}" y2="${(H - 18).toFixed(1)}" class="rr-grid"/><text x="${x(v).toFixed(1)}" y="${H - 4}" class="rr-axis" text-anchor="middle">${v}</text>`).join('');
+  const series = rows.map((r, i) => {
+    const y = top + i * rh + rh / 2; const xi = x(r.inh); const xr = x(r.res);
+    return `<text x="${left - 8}" y="${(y + 3).toFixed(1)}" class="rr-label" text-anchor="end">${esc(r.id)}</text>
+      <line x1="${xr.toFixed(1)}" y1="${y.toFixed(1)}" x2="${xi.toFixed(1)}" y2="${y.toFixed(1)}" class="rr-link"/>
+      <circle cx="${xi.toFixed(1)}" cy="${y.toFixed(1)}" r="6" class="rr-inh"><title>${esc(r.id)} inherent ${r.inh}</title></circle>
+      <circle cx="${xr.toFixed(1)}" cy="${y.toFixed(1)}" r="6" class="rr-res"><title>${esc(r.id)} residual ${r.res}</title></circle>`;
+  }).join('');
+  return `<svg class="rr" viewBox="0 0 ${W} ${H}" role="img" aria-label="Risk reduction from inherent to residual score">${grid}${series}</svg>`;
+}
+
 function regSummary(key, rows) {
   if (key === 'risk') {
     const levels = [['Critical', 'danger'], ['High', 'danger'], ['Medium', 'warn'], ['Low', 'ok']];
@@ -355,7 +375,9 @@ function regSummary(key, rows) {
         <div class="muted" style="font-size:12px;margin-bottom:4px">Inherent risk levels</div>${stackedBar(inhSeg)}
         <div class="muted" style="font-size:12px;margin:14px 0 4px">Residual risk levels, after treatment</div>${stackedBar(resSeg)}
       </div></div>
-      <div class="mini-cards" style="margin-top:14px">${mini(`${fullyCovered}/${withControls.length}`, 'Risks with all controls implemented', fullyCovered === withControls.length ? 'ok' : 'warn')}${mini(noControls, 'Risks with no control named', noControls ? 'warn' : 'ok')}</div>`;
+      <div class="mini-cards" style="margin-top:14px">${mini(`${fullyCovered}/${withControls.length}`, 'Risks with all controls implemented', fullyCovered === withControls.length ? 'ok' : 'warn')}${mini(noControls, 'Risks with no control named', noControls ? 'warn' : 'ok')}</div>
+      <div class="panel-head" style="margin-top:18px"><h3 style="margin:0">Risk reduction through treatment</h3><span class="legend" style="margin:0"><span class="leg"><i class="dot" style="background:var(--danger-solid)"></i>Inherent</span><span class="leg"><i class="dot" style="background:var(--ok-solid)"></i>Residual</span></span></div>
+      ${riskReductionChart(rows)}`;
   }
   if (key === 'supplier') {
     const dpa = rows.filter((r) => /^y/i.test(r.dpa || '')).length;

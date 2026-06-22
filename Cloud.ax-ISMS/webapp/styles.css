@@ -434,6 +434,14 @@ mark { background: #fde68a; color: inherit; padding: 0 2px; border-radius: 3px; 
 .rg-hub { fill: var(--brand); stroke: var(--brand-700); stroke-width: 1.5; }
 .rg-hubt { fill: #fff; font-size: 14px; font-weight: 700; }
 .rg-t { fill: var(--ink); font-size: 11px; }
+/* Risk reduction dumbbell chart */
+.rr { width: 100%; height: auto; display: block; margin-top: 8px; }
+.rr-grid { stroke: var(--line-2); stroke-width: 1; }
+.rr-axis { fill: var(--muted); font-size: 10px; }
+.rr-label { fill: var(--ink-2); font-size: 11px; font-weight: 600; }
+.rr-link { stroke: var(--neutral-solid); stroke-width: 3; opacity: 0.45; stroke-linecap: round; }
+.rr-inh { fill: var(--danger-solid); }
+.rr-res { fill: var(--ok-solid); }
 
 /* Control status mosaic */
 .mosaic-group { margin-bottom: 14px; }
