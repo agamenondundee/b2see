@@ -2,12 +2,12 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=6';
-import { CLAUSES } from './data/clauses.js?v=6';
+import { CONTROLS } from './data/controls.js?v=7';
+import { CLAUSES } from './data/clauses.js?v=7';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, cid, addMonths, nextReference,
-} from './store.js?v=6';
+} from './store.js?v=7';
 
 ensureSeed();
 
@@ -88,6 +88,31 @@ function metricBar(name, value, total) {
 }
 function mini(n, label, kind) { return `<div class="mini ${kind || ''}"><div class="n">${esc(String(n))}</div><div class="l">${esc(label)}</div></div>`; }
 
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// A brief, non blocking confirmation message.
+function toast(msg, kind = 'ok') {
+  let c = document.getElementById('toasts');
+  if (!c) { c = document.createElement('div'); c.id = 'toasts'; c.className = 'toasts'; document.body.appendChild(c); }
+  const t = document.createElement('div');
+  t.className = 'toast ' + kind;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => { t.style.transition = 'opacity 0.3s ease, transform 0.3s ease'; t.style.opacity = '0'; t.style.transform = 'translateY(10px)'; setTimeout(() => t.remove(), 320); }, 2600);
+}
+
+// Count whole number and percentage values up to their target.
+function animateCounts(root) {
+  if (reducedMotion()) return;
+  root.querySelectorAll('.kpi .num').forEach((el) => {
+    const m = /^(\d+)(%?)$/.exec(el.textContent.trim());
+    if (!m) return;
+    const target = Number(m[1]); const suffix = m[2]; const dur = 650; const start = performance.now();
+    const step = (now) => { const p = Math.min(1, (now - start) / dur); el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3))) + suffix; if (p < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  });
+}
+
 // ---- register intelligence -------------------------------------------------
 
 function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
@@ -120,7 +145,8 @@ function riskMatrix(rows) {
     h += `<tr><th>I${i}</th>`;
     for (let l = 1; l <= 5; l++) {
       const c = at(l, i); const lv = riskLevel(l * i);
-      h += `<td class="heat ${lv.kind} ${c ? '' : 'empty'}" title="Likelihood ${l}, impact ${i}, score ${l * i}">${c || '0'}</td>`;
+      const sel = riskCell && riskCell.l === l && riskCell.i === i ? ' sel' : '';
+      h += `<td class="heat ${lv.kind} ${c ? '' : 'empty'}${sel}" data-l="${l}" data-i="${i}" title="Likelihood ${l}, impact ${i}, score ${l * i}: ${c} risk${c === 1 ? '' : 's'}">${c || '0'}</td>`;
     }
     h += '</tr>';
   }
@@ -403,6 +429,7 @@ function renderDashboard() {
         log.map((a) => ({ ts: a.ts.slice(0, 16).replace('T', ' '), actor: a.actor, action: `${a.action} ${a.entity}`, detail: a.detail })),
       )}
     </div>`;
+  animateCounts(viewEl());
 }
 
 function table(columns, rows) {
@@ -502,7 +529,7 @@ function renderDocumentDetail(id) {
       <div class="panel-head"><h3>Document content</h3><a href="${encodeURI(doc.file)}" download>Download original</a></div>
       ${isPdf
         ? `<iframe class="reader-frame" src="${encodeURI(doc.file)}#view=FitH" title="${esc(doc.title)} document"></iframe>`
-        : '<div class="reader" id="doc-reader"><p class="muted">Loading the document...</p></div>'}
+        : '<div class="reader" id="doc-reader"><div class="skeleton skeleton-line" style="width:55%"></div><div class="skeleton skeleton-line" style="width:92%"></div><div class="skeleton skeleton-line" style="width:84%"></div><div class="skeleton skeleton-line" style="width:96%"></div><div class="skeleton skeleton-line" style="width:68%"></div></div>'}
     </div>` : '';
   viewEl().innerHTML = `
     <h2>${esc(doc.ref)} ${esc(doc.title)}</h2>
@@ -545,10 +572,12 @@ function renderDocumentDetail(id) {
         applyTransition(doc, act);
         audit('StatusChanged', 'Document', `${doc.ref} ${act} to ${doc.status}`);
       }
+      const msg = act === 'save-links' ? 'Mapping saved.' : `${doc.ref} is now ${doc.status}.`;
       setCollection('documents', docs);
       renderDocumentDetail(id);
+      toast(msg);
     } catch (err) {
-      alert(err.message);
+      toast(err.message, 'danger');
     }
   }));
 }
@@ -635,7 +664,7 @@ function renderSoa() {
   if (populate) populate.addEventListener('click', () => {
     const n = populateSoaFromDocuments();
     audit('Updated', 'SoaEntry', `Populated ${n} controls from the document set`);
-    alert(`Updated ${n} controls from the controlled documents.`);
+    toast(`Updated ${n} controls from the document set.`);
     renderSoa();
   });
   const save = document.getElementById('soa-save');
@@ -647,7 +676,7 @@ function renderSoa() {
       if (field === 'applicable') entry.applicable = input.value === '' ? null : input.value === 'yes';
       else entry[field] = input.value;
     });
-    for (const s of soa) if (s.applicable !== null && !s.justification.trim()) { alert(`A justification is required for ${s.ref} once applicability is decided.`); return; }
+    for (const s of soa) if (s.applicable !== null && !s.justification.trim()) { toast(`A justification is required for ${s.ref} once applicability is decided.`, 'danger'); return; }
     setCollection('soa', soa);
     audit('Updated', 'SoaEntry', 'Statement of Applicability');
     renderSoa();
@@ -657,6 +686,7 @@ function renderSoa() {
 let activeRegister = CONFIG.registers[0].key;
 let regFilter = '';
 let regEditingId = null;
+let riskCell = null;
 function renderRegisters() {
   const def = CONFIG.registers.find((r) => r.key === activeRegister);
   const editable = can('ISMS Manager');
@@ -687,6 +717,7 @@ function renderRegisters() {
     <div class="panel"><div class="panel-head"><h3>${esc(def.label)}</h3><span class="muted">${all.length} ${all.length === 1 ? 'entry' : 'entries'}</span></div>${regSummary(def.key, all)}</div>
     <div class="toolbar">
       <input id="reg-q" placeholder="Filter ${esc(def.label.toLowerCase())}" value="${esc(regFilter)}" style="width:260px" aria-label="Filter register" />
+      ${def.key === 'risk' && riskCell ? `<button class="reg-chip active" id="risk-clear">Likelihood ${riskCell.l}, impact ${riskCell.i} (clear)</button>` : ''}
       <span class="spacer"></span>
       <button class="secondary" id="reg-csv">Export this register</button>
       ${editable ? '<button class="secondary" id="reg-load">Load the register set</button>' : ''}
@@ -697,6 +728,7 @@ function renderRegisters() {
   const draw = () => {
     const q = regFilter.trim().toLowerCase();
     let rows = all.filter((e) => !q || Object.values(e).join(' ').toLowerCase().includes(q));
+    if (def.key === 'risk' && riskCell) rows = rows.filter((e) => num(e.likelihood) === riskCell.l && num(e.impact) === riskCell.i);
     if (disp && disp.sort) rows = rows.slice().sort(disp.sort);
     const display = rows.map((e) => {
       const o = disp ? disp.row(e) : Object.fromEntries(def.fields.map((f) => [f.name, esc(e[f.name] ?? '')]));
@@ -715,7 +747,16 @@ function renderRegisters() {
   };
   draw();
 
-  viewEl().querySelectorAll('[data-reg]').forEach((btn) => btn.addEventListener('click', () => { activeRegister = btn.dataset.reg; regFilter = ''; regEditingId = null; renderRegisters(); }));
+  if (def.key === 'risk') {
+    viewEl().querySelectorAll('.matrix .heat:not(.empty)').forEach((c) => c.addEventListener('click', () => {
+      const l = Number(c.dataset.l); const i = Number(c.dataset.i);
+      riskCell = (riskCell && riskCell.l === l && riskCell.i === i) ? null : { l, i };
+      renderRegisters();
+    }));
+    const rc = document.getElementById('risk-clear');
+    if (rc) rc.addEventListener('click', () => { riskCell = null; renderRegisters(); });
+  }
+  viewEl().querySelectorAll('[data-reg]').forEach((btn) => btn.addEventListener('click', () => { activeRegister = btn.dataset.reg; regFilter = ''; regEditingId = null; riskCell = null; renderRegisters(); }));
   document.getElementById('reg-q').addEventListener('input', (e) => { regFilter = e.target.value; draw(); });
   document.getElementById('reg-csv').addEventListener('click', () => {
     download(def.key + '-register.csv', toCsv(def.fields.map((f) => ({ key: f.name, label: f.label })), all), 'text/csv');
@@ -727,7 +768,9 @@ function renderRegisters() {
     const n = loadRegisterSet();
     audit('Imported', 'Register', `Loaded the register set (${n} entries)`);
     regEditingId = null;
+    riskCell = null;
     renderRegisters();
+    toast(`Loaded ${n} register entries.`);
   });
   const form = document.getElementById('reg-form');
   if (form) form.addEventListener('submit', (e) => {
@@ -818,7 +861,7 @@ function renderSettings() {
     </div>`;
   document.getElementById('save-name').addEventListener('click', () => {
     setSettings({ ...getSettings(), user: document.getElementById('uname').value.trim() || 'Local user' });
-    alert('Saved.');
+    toast('Your name has been saved.');
   });
   document.getElementById('evidence').addEventListener('click', () => {
     const ref = document.getElementById('scope').value.trim();
@@ -833,14 +876,14 @@ function renderSettings() {
     if (!confirm('Load the Cloud.ax controlled document set? This replaces the documents currently held in this browser.')) return;
     const n = loadDocumentSet();
     audit('Imported', 'Document', `Loaded the Cloud.ax document set (${n} documents)`);
-    alert(`Loaded ${n} documents.`);
+    toast(`Loaded ${n} documents.`);
     navigate();
   });
   document.getElementById('import').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => { try { importAll(JSON.parse(reader.result)); alert('Imported.'); navigate(); } catch { alert('That file could not be read.'); } };
+    reader.onload = () => { try { importAll(JSON.parse(reader.result)); navigate(); toast('Backup imported.'); } catch { toast('That file could not be read.', 'danger'); } };
     reader.readAsText(file);
   });
   document.getElementById('reset').addEventListener('click', () => { if (confirm('Reset all data in this browser to the seeded starting point?')) { resetAll(); navigate(); } });
