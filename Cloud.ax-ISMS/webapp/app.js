@@ -2,14 +2,14 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=21';
-import { CLAUSES } from './data/clauses.js?v=21';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=21';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=21';
+import { CONTROLS } from './data/controls.js?v=22';
+import { CLAUSES } from './data/clauses.js?v=22';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=22';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=22';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
-} from './store.js?v=21';
+} from './store.js?v=22';
 
 ensureSeed();
 applyTheme();
@@ -159,7 +159,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=21').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=22').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -769,24 +769,17 @@ function renderFramework() {
   draw();
 }
 
+const soaFilter = { theme: 'All', app: 'All', impl: 'All', q: '' };
 function renderSoa() {
   const soa = getCollection('soa');
   const byRef = Object.fromEntries(CONTROLS.map((c) => [c.ref, c]));
   const editable = can('ISMS Manager');
-  const rows = soa.map((s) => {
-    const applicable = s.applicable === null ? '' : s.applicable ? 'yes' : 'no';
-    const sel = (name, value, options) => `<select data-ref="${s.ref}" data-field="${name}" ${editable ? '' : 'disabled'}>${options.map((o) => `<option value="${o.v}" ${o.v === value ? 'selected' : ''}>${o.t}</option>`).join('')}</select>`;
-    return `<tr>
-      <td title="${esc(byRef[s.ref] ? byRef[s.ref].title : '')}">${esc(s.ref)}</td>
-      <td>${sel('applicable', applicable, [{ v: '', t: 'Undecided' }, { v: 'yes', t: 'Yes' }, { v: 'no', t: 'No' }])}</td>
-      <td><input data-ref="${s.ref}" data-field="justification" value="${esc(s.justification)}" ${editable ? '' : 'disabled'} /></td>
-      <td>${sel('status', s.status, CONFIG.implementationStatuses.map((x) => ({ v: x, t: x })))}</td>
-      <td><input data-ref="${s.ref}" data-field="owner" value="${esc(s.owner)}" style="width:120px" ${editable ? '' : 'disabled'} /></td>
-    </tr>`;
-  }).join('');
+  const themes = ['All', ...Array.from(new Set(CONTROLS.map((c) => c.theme)))];
+  const appOf = (s) => (s.applicable === true ? 'Applicable' : s.applicable === false ? 'Excluded' : 'Undecided');
   const applicable = soa.filter((s) => s.applicable === true).length;
   const excluded = soa.filter((s) => s.applicable === false).length;
   const undecided = soa.length - applicable - excluded;
+  const sel = (id, opts, cur, width) => `<select id="${id}" aria-label="${id}"${width ? ` style="max-width:${width}px"` : ''}>${opts.map((o) => `<option ${o === cur ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
   viewEl().innerHTML = `
     <h2>Statement of Applicability</h2>
     <div class="panel">
@@ -798,13 +791,60 @@ function renderSoa() {
       ])}
     </div>
     <div class="toolbar">
+      ${sel('soa-theme', themes, soaFilter.theme, 160)}
+      ${sel('soa-app', ['All', 'Applicable', 'Excluded', 'Undecided'], soaFilter.app, 150)}
+      ${sel('soa-impl', ['All', ...CONFIG.implementationStatuses], soaFilter.impl, 160)}
+      <input id="soa-q" placeholder="Filter by reference, title, justification or owner" value="${esc(soaFilter.q)}" style="width:240px" aria-label="Filter the Statement of Applicability" />
+      <span class="badge" id="soa-count"></span>
+      <span class="spacer"></span>
       <button class="secondary" id="soa-csv">Export spreadsheet (CSV)</button>
       <button class="secondary" id="soa-print">Print or save as PDF</button>
       ${editable ? '<button class="secondary" id="soa-populate">Populate from the document set</button>' : ''}
-      <span class="spacer"></span>
       ${editable ? '<button id="soa-save">Save changes</button>' : ''}
     </div>
-    <div class="panel table-wrap"><table><thead><tr><th>Control</th><th>Applicable</th><th>Justification</th><th>Status</th><th>Owner</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="panel table-wrap" id="soa-rows"></div>`;
+
+  const draw = () => {
+    const q = soaFilter.q.trim().toLowerCase();
+    const list = soa.filter((s) => {
+      const c = byRef[s.ref] || {};
+      if (soaFilter.theme !== 'All' && c.theme !== soaFilter.theme) return false;
+      if (soaFilter.app !== 'All' && appOf(s) !== soaFilter.app) return false;
+      if (soaFilter.impl !== 'All' && !(s.applicable === true && s.status === soaFilter.impl)) return false;
+      if (q && !(`${s.ref} ${c.title || ''} ${s.justification || ''} ${s.owner || ''}`).toLowerCase().includes(q)) return false;
+      return true;
+    });
+    const cell = (name, value, options, ref) => `<select data-ref="${esc(ref)}" data-field="${name}" ${editable ? '' : 'disabled'}>${options.map((o) => `<option value="${o.v}" ${o.v === value ? 'selected' : ''}>${o.t}</option>`).join('')}</select>`;
+    const body = list.map((s) => {
+      const c = byRef[s.ref] || {};
+      const applicableValue = s.applicable === null ? '' : s.applicable ? 'yes' : 'no';
+      return `<tr>
+        <td><b>${esc(s.ref)}</b></td>
+        <td>${esc(c.title || '')}</td>
+        <td>${cell('applicable', applicableValue, [{ v: '', t: 'Undecided' }, { v: 'yes', t: 'Yes' }, { v: 'no', t: 'No' }], s.ref)}</td>
+        <td><input data-ref="${esc(s.ref)}" data-field="justification" value="${esc(s.justification)}" ${editable ? '' : 'disabled'} /></td>
+        <td>${cell('status', s.status, CONFIG.implementationStatuses.map((x) => ({ v: x, t: x })), s.ref)}</td>
+        <td><input data-ref="${esc(s.ref)}" data-field="owner" value="${esc(s.owner)}" style="width:120px" ${editable ? '' : 'disabled'} /></td>
+      </tr>`;
+    }).join('');
+    document.getElementById('soa-rows').innerHTML = `<table><thead><tr><th>Control</th><th>Title</th><th>Applicable</th><th>Justification</th><th>Status</th><th>Owner</th></tr></thead><tbody>${body || '<tr><td colspan="6" class="muted">No controls match the current filter.</td></tr>'}</tbody></table>`;
+    document.getElementById('soa-count').textContent = `${list.length} of ${soa.length}`;
+    document.querySelectorAll('#soa-rows [data-ref]').forEach((input) => {
+      const handler = () => {
+        const entry = soa.find((s) => s.ref === input.dataset.ref);
+        if (!entry) return;
+        const field = input.dataset.field;
+        if (field === 'applicable') entry.applicable = input.value === '' ? null : input.value === 'yes';
+        else entry[field] = input.value;
+      };
+      input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', handler);
+    });
+  };
+  document.getElementById('soa-theme').addEventListener('change', (e) => { soaFilter.theme = e.target.value; draw(); });
+  document.getElementById('soa-app').addEventListener('change', (e) => { soaFilter.app = e.target.value; draw(); });
+  document.getElementById('soa-impl').addEventListener('change', (e) => { soaFilter.impl = e.target.value; draw(); });
+  document.getElementById('soa-q').addEventListener('input', (e) => { soaFilter.q = e.target.value; draw(); });
+  draw();
 
   document.getElementById('soa-csv').addEventListener('click', () => {
     const cols = [{ key: 'ref', label: 'Control' }, { key: 'title', label: 'Title' }, { key: 'theme', label: 'Theme' }, { key: 'applicable', label: 'Applicable' }, { key: 'justification', label: 'Justification' }, { key: 'status', label: 'Implementation status' }, { key: 'owner', label: 'Owner' }];
@@ -822,14 +862,7 @@ function renderSoa() {
   });
   const save = document.getElementById('soa-save');
   if (save) save.addEventListener('click', () => {
-    viewEl().querySelectorAll('[data-ref]').forEach((input) => {
-      const entry = soa.find((s) => s.ref === input.dataset.ref);
-      if (!entry) return;
-      const field = input.dataset.field;
-      if (field === 'applicable') entry.applicable = input.value === '' ? null : input.value === 'yes';
-      else entry[field] = input.value;
-    });
-    for (const s of soa) if (s.applicable !== null && !s.justification.trim()) { toast(`A justification is required for ${s.ref} once applicability is decided.`, 'danger'); return; }
+    for (const s of soa) if (s.applicable !== null && !String(s.justification || '').trim()) { toast(`A justification is required for ${s.ref} once applicability is decided.`, 'danger'); return; }
     setCollection('soa', soa);
     audit('Updated', 'SoaEntry', 'Statement of Applicability');
     renderSoa();
