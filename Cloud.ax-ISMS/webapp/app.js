@@ -2,12 +2,13 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=10';
-import { CLAUSES } from './data/clauses.js?v=10';
+import { CONTROLS } from './data/controls.js?v=11';
+import { CLAUSES } from './data/clauses.js?v=11';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=11';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
-  resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, cid, addMonths, nextReference,
-} from './store.js?v=10';
+  resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
+} from './store.js?v=11';
 
 ensureSeed();
 
@@ -61,7 +62,7 @@ const ICONS = {
 
 const ROUTE_TITLES = {
   dashboard: 'Dashboard', readiness: 'Certification readiness', documents: 'Documents', framework: 'Framework',
-  soa: 'Statement of Applicability', registers: 'Registers', audits: 'Internal audits', audit: 'Audit log',
+  soa: 'Statement of Applicability', registers: 'Registers', audits: 'Internal audits', certbody: 'Certification body', audit: 'Audit log',
   search: 'Search', settings: 'Settings', report: 'Audit pack',
 };
 
@@ -118,7 +119,7 @@ function animateCounts(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=10').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=11').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -305,7 +306,7 @@ function applyTransition(doc, action) {
 function shell(active) {
   const nav = [
     ['dashboard', 'Dashboard'], ['readiness', 'Readiness'], ['documents', 'Documents'], ['framework', 'Framework'],
-    ['soa', 'Statement of Applicability'], ['registers', 'Registers'], ['audits', 'Internal audits'],
+    ['soa', 'Statement of Applicability'], ['registers', 'Registers'], ['audits', 'Internal audits'], ['certbody', 'Certification body'],
   ];
   if (can('ISMS Manager')) nav.push(['audit', 'Audit log']);
   nav.push(['search', 'Search'], ['settings', 'Settings']);
@@ -1107,6 +1108,107 @@ function renderAuditDetail(id) {
   viewEl().querySelectorAll('[data-fdel]').forEach((b) => b.addEventListener('click', () => { if (!confirm('Delete this finding?')) return; a.findings = a.findings.filter((x) => x.id !== b.dataset.fdel); save(); renderAuditDetail(id); }));
 }
 
+// ---- certification body scorecard ------------------------------------------
+
+function bodyScore(b) {
+  let got = 0; let max = 0;
+  for (const c of CERT_CRITERIA) { got += Number((b.scores || {})[c.key] || 0) * c.weight; max += 5 * c.weight; }
+  return max ? Math.round((got / max) * 100) : 0;
+}
+function scoreKind(p) { return p >= 80 ? 'ok' : p >= 60 ? 'warn' : 'danger'; }
+
+let cbAdding = false;
+function renderCertBodies() {
+  const bodies = getCollection('certBodies');
+  const editable = can('ISMS Manager');
+  const scored = bodies.slice().map((b) => ({ b, p: bodyScore(b) })).sort((x, y) => y.p - x.p);
+  const topId = scored.length && scored[0].p > 0 ? scored[0].b.id : null;
+  const addForm = editable && cbAdding ? `
+    <details class="panel" open><summary>Add a certification body</summary>
+      <form id="cb-form"><div class="cards">
+        <div><label for="cb-name">Name</label><input id="cb-name" required /></div>
+        <div><label for="cb-acc">Accreditation</label><input id="cb-acc" placeholder="UKAS" /></div>
+        <div><label for="cb-scopes">Scopes (comma separated)</label><input id="cb-scopes" placeholder="ISO/IEC 27001, ISO/IEC 42001" /></div>
+      </div><div class="toolbar" style="margin-top:12px"><button type="submit">Add</button><button type="button" class="secondary" id="cb-cancel">Cancel</button></div></form>
+    </details>` : '';
+  const cards = scored.map(({ b, p }) => `
+    <a class="cb-card" href="#/certbody/${b.id}">
+      ${b.id === topId ? '<span class="cb-badge">Recommended</span>' : ''}
+      <div class="ring sm ${scoreKind(p)}" style="--p:${p}"><div class="inner"><div class="v">${p}%</div></div></div>
+      <div class="cb-meta"><div class="cb-name">${esc(b.name)}</div><div class="muted">${esc(b.accreditation || 'No accreditation')}</div><div>${(b.scopes || []).map((s) => `<span class="chip">${esc(s)}</span>`).join('')}</div></div>
+    </a>`).join('');
+  const cmpCols = [{ key: 'name', label: 'Body' }].concat(CERT_CRITERIA.map((c) => ({ key: c.key, label: `${c.label} (${c.weight})` }))).concat([{ key: 'total', label: 'Weighted score' }]);
+  const cmpRows = scored.map(({ b, p }) => { const o = { __html: true, name: `<a href="#/certbody/${b.id}">${esc(b.name)}</a>` }; for (const c of CERT_CRITERIA) o[c.key] = esc(String((b.scores || {})[c.key] || '-')); o.total = pill(`${p}%`, scoreKind(p)); return o; });
+  viewEl().innerHTML = `<h2>Certification body</h2>
+    <div class="panel"><div class="panel-head"><h3>Assessment</h3><span class="muted">${bodies.length} bodies, scored against ${CERT_CRITERIA.length} weighted criteria</span></div>
+      <p class="muted">A weighted scorecard to choose and review the external certification body. Open a body to score it; the highest weighted score is recommended.</p>
+      <div class="cb-cards">${cards || '<p class="muted">No bodies recorded.</p>'}</div>
+    </div>
+    <div class="toolbar">${editable ? '<button id="cb-add">Add a certification body</button>' : ''}<span class="spacer"></span>${editable ? '<button class="secondary" id="cb-load">Load the sample assessment</button>' : ''}<button class="secondary" id="cb-csv">Export</button></div>
+    ${addForm}
+    <div class="panel table-wrap"><div class="panel-head"><h3>Comparison</h3><span class="muted">scores 1 to 5, weight in brackets</span></div>${table(cmpCols, cmpRows)}</div>`;
+  const add = document.getElementById('cb-add'); if (add) add.addEventListener('click', () => { cbAdding = true; renderCertBodies(); });
+  const cancel = document.getElementById('cb-cancel'); if (cancel) cancel.addEventListener('click', () => { cbAdding = false; renderCertBodies(); });
+  const load = document.getElementById('cb-load'); if (load) load.addEventListener('click', () => { if (!confirm('Load the sample certification body assessment? This replaces the current bodies.')) return; const n = loadCertBodySet(); audit('Imported', 'CertBody', `Loaded the sample assessment (${n} bodies)`); renderCertBodies(); toast(`Loaded ${n} certification bodies.`); });
+  document.getElementById('cb-csv').addEventListener('click', () => {
+    const cols = [{ key: 'name', label: 'Body' }, { key: 'acc', label: 'Accreditation' }, { key: 'scopes', label: 'Scopes' }].concat(CERT_CRITERIA.map((c) => ({ key: c.key, label: c.label }))).concat([{ key: 'total', label: 'Weighted score' }]);
+    const data = scored.map(({ b, p }) => { const o = { name: b.name, acc: b.accreditation, scopes: (b.scopes || []).join('; ') }; for (const c of CERT_CRITERIA) o[c.key] = (b.scores || {})[c.key] || ''; o.total = `${p}%`; return o; });
+    download('certification-bodies.csv', toCsv(cols, data), 'text/csv');
+    audit('Exported', 'CertBody', 'Assessment to CSV');
+  });
+  const form = document.getElementById('cb-form');
+  if (form) form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const list = getCollection('certBodies');
+    const b = { id: cid(), name: document.getElementById('cb-name').value.trim(), accreditation: document.getElementById('cb-acc').value.trim(), scopes: document.getElementById('cb-scopes').value.split(',').map((x) => x.trim()).filter(Boolean), notes: '', scores: {} };
+    list.push(b); setCollection('certBodies', list); audit('Created', 'CertBody', b.name); cbAdding = false; go('certbody/' + b.id); toast('Certification body added.');
+  });
+}
+
+function renderCertBodyDetail(id) {
+  const bodies = getCollection('certBodies');
+  const b = bodies.find((x) => x.id === id);
+  if (!b) { viewEl().innerHTML = '<p class="error">Certification body not found.</p>'; return; }
+  const editable = can('ISMS Manager');
+  const p = bodyScore(b);
+  const rows = CERT_CRITERIA.map((c) => {
+    const v = Number((b.scores || {})[c.key] || 0);
+    const sel = editable ? `<select data-crit="${c.key}">${[0, 1, 2, 3, 4, 5].map((n) => `<option value="${n}" ${n === v ? 'selected' : ''}>${n === 0 ? 'Not scored' : n}</option>`).join('')}</select>` : (v || '-');
+    return { __html: true, criterion: `${esc(c.label)}<div class="muted" style="font-size:12px">${esc(c.note)}</div>`, weight: String(c.weight), score: sel };
+  });
+  viewEl().innerHTML = `
+    <h2>${esc(b.name)}</h2>
+    <div class="panel"><div class="readiness-hero">
+      <div class="ring ${scoreKind(p)}" style="--p:${p}"><div class="inner"><div class="v" id="cb-score">${p}%</div><div class="l">weighted</div></div></div>
+      <div class="readiness-sum">
+        <p>${pill(b.accreditation || 'No accreditation recorded', b.accreditation ? 'ok' : 'warn')} ${(b.scopes || []).map((s) => `<span class="chip">${esc(s)}</span>`).join('')}</p>
+        <p class="muted">${esc(b.notes || '')}</p>
+        <div class="toolbar"><a href="#/certbody">Back to assessment</a></div>
+      </div>
+    </div></div>
+    <div class="panel"><div class="panel-head"><h3>Scorecard</h3><span class="muted">score each criterion 1 to 5</span></div>
+      ${table([{ key: 'criterion', label: 'Criterion' }, { key: 'weight', label: 'Weight' }, { key: 'score', label: 'Score' }], rows)}
+      ${editable ? `<label for="cb-notes" style="margin-top:12px">Notes</label><input id="cb-notes" value="${esc(b.notes || '')}" /><div class="toolbar" style="margin-top:12px"><button id="cb-save">Save scorecard</button></div>` : ''}
+    </div>`;
+  const preview = () => {
+    const tmp = { scores: {} };
+    viewEl().querySelectorAll('[data-crit]').forEach((s) => { tmp.scores[s.dataset.crit] = Number(s.value); });
+    const np = bodyScore(tmp);
+    document.getElementById('cb-score').textContent = np + '%';
+    const ring = viewEl().querySelector('.ring');
+    ring.className = `ring ${scoreKind(np)}`;
+    ring.style.setProperty('--p', np);
+  };
+  viewEl().querySelectorAll('[data-crit]').forEach((s) => s.addEventListener('change', preview));
+  const save = document.getElementById('cb-save');
+  if (save) save.addEventListener('click', () => {
+    b.scores = {};
+    viewEl().querySelectorAll('[data-crit]').forEach((s) => { b.scores[s.dataset.crit] = Number(s.value); });
+    b.notes = document.getElementById('cb-notes').value.trim();
+    setCollection('certBodies', bodies); audit('Updated', 'CertBody', `${b.name} scorecard`); renderCertBodyDetail(id); toast('Scorecard saved.');
+  });
+}
+
 function renderAudit() {
   if (!can('ISMS Manager')) { viewEl().innerHTML = '<p class="error">The audit log is available to the ISMS Manager and Administrator roles.</p>'; return; }
   const log = getCollection('audit');
@@ -1232,7 +1334,8 @@ function navigate() {
   const views = {
     dashboard: renderDashboard, readiness: renderReadiness, documents: () => (param ? renderDocumentDetail(param) : renderDocuments()),
     framework: renderFramework, soa: renderSoa, registers: renderRegisters,
-    audits: () => (param ? renderAuditDetail(param) : renderInternalAudits()), audit: renderAudit,
+    audits: () => (param ? renderAuditDetail(param) : renderInternalAudits()),
+    certbody: () => (param ? renderCertBodyDetail(param) : renderCertBodies()), audit: renderAudit,
     search: renderSearch, settings: renderSettings, report: renderReport,
   };
   (views[route] || renderDashboard)();

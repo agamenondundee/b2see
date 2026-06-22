@@ -3,13 +3,14 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=10';
-import { DOCUMENTS } from './documents-data.js?v=10';
-import { REGISTER_SEED } from './data/registers.js?v=10';
-import { AUDIT_SEED } from './data/audits.js?v=10';
+import { CONTROLS } from './data/controls.js?v=11';
+import { DOCUMENTS } from './documents-data.js?v=11';
+import { REGISTER_SEED } from './data/registers.js?v=11';
+import { AUDIT_SEED } from './data/audits.js?v=11';
+import { CERT_BODY_SEED } from './data/cert-bodies.js?v=11';
 
 const NS = 'cloudax.isms.';
-const SEED_VERSION = 6;
+const SEED_VERSION = 7;
 
 export const CONFIG = {
   prefixes: { Policy: 'POL', Procedure: 'PROC', Standard: 'STD', Guideline: 'GUI', Plan: 'PLAN', Register: 'REG', Record: 'REC', Form: 'FORM' },
@@ -143,6 +144,13 @@ export function loadAuditSet() {
   return a.length;
 }
 
+// Fill the certification body assessment with its starter content.
+export function loadCertBodySet() {
+  const b = CERT_BODY_SEED.map((x) => ({ id: cid(), ...x }));
+  write('certBodies', b);
+  return b.length;
+}
+
 // Fill every register with its starter content. Replaces what is held in the browser.
 export function loadRegisterSet() {
   let n = 0;
@@ -214,6 +222,10 @@ export function ensureSeed() {
   if ((s.seedVersion || 0) < 6 && read('audits', null) === null) {
     write('audits', AUDIT_SEED.map((a) => ({ id: cid(), ...a, findings: (a.findings || []).map((f) => ({ id: cid(), ...f })) })));
   }
+  // Seed the certification body assessment once.
+  if ((s.seedVersion || 0) < 7 && read('certBodies', null) === null) {
+    write('certBodies', CERT_BODY_SEED.map((b) => ({ id: cid(), ...b })));
+  }
   // Backfill the controls that treat each risk onto existing risk entries, matched by
   // risk identifier, without disturbing any other recorded values.
   if ((s.seedVersion || 0) < 5) {
@@ -227,7 +239,7 @@ export function ensureSeed() {
 }
 
 export function resetAll() {
-  for (const k of ['documents', 'soa', 'audit', 'audits', 'settings']) localStorage.removeItem(NS + k);
+  for (const k of ['documents', 'soa', 'audit', 'audits', 'certBodies', 'settings']) localStorage.removeItem(NS + k);
   for (const r of CONFIG.registers) localStorage.removeItem(NS + 'register.' + r.key);
   ensureSeed();
 }
