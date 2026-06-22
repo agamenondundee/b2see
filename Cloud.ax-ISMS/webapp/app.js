@@ -2,13 +2,13 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=16';
-import { CLAUSES } from './data/clauses.js?v=16';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=16';
+import { CONTROLS } from './data/controls.js?v=17';
+import { CLAUSES } from './data/clauses.js?v=17';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=17';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
-} from './store.js?v=16';
+} from './store.js?v=17';
 
 ensureSeed();
 applyTheme();
@@ -54,6 +54,7 @@ const ICONS = {
   soa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
   registers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>',
   readiness: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h1V5a1 1 0 0 1 1-1z"/><path d="m9 13 2 2 4-4"/></svg>',
+  calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
   audits: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/><circle cx="6.5" cy="7" r="0.5" fill="currentColor"/></svg>',
   certbody: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5 7 22l5-3 5 3-1.5-9.5"/></svg>',
   audit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
@@ -79,7 +80,7 @@ function toggleTheme() {
 }
 
 const ROUTE_TITLES = {
-  dashboard: 'Dashboard', readiness: 'Certification readiness', documents: 'Documents', framework: 'Framework',
+  dashboard: 'Dashboard', readiness: 'Certification readiness', calendar: 'Compliance calendar', documents: 'Documents', framework: 'Framework',
   soa: 'Statement of Applicability', registers: 'Registers', audits: 'Internal audits', certbody: 'Certification body', audit: 'Audit log',
   search: 'Search', settings: 'Settings', report: 'Audit pack',
 };
@@ -156,7 +157,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=16').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=17').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -364,7 +365,7 @@ function applyTransition(doc, action) {
 
 function shell(active) {
   const nav = [
-    ['dashboard', 'Dashboard'], ['readiness', 'Readiness'], ['documents', 'Documents'], ['framework', 'Framework'],
+    ['dashboard', 'Dashboard'], ['readiness', 'Readiness'], ['calendar', 'Calendar'], ['documents', 'Documents'], ['framework', 'Framework'],
     ['soa', 'Statement of Applicability'], ['registers', 'Registers'], ['audits', 'Internal audits'], ['certbody', 'Certification body'],
   ];
   if (can('ISMS Manager')) nav.push(['audit', 'Audit log']);
@@ -1031,6 +1032,52 @@ function renderReport() {
   if (p) p.addEventListener('click', () => window.print());
 }
 
+// ---- compliance calendar ---------------------------------------------------
+
+function calendarEvents() {
+  const now = Date.now();
+  const ev = [];
+  const add = (date, type, title, view) => {
+    if (!date) return; const t = new Date(date).getTime(); if (Number.isNaN(t)) return;
+    ev.push({ date, t, type, title, view, kind: t < now ? 'overdue' : (t <= now + 30 * 86400000 ? 'soon' : 'future') });
+  };
+  for (const d of getCollection('documents')) if (d.status === 'Published' && d.nextReviewDate) add(d.nextReviewDate, 'Document review', `${d.ref} ${d.title}`, 'documents/' + d.id);
+  for (const a of getCollection('audits')) {
+    if (!/complet/i.test(a.status) && a.plannedDate) add(a.plannedDate, 'Internal audit', `${a.ref} ${a.scope}`, 'audits/' + a.id);
+    for (const f of (a.findings || [])) if (!/clos/i.test(f.status) && f.dueDate) add(f.dueDate, 'Audit finding', `${a.ref}: ${f.description}`, 'audits/' + a.id);
+  }
+  for (const r of getCollection('register.supplier')) if (r.reviewDate) add(r.reviewDate, 'Supplier review', r.name, 'registers');
+  for (const r of getCollection('register.nonconformity')) if (!/clos|resolv|verif|complet/i.test(r.status) && r.dueDate) add(r.dueDate, 'Corrective action', r.description, 'registers');
+  for (const r of getCollection('register.legal')) if (r.reviewDate) add(r.reviewDate, 'Legal review', r.requirement, 'registers');
+  for (const r of getCollection('register.management-review')) if (r.date && new Date(r.date).getTime() > now) add(r.date, 'Management review', r.reviewId, 'registers');
+  for (const s of getCollection('soa')) { /* no per control dates */ void s; }
+  return ev.sort((a, b) => a.t - b.t);
+}
+
+function renderCalendar() {
+  const ev = calendarEvents();
+  const now = Date.now();
+  const overdue = ev.filter((e) => e.kind === 'overdue');
+  const soon = ev.filter((e) => e.kind === 'soon');
+  const horizon = now + 365 * 86400000;
+  const upcoming = ev.filter((e) => e.t >= now && e.t <= horizon);
+  const groups = {};
+  for (const e of upcoming) {
+    const d = new Date(e.date); const key = d.getFullYear() * 100 + d.getMonth();
+    (groups[key] = groups[key] || { label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }), items: [] }).items.push(e);
+  }
+  const monthKeys = Object.keys(groups).sort((a, b) => a - b);
+  const statusPill = (k) => pill(k === 'overdue' ? 'Overdue' : k === 'soon' ? 'Due soon' : 'Scheduled', k === 'overdue' ? 'danger' : k === 'soon' ? 'warn' : 'neutral');
+  const evRow = (e) => ({ __html: true, date: esc(fmtDate(e.date)), type: `<span class="chip">${esc(e.type)}</span>`, item: e.view ? `<a href="#/${e.view}">${esc(e.title)}</a>` : esc(e.title), status: statusPill(e.kind) });
+  const cols = [{ key: 'date', label: 'Date' }, { key: 'type', label: 'Type' }, { key: 'item', label: 'Item' }, { key: 'status', label: 'Status' }];
+  viewEl().innerHTML = `<h2>Compliance calendar</h2>
+    <div class="panel"><div class="panel-head"><h3>Obligations</h3><span class="muted">${ev.length} dated obligations across the management system</span></div>
+      <div class="mini-cards">${mini(overdue.length, 'Overdue', overdue.length ? 'danger' : 'ok')}${mini(soon.length, 'Due within 30 days', soon.length ? 'warn' : 'ok')}${mini(upcoming.length, 'In the next year')}</div>
+    </div>
+    ${overdue.length ? `<div class="panel"><div class="panel-head"><h3>Overdue</h3><span class="pill danger">${overdue.length}</span></div>${table(cols, overdue.map(evRow))}</div>` : ''}
+    ${monthKeys.length ? monthKeys.map((k) => { const items = groups[k].items; const shown = items.slice(0, 25); return `<div class="panel"><div class="panel-head"><h3>${esc(groups[k].label)}</h3><span class="muted">${items.length} item${items.length === 1 ? '' : 's'}</span></div>${table(cols, shown.map(evRow))}${items.length > 25 ? `<p class="muted">and ${items.length - 25} more this month.</p>` : ''}</div>`; }).join('') : '<div class="panel"><p class="muted">No scheduled obligations in the next year.</p></div>'}`;
+}
+
 // ---- internal audits -------------------------------------------------------
 
 function findingPill(f) {
@@ -1448,7 +1495,7 @@ function renderSettings() {
 
 function paletteItems() {
   const items = [];
-  const navs = [['dashboard', 'Dashboard'], ['readiness', 'Certification readiness'], ['documents', 'Documents'], ['framework', 'Framework'], ['soa', 'Statement of Applicability'], ['registers', 'Registers'], ['audits', 'Internal audits'], ['certbody', 'Certification body'], ['search', 'Search'], ['settings', 'Settings']];
+  const navs = [['dashboard', 'Dashboard'], ['readiness', 'Certification readiness'], ['calendar', 'Compliance calendar'], ['documents', 'Documents'], ['framework', 'Framework'], ['soa', 'Statement of Applicability'], ['registers', 'Registers'], ['audits', 'Internal audits'], ['certbody', 'Certification body'], ['search', 'Search'], ['settings', 'Settings']];
   for (const [k, l] of navs) items.push({ group: 'Go to', label: l, icon: ICONS[k] || '', run: () => go(k) });
   items.push({ group: 'Actions', label: 'Generate audit pack', icon: ICONS.readiness, run: () => go('report') });
   items.push({ group: 'Actions', label: `Switch to ${currentTheme() === 'dark' ? 'light' : 'dark'} mode`, icon: currentTheme() === 'dark' ? ICONS.sun : ICONS.moon, run: () => { toggleTheme(); navigate(); } });
@@ -1521,7 +1568,7 @@ function navigate() {
   const [route, param] = parseHash();
   shell(route);
   const views = {
-    dashboard: renderDashboard, readiness: renderReadiness, documents: () => (param ? renderDocumentDetail(param) : renderDocuments()),
+    dashboard: renderDashboard, readiness: renderReadiness, calendar: renderCalendar, documents: () => (param ? renderDocumentDetail(param) : renderDocuments()),
     framework: renderFramework, soa: renderSoa, registers: renderRegisters,
     audits: () => (param ? renderAuditDetail(param) : renderInternalAudits()),
     certbody: () => (param ? renderCertBodyDetail(param) : renderCertBodies()), audit: renderAudit,
