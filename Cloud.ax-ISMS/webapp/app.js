@@ -2,15 +2,15 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=38';
-import { CLAUSES } from './data/clauses.js?v=38';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=38';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=38';
+import { CONTROLS } from './data/controls.js?v=40';
+import { CLAUSES } from './data/clauses.js?v=40';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=40';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=40';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=38';
+} from './store.js?v=40';
 
 ensureSeed();
 applyTheme();
@@ -201,7 +201,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=38').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=40').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -880,6 +880,11 @@ function renderControlDetail(ref) {
   const prev = idx > 0 ? CONTROLS[idx - 1] : null;
   const next = idx < CONTROLS.length - 1 ? CONTROLS[idx + 1] : null;
   const chips = (arr) => (arr || []).map((a) => `<span class="chip">${esc(a)}</span>`).join('') || '<span class="muted">-</span>';
+  const connNodes = [
+    ...docs.slice(0, 7).map((d) => ({ label: d.ref, kind: 'system', href: '#/documents/' + d.id })),
+    ...risks.slice(0, 5).map((r) => ({ label: r.riskId, kind: 'vault', href: '#/registers' })),
+    ...evidence.slice(0, 5).map((e) => ({ label: e.evidenceId, kind: 'store', href: '#/registers' })),
+  ];
   viewEl().innerHTML = `
     <p class="muted"><a href="#/framework">Framework</a> <span aria-hidden="true">/</span> ${esc(c.ref)}</p>
     <h2>${esc(c.ref)} ${esc(c.title)}</h2>
@@ -891,6 +896,16 @@ function renderControlDetail(ref) {
         <tr><th>Cybersecurity concepts</th><td>${chips(c.concepts)}</td></tr>
       </tbody></table>
     </div>
+    ${connNodes.length ? `<div class="panel">
+      <div class="panel-head"><h3>Connections</h3><span class="muted">${docs.length} document${docs.length === 1 ? '' : 's'}, ${risks.length} risk${risks.length === 1 ? '' : 's'}, ${evidence.length} evidence</span></div>
+      <p class="muted">The documents, risks and evidence linked to this control. Select any to open it.</p>
+      ${radialGraph(c.ref, connNodes)}
+      <div class="legend">
+        <span class="leg"><i class="dot" style="background:var(--brand-300)"></i>Document</span>
+        <span class="leg"><i class="dot" style="background:var(--warn-solid)"></i>Risk</span>
+        <span class="leg"><i class="dot" style="background:var(--ok-solid)"></i>Evidence</span>
+      </div>
+    </div>` : ''}
     <div class="panel">
       <div class="panel-head"><h3>Applicability decision</h3><a href="#/soa">Edit in the Statement of Applicability</a></div>
       ${s ? `<table class="spec"><tbody>
@@ -1800,6 +1815,27 @@ function wrapText(text, maxChars) {
   }
   if (cur) lines.push(cur);
   return lines;
+}
+
+// A hub and spoke graph: a central node connected to a ring of related items. Used to
+// show, around a control, the documents, risks and evidence linked to it.
+function radialGraph(hub, items) {
+  const W = 760; const H = 360; const cx = W / 2; const cy = H / 2;
+  const n = items.length; const R = Math.min(cx, cy) - 58;
+  const placed = items.map((nd, i) => {
+    const ang = (-90 + (360 * i) / Math.max(n, 1)) * Math.PI / 180;
+    return { ...nd, px: cx + R * Math.cos(ang), py: cy + R * Math.sin(ang), w: 124, h: 38 };
+  });
+  const edges = placed.map((it) => `<line x1="${cx}" y1="${cy}" x2="${it.px.toFixed(1)}" y2="${it.py.toFixed(1)}" class="dfd-edge"/>`).join('');
+  const boxes = placed.map((it) => {
+    const lines = wrapText(it.label, 17); const lh = 12; const sy = it.py - ((lines.length - 1) * lh) / 2 + 3.5;
+    const txt = lines.map((ln, i) => `<text x="${it.px.toFixed(1)}" y="${(sy + i * lh).toFixed(1)}" class="rg-t" text-anchor="middle">${esc(ln)}</text>`).join('');
+    const rect = `<rect x="${(it.px - it.w / 2).toFixed(1)}" y="${(it.py - it.h / 2).toFixed(1)}" width="${it.w}" height="${it.h}" rx="8" class="dfd-node dfd-${it.kind}"/>`;
+    return it.href ? `<a href="${it.href}" class="dfd-link">${rect}${txt}</a>` : rect + txt;
+  }).join('');
+  const hw = 96; const hh = 46;
+  const hubBox = `<rect x="${cx - hw / 2}" y="${cy - hh / 2}" width="${hw}" height="${hh}" rx="9" class="rg-hub"/><text x="${cx}" y="${cy + 4}" class="rg-hubt" text-anchor="middle">${esc(hub)}</text>`;
+  return `<svg class="dfd" viewBox="0 0 ${W} ${H}" role="img" aria-label="Connections for ${esc(hub)}">${edges}${boxes}${hubBox}</svg>`;
 }
 
 // Pick the anchor points on two boxes for a connecting edge, on the sides that face
