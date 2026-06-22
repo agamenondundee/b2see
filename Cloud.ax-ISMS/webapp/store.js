@@ -3,12 +3,12 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=23';
-import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=23';
-import { DOCUMENTS } from './documents-data.js?v=23';
-import { REGISTER_SEED } from './data/registers.js?v=23';
-import { AUDIT_SEED } from './data/audits.js?v=23';
-import { CERT_BODY_SEED } from './data/cert-bodies.js?v=23';
+import { CONTROLS } from './data/controls.js?v=24';
+import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=24';
+import { DOCUMENTS } from './documents-data.js?v=24';
+import { REGISTER_SEED } from './data/registers.js?v=24';
+import { AUDIT_SEED } from './data/audits.js?v=24';
+import { CERT_BODY_SEED } from './data/cert-bodies.js?v=24';
 
 const NS = 'cloudax.isms.';
 const SEED_VERSION = 10;
@@ -157,6 +157,35 @@ export function loadCertBodySet() {
   return b.length;
 }
 
+// A starter trend of certification readiness over recent months, so the readiness view
+// shows movement from the first visit. The current score is captured on top of this as
+// the system is used. Dates are historical and the values climb to just below today.
+const READINESS_SEED = [
+  { date: '2025-12-15', score: 50 },
+  { date: '2026-01-15', score: 55 },
+  { date: '2026-02-15', score: 59 },
+  { date: '2026-03-15', score: 62 },
+  { date: '2026-04-15', score: 64 },
+  { date: '2026-05-15', score: 66 },
+];
+
+export function getReadinessHistory() {
+  return read('readinessHistory', []);
+}
+
+// Record a readiness score against today. One point per day: a second reading on the
+// same day updates that day's value rather than adding another. The series is capped.
+export function recordReadiness(score, dateIso) {
+  const day = (dateIso || new Date().toISOString()).slice(0, 10);
+  const h = read('readinessHistory', []);
+  const last = h[h.length - 1];
+  if (last && last.date === day) last.score = score;
+  else h.push({ date: day, score });
+  const trimmed = h.slice(-180);
+  write('readinessHistory', trimmed);
+  return trimmed;
+}
+
 // Fill every register with its starter content. Replaces what is held in the browser.
 export function loadRegisterSet() {
   let n = 0;
@@ -205,6 +234,8 @@ export function ensureSeed() {
   }
   if (read('documents', null) === null) write('documents', []);
   if (!read('audit', null)) write('audit', []);
+  // Seed the readiness trend once, so the view shows movement from the first visit.
+  if (!read('readinessHistory', null)) write('readinessHistory', READINESS_SEED.map((e) => ({ ...e })));
   // Seed the AI management system Statement of Applicability from the ISO/IEC 42001
   // Annex A controls with their starter decisions. Created once and never overwritten,
   // so recorded decisions stay. Refs missing from the seed default to undecided.
@@ -282,13 +313,13 @@ export function ensureSeed() {
 }
 
 export function resetAll() {
-  for (const k of ['documents', 'soa', 'aimsSoa', 'audit', 'audits', 'certBodies', 'settings']) localStorage.removeItem(NS + k);
+  for (const k of ['documents', 'soa', 'aimsSoa', 'readinessHistory', 'audit', 'audits', 'certBodies', 'settings']) localStorage.removeItem(NS + k);
   for (const r of CONFIG.registers) localStorage.removeItem(NS + 'register.' + r.key);
   ensureSeed();
 }
 
 export function exportAll() {
-  const data = { settings: getSettings(), documents: read('documents', []), soa: read('soa', []), aimsSoa: read('aimsSoa', []), audit: read('audit', []), registers: {} };
+  const data = { settings: getSettings(), documents: read('documents', []), soa: read('soa', []), aimsSoa: read('aimsSoa', []), readinessHistory: read('readinessHistory', []), audit: read('audit', []), registers: {} };
   for (const r of CONFIG.registers) data.registers[r.key] = read('register.' + r.key, []);
   return data;
 }
@@ -297,6 +328,7 @@ export function importAll(data) {
   if (data.documents) write('documents', data.documents);
   if (data.soa) write('soa', data.soa);
   if (data.aimsSoa) write('aimsSoa', data.aimsSoa);
+  if (data.readinessHistory) write('readinessHistory', data.readinessHistory);
   if (data.audit) write('audit', data.audit);
   if (data.settings) write('settings', data.settings);
   if (data.registers) for (const k of Object.keys(data.registers)) write('register.' + k, data.registers[k]);

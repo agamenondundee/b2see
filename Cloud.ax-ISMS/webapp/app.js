@@ -2,14 +2,15 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=23';
-import { CLAUSES } from './data/clauses.js?v=23';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=23';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=23';
+import { CONTROLS } from './data/controls.js?v=24';
+import { CLAUSES } from './data/clauses.js?v=24';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=24';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=24';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
-} from './store.js?v=23';
+  getReadinessHistory, recordReadiness,
+} from './store.js?v=24';
 
 ensureSeed();
 applyTheme();
@@ -112,6 +113,30 @@ function metricBar(name, value, total) {
   return `<div class="metric-row"><span class="name">${esc(name)}</span><span class="track"><span style="width:${pct(value, total)}%"></span></span><span class="val">${value}</span></div>`;
 }
 function mini(n, label, kind) { return `<div class="mini ${kind || ''}"><div class="n">${esc(String(n))}</div><div class="l">${esc(label)}</div></div>`; }
+// A simple SVG line chart for a series of { date, score } points on a fixed 0 to 100
+// scale, used for the readiness trend. Scales to the width of its container.
+function sparkline(points) {
+  if (!points || points.length < 2) return '<p class="muted">Not enough history yet to show a trend. It will build as the system is used.</p>';
+  const W = 600; const H = 150; const padX = 12; const padTop = 14; const padBot = 26;
+  const n = points.length;
+  const x = (i) => padX + (i * (W - 2 * padX)) / (n - 1);
+  const y = (v) => padTop + (1 - Math.max(0, Math.min(100, v)) / 100) * (H - padTop - padBot);
+  const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.score).toFixed(1)}`).join(' ');
+  const area = `M${x(0).toFixed(1)},${(H - padBot).toFixed(1)} ` + points.map((p, i) => `L${x(i).toFixed(1)},${y(p.score).toFixed(1)}`).join(' ') + ` L${x(n - 1).toFixed(1)},${(H - padBot).toFixed(1)} Z`;
+  const grid = [25, 50, 75, 100].map((v) => `<line x1="${padX}" y1="${y(v).toFixed(1)}" x2="${W - padX}" y2="${y(v).toFixed(1)}" class="spark-grid"/><text x="${padX}" y="${(y(v) - 3).toFixed(1)}" class="spark-y">${v}</text>`).join('');
+  const dots = points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.score).toFixed(1)}" r="${i === n - 1 ? 4.5 : 2.5}" class="spark-dot${i === n - 1 ? ' last' : ''}"><title>${esc(p.date)}: ${p.score}%</title></circle>`).join('');
+  const last = points[n - 1];
+  const labels = `<text x="${x(0).toFixed(1)}" y="${H - 7}" class="spark-x">${esc(points[0].date)}</text><text x="${x(n - 1).toFixed(1)}" y="${H - 7}" text-anchor="end" class="spark-x">${esc(last.date)}</text>`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="Certification readiness over time">
+    <defs><linearGradient id="sparkfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--brand)" stop-opacity="0.25"/><stop offset="100%" stop-color="var(--brand)" stop-opacity="0"/></linearGradient></defs>
+    ${grid}
+    <path d="${area}" fill="url(#sparkfill)"/>
+    <path d="${line}" class="spark-line"/>
+    ${dots}
+    <text x="${x(n - 1).toFixed(1)}" y="${(y(last.score) - 9).toFixed(1)}" text-anchor="end" class="spark-val">${last.score}%</text>
+    ${labels}
+  </svg>`;
+}
 
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -159,7 +184,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=23').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=24').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -465,6 +490,7 @@ function renderDashboard() {
 
   const checks = readinessData();
   const readyScore = pct(checks.filter((c) => c.ok).length, checks.length);
+  recordReadiness(readyScore);
   const audits = getCollection('audits');
   const openFindings = audits.flatMap((a) => a.findings || []).filter((f) => !/clos/i.test(f.status)).length;
   const settings = getSettings();
@@ -1165,11 +1191,21 @@ function readinessData() {
   ];
 }
 
+function trendDelta(value, suffix) {
+  const kind = value > 0 ? 'ok' : value < 0 ? 'danger' : 'neutral';
+  const arrow = value > 0 ? '↑' : value < 0 ? '↓' : '→';
+  return `<span class="pill ${kind}">${arrow} ${value > 0 ? '+' : ''}${value} ${esc(suffix)}</span>`;
+}
 function renderReadiness() {
   const checks = readinessData();
   const met = checks.filter((c) => c.ok).length;
   const score = pct(met, checks.length);
   const ring = score >= 90 ? 'ok' : score >= 70 ? 'warn' : 'danger';
+  const history = recordReadiness(score);
+  const first = history[0];
+  const prev = history.length > 1 ? history[history.length - 2] : null;
+  const sinceStart = first ? score - first.score : 0;
+  const sincePrev = prev ? score - prev.score : 0;
   viewEl().innerHTML = `
     <h2>Certification readiness</h2>
     <div class="panel">
@@ -1181,6 +1217,10 @@ function renderReadiness() {
           <div class="toolbar"><button id="audit-pack">Generate audit pack</button></div>
         </div>
       </div>
+    </div>
+    <div class="panel"><div class="panel-head"><h3>Readiness over time</h3><span>${trendDelta(sinceStart, 'since ' + (first ? first.date : ''))}${prev ? trendDelta(sincePrev, 'since last') : ''}</span></div>
+      <p class="muted">Certification readiness is captured each day the system is used. A steady climb is evidence of continual improvement.</p>
+      ${sparkline(history)}
     </div>
     <div class="panel"><div class="panel-head"><h3>Readiness checks</h3><span class="muted">${met} met, ${checks.length - met} to address</span></div>
       <div class="checks">${checks.map((c) => `
