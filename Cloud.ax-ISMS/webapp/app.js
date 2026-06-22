@@ -2,15 +2,15 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=41';
-import { CLAUSES } from './data/clauses.js?v=41';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=41';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=41';
+import { CONTROLS } from './data/controls.js?v=42';
+import { CLAUSES } from './data/clauses.js?v=42';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=42';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=42';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=41';
+} from './store.js?v=42';
 
 ensureSeed();
 applyTheme();
@@ -201,7 +201,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=41').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=42').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -1501,6 +1501,32 @@ function findingPill(f) {
   if (/opportun/i.test(f.type)) return pill('Opportunity', 'info');
   return pill('Observation', 'neutral');
 }
+// An annual audit schedule drawn as a Gantt style timeline: a month axis for the
+// programme year with one row per audit, a marker at its planned date and a bar to its
+// completion, coloured by status. Each row links to the audit.
+function auditSchedule(audits) {
+  const dated = audits.filter((a) => a.plannedDate);
+  if (!dated.length) return '<p class="muted">No audits have a planned date yet.</p>';
+  const year = new Date(dated.map((a) => a.plannedDate).sort()[0]).getFullYear();
+  const yStart = new Date(year, 0, 1).getTime(); const yEnd = new Date(year + 1, 0, 1).getTime(); const span = yEnd - yStart;
+  const sorted = dated.slice().sort((a, b) => new Date(a.plannedDate) - new Date(b.plannedDate));
+  const W = 920; const left = 116; const right = 24; const top = 28; const rowH = 30; const H = top + sorted.length * rowH + 28;
+  const plotW = W - left - right;
+  const x = (t) => left + ((Math.max(yStart, Math.min(yEnd, new Date(t).getTime())) - yStart) / span) * plotW;
+  const months = Array.from({ length: 12 }, (_, m) => new Date(year, m, 1));
+  const grid = months.map((md) => { const gx = x(md.getTime()); return `<line x1="${gx.toFixed(1)}" y1="${top - 8}" x2="${gx.toFixed(1)}" y2="${(H - 22).toFixed(1)}" class="tl-grid"/><text x="${(gx + plotW / 24).toFixed(1)}" y="${H - 6}" class="tl-axis" text-anchor="middle">${md.toLocaleDateString('en-GB', { month: 'short' })}</text>`; }).join('');
+  const now = Date.now();
+  const todayLine = (now >= yStart && now <= yEnd) ? `<line x1="${x(now).toFixed(1)}" y1="${top - 8}" x2="${x(now).toFixed(1)}" y2="${(H - 22).toFixed(1)}" class="tl-today"><title>Today</title></line>` : '';
+  const kindOf = (st) => (/complet/i.test(st) ? 'ok' : /progress/i.test(st) ? 'warn' : 'info');
+  const rows = sorted.map((a, i) => {
+    const y = top + i * rowH + rowH / 2; const px = x(a.plannedDate); const cx = a.completedDate ? x(a.completedDate) : px;
+    const x1 = Math.min(px, cx); const x2 = Math.max(px, cx); const k = kindOf(a.status);
+    const bar = (x2 - x1 > 3) ? `<rect x="${x1.toFixed(1)}" y="${(y - 5).toFixed(1)}" width="${(x2 - x1).toFixed(1)}" height="10" rx="5" class="gantt-bar ${k}"/>` : '';
+    return `<a href="#/audits/${a.id}" class="dfd-link"><line x1="${left}" y1="${y.toFixed(1)}" x2="${(W - right).toFixed(1)}" y2="${y.toFixed(1)}" class="tl-base"/><text x="${left - 10}" y="${(y + 3).toFixed(1)}" class="tl-lane" text-anchor="end">${esc(a.ref)}</text>${bar}<circle cx="${px.toFixed(1)}" cy="${y.toFixed(1)}" r="6" class="gantt-dot ${k}"><title>${esc(a.ref)} ${esc(a.scope)}, ${esc(a.status)}, planned ${esc(fmtDate(a.plannedDate))}</title></circle></a>`;
+  }).join('');
+  return `<svg class="tl" viewBox="0 0 ${W} ${H}" role="img" aria-label="Annual audit schedule for ${year}">${grid}${todayLine}${rows}</svg>`;
+}
+
 function auditStats(audits) {
   const f = audits.flatMap((a) => a.findings || []);
   return {
@@ -1546,9 +1572,29 @@ function renderInternalAudits() {
       auditor: esc(a.auditor || ''), status: pill(a.status || '-', auditStatusKind(a.status)),
       findings: fc.length ? `${fc.length} (${open} open)` : '<span class="muted">none</span>' };
   });
+  const allFindings = audits.flatMap((a) => a.findings || []);
+  const findingSeg = [
+    { label: 'Major nonconformity', value: allFindings.filter((f) => /nonconform/i.test(f.type) && /major/i.test(f.severity)).length, kind: 'danger' },
+    { label: 'Minor nonconformity', value: allFindings.filter((f) => /nonconform/i.test(f.type) && /minor/i.test(f.severity)).length, kind: 'warn' },
+    { label: 'Observation', value: allFindings.filter((f) => /observ/i.test(f.type)).length, kind: 'neutral' },
+    { label: 'Opportunity', value: allFindings.filter((f) => /opportun/i.test(f.type)).length, kind: 'info' },
+  ];
+  const inProgress = audits.filter((a) => /progress/i.test(a.status)).length;
+  const statusSeg = [
+    { label: 'Complete', value: s.complete, kind: 'ok' },
+    { label: 'In progress', value: inProgress, kind: 'warn' },
+    { label: 'Planned', value: s.planned, kind: 'info' },
+  ];
   viewEl().innerHTML = `<h2>Internal audits</h2>
     <div class="panel"><div class="panel-head"><h3>Programme</h3><span class="muted">${covered.size} clauses and controls audited</span></div>
       <div class="mini-cards">${mini(s.total, 'Audits')}${mini(s.complete, 'Complete', 'ok')}${mini(s.planned, 'Planned', s.planned ? 'warn' : 'ok')}${mini(s.open, 'Open findings', s.open ? 'warn' : 'ok')}${mini(s.major, 'Major nonconformities', s.major ? 'danger' : 'ok')}${mini(s.minor, 'Minor nonconformities', s.minor ? 'warn' : 'ok')}</div>
+    </div>
+    <div class="panel"><div class="panel-head"><h3>Annual audit schedule</h3><span class="legend" style="margin:0"><span class="leg"><i class="dot ok"></i>Complete</span><span class="leg"><i class="dot warn"></i>In progress</span><span class="leg"><i class="dot info"></i>Planned</span></span></div>
+      ${auditSchedule(audits)}
+    </div>
+    <div class="grid-2">
+      <div class="panel"><div class="panel-head"><h3>Audit status</h3><span class="muted">${s.total} audits</span></div>${donut(statusSeg, { center: s.total ? pct(s.complete, s.total) + '%' : '0%', sub: 'complete', aria: 'Audit status' })}</div>
+      <div class="panel"><div class="panel-head"><h3>Findings by type</h3><span class="muted">${allFindings.length} findings</span></div>${allFindings.length ? stackedBar(findingSeg) : '<p class="muted">No findings recorded.</p>'}</div>
     </div>
     <div class="toolbar">${editable ? '<button id="audit-plan">Plan an audit</button>' : ''}<span class="spacer"></span><button class="secondary" id="audit-csv">Export programme</button></div>
     ${addForm}
