@@ -2,15 +2,15 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=29';
-import { CLAUSES } from './data/clauses.js?v=29';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=29';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=29';
+import { CONTROLS } from './data/controls.js?v=30';
+import { CLAUSES } from './data/clauses.js?v=30';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=30';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=30';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=29';
+} from './store.js?v=30';
 
 ensureSeed();
 applyTheme();
@@ -24,6 +24,8 @@ function esc(value) {
 }
 function role() { return getSettings().role; }
 function can(...roles) { return role() === 'Administrator' || roles.includes(role()); }
+const ORG_DEFAULTS = { name: 'Cloudax Ltd', scope: 'Cloudax Connect conversational AI platform' };
+function getOrg() { return { ...ORG_DEFAULTS, ...(getSettings().org || {}) }; }
 function fmtDate(iso) { return iso ? iso.slice(0, 10) : ''; }
 function parseHash() {
   const parts = location.hash.replace(/^#\/?/, '').split('/');
@@ -184,7 +186,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=29').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=30').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -1349,7 +1351,8 @@ function renderReport() {
       <section class="report-section cover">
         <h1>Information Security Management System</h1>
         <h2>Audit pack</h2>
-        <p class="muted">Cloudax Ltd, Cloudax Connect Conversational AI Platform</p>
+        <p class="muted">${esc(getOrg().name)}</p>
+        <p class="muted">Scope: ${esc(getOrg().scope)}</p>
         <p class="muted">ISO/IEC 27001:2022 and ISO/IEC 42001:2023 | Generated ${today} | Classification: Internal</p>
         <div class="ring ${score >= 90 ? 'ok' : score >= 70 ? 'warn' : 'danger'}" style="--p:${score}"><div class="inner"><div class="v">${score}%</div><div class="l">ready</div></div></div>
       </section>
@@ -1768,6 +1771,15 @@ function renderSettings() {
   viewEl().innerHTML = `
     <h2>Settings</h2>
     <div class="panel">
+      <h3>Organisation profile</h3>
+      <label for="org-name">Organisation name</label>
+      <input id="org-name" value="${esc(getOrg().name)}" style="max-width:440px" />
+      <label for="org-scope">Certification scope</label>
+      <input id="org-scope" value="${esc(getOrg().scope)}" style="max-width:560px" />
+      <p><button id="save-org">Save</button></p>
+      <p class="muted">Shown on the audit pack cover and used as the scope statement of the management system.</p>
+    </div>
+    <div class="panel">
       <h3>Your name</h3>
       <label for="uname">Used as the author and owner on documents you create, and in the audit log.</label>
       <input id="uname" value="${esc(s.user)}" style="max-width:320px" />
@@ -1808,6 +1820,12 @@ function renderSettings() {
       <p class="muted">Browser based ISMS for ISO/IEC 27001:2022. For a multi user, server enforced deployment with real
       authentication, an append only audit store and access control, use the backend in the parent folder.</p>
     </div>`;
+  document.getElementById('save-org').addEventListener('click', () => {
+    const org = { name: document.getElementById('org-name').value.trim() || ORG_DEFAULTS.name, scope: document.getElementById('org-scope').value.trim() || ORG_DEFAULTS.scope };
+    setSettings({ ...getSettings(), org });
+    audit('Updated', 'Settings', 'Organisation profile');
+    toast('Organisation profile saved.');
+  });
   document.getElementById('save-name').addEventListener('click', () => {
     setSettings({ ...getSettings(), user: document.getElementById('uname').value.trim() || 'Local user' });
     toast('Your name has been saved.');
