@@ -6,7 +6,7 @@ import { CONTROLS } from './data/controls.js';
 import { CLAUSES } from './data/clauses.js';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
-  resetAll, exportAll, importAll, cid, addMonths, nextReference,
+  resetAll, exportAll, importAll, loadDocumentSet, cid, addMonths, nextReference,
 } from './store.js';
 
 ensureSeed();
@@ -155,15 +155,10 @@ function table(columns, rows) {
   return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
+const docFilter = { system: 'All', q: '' };
 function renderDocuments() {
-  const docs = getCollection('documents');
-  const rows = docs.map((d) => ({
-    __html: true,
-    ref: `<a href="#/documents/${d.id}">${esc(d.ref)}</a>`,
-    title: esc(d.title), type: esc(d.type), classification: esc(d.classification),
-    status: `<span class="badge">${esc(d.status)}</span>`, version: esc(d.currentVersion || '-'),
-    review: fmtDate(d.nextReviewDate) || '-',
-  }));
+  const all = getCollection('documents');
+  const systems = ['All', ...Array.from(new Set(all.map((d) => d.system).filter(Boolean)))];
   const createForm = can('Document Owner', 'ISMS Manager') ? `
     <details class="panel"><summary>New document</summary>
       <form id="doc-form">
@@ -175,10 +170,33 @@ function renderDocuments() {
         <p><button type="submit">Create</button></p>
       </form>
     </details>` : '';
-  viewEl().innerHTML = `<h2>Documents</h2>${createForm}<div class="panel">${table(
-    [{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'type', label: 'Type' }, { key: 'classification', label: 'Class' }, { key: 'status', label: 'Status' }, { key: 'version', label: 'Version' }, { key: 'review', label: 'Review by' }],
-    rows,
-  )}</div>`;
+  const filterBar = `<div class="toolbar">
+      <label for="docsys">System</label>
+      <select id="docsys" aria-label="Filter by system">${systems.map((x) => `<option ${x === docFilter.system ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
+      <input id="docq" placeholder="Filter by reference or title" value="${esc(docFilter.q)}" style="width:260px" aria-label="Filter documents" />
+      <span class="badge" id="doc-count"></span>
+    </div>`;
+  viewEl().innerHTML = `<h2>Documents</h2>${createForm}${filterBar}<div class="panel" id="docs-table"></div>`;
+  const columns = [{ key: 'ref', label: 'Reference' }, { key: 'system', label: 'System' }, { key: 'title', label: 'Title' }, { key: 'type', label: 'Type' }, { key: 'classification', label: 'Class' }, { key: 'status', label: 'Status' }, { key: 'version', label: 'Version' }, { key: 'review', label: 'Review by' }];
+  const draw = () => {
+    const q = docFilter.q.trim().toLowerCase();
+    const docs = all.filter((d) =>
+      (docFilter.system === 'All' || d.system === docFilter.system) &&
+      (!q || (`${d.ref} ${d.title}`).toLowerCase().includes(q)));
+    const rows = docs.map((d) => ({
+      __html: true,
+      ref: `<a href="#/documents/${d.id}">${esc(d.ref)}</a>`,
+      system: esc(d.system || '-'),
+      title: esc(d.title), type: esc(d.type), classification: esc(d.classification),
+      status: `<span class="badge">${esc(d.status)}</span>`, version: esc(d.currentVersion || '-'),
+      review: fmtDate(d.nextReviewDate) || '-',
+    }));
+    document.getElementById('docs-table').innerHTML = table(columns, rows);
+    document.getElementById('doc-count').textContent = `${docs.length} of ${all.length}`;
+  };
+  document.getElementById('docsys').addEventListener('change', (e) => { docFilter.system = e.target.value; draw(); });
+  document.getElementById('docq').addEventListener('input', (e) => { docFilter.q = e.target.value; draw(); });
+  draw();
   const form = document.getElementById('doc-form');
   if (form) form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -209,8 +227,9 @@ function renderDocumentDetail(id) {
   viewEl().innerHTML = `
     <h2>${esc(doc.ref)} ${esc(doc.title)}</h2>
     <div class="panel">
-      <p><span class="badge">${esc(doc.status)}</span> <span class="muted">${esc(doc.type)} | ${esc(doc.classification)} | reviewed every ${doc.reviewMonths} months</span></p>
-      <p class="muted">Owner: ${esc(doc.owner)} | Author: ${esc(doc.author)} ${doc.nextReviewDate ? '| Next review: ' + fmtDate(doc.nextReviewDate) : ''}</p>
+      <p><span class="badge">${esc(doc.status)}</span> ${doc.system ? `<span class="badge">${esc(doc.system)}</span>` : ''} <span class="muted">${esc(doc.type)} | ${esc(doc.classification)} | version ${esc(doc.currentVersion || '1.0')} | reviewed every ${doc.reviewMonths} months</span></p>
+      <p class="muted">Owner: ${esc(doc.owner) || 'not set'} | Author: ${esc(doc.author) || 'not set'} ${doc.nextReviewDate ? '| Next review: ' + fmtDate(doc.nextReviewDate) : ''}</p>
+      ${doc.file ? `<p><a href="${encodeURI(doc.file)}" target="_blank" rel="noopener">Open source document</a> <span class="muted">${esc(doc.file.split('/').pop())}</span></p>` : ''}
       <div class="toolbar">${actions || '<span class="muted">No actions available for your role at this status.</span>'}</div>
     </div>
     <div class="panel"><h3>Versions</h3>${table(
@@ -252,13 +271,14 @@ function renderFramework() {
   const linkedControl = (ref) => docs.filter((d) => (d.controlRefs || []).includes(ref)).map((d) => d.ref);
   const gaps = CLAUSES.filter((c) => c.mandatory.length > 0 && !linkedClause.has(c.number));
   const controlsRows = CONTROLS.map((c) => ({ ref: c.ref, title: c.title, theme: c.theme, types: c.types.join(', '), docs: linkedControl(c.ref).join(', ') || 'none' }));
+  const covered = CONTROLS.filter((c) => linkedControl(c.ref).length > 0).length;
   viewEl().innerHTML = `
     <h2>ISO/IEC 27001:2022 framework</h2>
     <div class="panel"><h3>Coverage gaps</h3><p class="muted">Clauses that require documented information but have no linked document.</p>${gaps.length ? table(
       [{ key: 'number', label: 'Clause' }, { key: 'title', label: 'Title' }, { key: 'mandatory', label: 'Mandatory documented information' }],
       gaps.map((g) => ({ number: g.number, title: g.title, mandatory: g.mandatory.join('; ') })),
     ) : '<p>No coverage gaps.</p>'}</div>
-    <div class="panel"><h3>Annex A controls (93)</h3>${table(
+    <div class="panel"><h3>Annex A controls (93)</h3><p class="muted">Controls with at least one linked document: ${covered} of ${CONTROLS.length}.</p>${table(
       [{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'theme', label: 'Theme' }, { key: 'types', label: 'Type' }, { key: 'docs', label: 'Documents' }],
       controlsRows,
     )}</div>
@@ -419,8 +439,10 @@ function renderSettings() {
       <div class="toolbar">
         <button class="secondary" id="export">Export all data (JSON)</button>
         <label class="secondary" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--brand);border-radius:8px;padding:8px 12px;cursor:pointer">Import backup<input id="import" type="file" accept="application/json" style="display:none" /></label>
+        <button class="secondary" id="loadset">Load the Cloud.ax document set</button>
         <button class="secondary" id="reset">Reset to seeded data</button>
       </div>
+      <p class="muted">The Cloud.ax document set is the controlled ISMS and AIMS library imported with this application. Loading it replaces the documents currently held in this browser.</p>
     </div>
     <div class="panel">
       <h3>About</h3>
@@ -440,6 +462,13 @@ function renderSettings() {
     audit('Exported', 'EvidencePack', `Manifest for ${ref || 'all'} (${docs.length} documents)`);
   });
   document.getElementById('export').addEventListener('click', () => download('cloud-ax-isms-backup.json', JSON.stringify(exportAll(), null, 2), 'application/json'));
+  document.getElementById('loadset').addEventListener('click', () => {
+    if (!confirm('Load the Cloud.ax controlled document set? This replaces the documents currently held in this browser.')) return;
+    const n = loadDocumentSet();
+    audit('Imported', 'Document', `Loaded the Cloud.ax document set (${n} documents)`);
+    alert(`Loaded ${n} documents.`);
+    navigate();
+  });
   document.getElementById('import').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;

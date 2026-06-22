@@ -8,6 +8,11 @@ It ships seeded with the ISO/IEC 27001:2022 clauses 4 to 10 (including the clima
 change considerations in 4.1 and 4.2) and all 93 Annex A controls with their 2022
 attributes, plus a starter Statement of Applicability.
 
+It also imports the Cloud.ax controlled document set: the ISMS and AIMS library of 99
+documents, each held under `documents/` with its metadata, version, classification and
+the Annex A controls and clauses it addresses. The set loads automatically the first
+time you open the application, and you can reload it at any time from Settings.
+
 ## Open it
 
 - Hosted: this folder is served as a static site. On GitHub Pages it is at
@@ -26,7 +31,8 @@ attributes, plus a starter Statement of Applicability.
   gaps, and recent activity.
 - Documents: create, view and take a document through Draft, In Review, Approved,
   Published, Under Revision and Retired, with version history and segregation of
-  duties, and map it to clauses and controls.
+  duties, and map it to clauses and controls. Imported documents open their source
+  file and can be filtered by system (ISMS or AIMS) and by reference or title.
 - Framework: the clauses and all 93 controls, with coverage gaps.
 - Statement of Applicability: one row per control with applicability, justification,
   implementation status and owner; export to CSV or print to PDF.

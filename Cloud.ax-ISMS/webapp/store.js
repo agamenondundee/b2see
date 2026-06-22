@@ -4,9 +4,10 @@
 // multi user, server enforced version lives in the backend in the parent folder.
 
 import { CONTROLS } from './data/controls.js';
+import { DOCUMENTS } from './documents-data.js';
 
 const NS = 'cloudax.isms.';
-const SEED_VERSION = 1;
+const SEED_VERSION = 2;
 
 export const CONFIG = {
   prefixes: { Policy: 'POL', Procedure: 'PROC', Standard: 'STD', Guideline: 'GUI', Plan: 'PLAN', Register: 'REG', Record: 'REC', Form: 'FORM' },
@@ -93,13 +94,61 @@ export function audit(action, entity, detail = '') {
   write('audit', log.slice(0, 3000));
 }
 
+// Convert a record from the imported controlled document set (documents-data.js) into
+// the shape the application uses. The source file is retained so it can be opened from
+// the document detail. The single version carries the stated version number and status.
+function toDocumentShape(r) {
+  const published = r.status === 'Published';
+  const reviewMonths = CONFIG.defaultReviewMonths;
+  const version = r.version || '1.0';
+  const approvedAt = published && r.nextReviewDate ? addMonths(r.nextReviewDate, -reviewMonths) : null;
+  return {
+    id: cid(),
+    ref: r.ref,
+    title: r.title,
+    system: r.system || 'ISMS',
+    type: r.type,
+    classification: r.classification,
+    status: r.status,
+    owner: r.owner || '',
+    author: r.owner || '',
+    approver: '',
+    reviewMonths,
+    lastApprovedAt: approvedAt,
+    nextReviewDate: published ? (r.nextReviewDate || null) : null,
+    clauseRefs: r.clauseRefs || [],
+    controlRefs: r.controlRefs || [],
+    currentVersion: version,
+    file: r.file || '',
+    versions: [{
+      number: version,
+      status: published ? 'Published' : 'Retired',
+      changeSummary: 'Imported from the Cloudax controlled document set.',
+      createdAt: approvedAt || new Date().toISOString(),
+      publishedAt: published ? approvedAt : null,
+    }],
+  };
+}
+
+// Replace the documents held in the browser with a fresh copy of the controlled set.
+export function loadDocumentSet() {
+  const docs = DOCUMENTS.map(toDocumentShape);
+  write('documents', docs);
+  return docs.length;
+}
+
 export function ensureSeed() {
   const s = getSettings();
   if (!read('soa', null)) {
     write('soa', CONTROLS.map((c) => ({ ref: c.ref, applicable: null, justification: '', status: 'Not started', owner: '', docRefs: [] })));
   }
-  if (!read('documents', null)) write('documents', []);
+  if (read('documents', null) === null) write('documents', []);
   if (!read('audit', null)) write('audit', []);
+  // One time import of the controlled document set. This runs on a new install and when
+  // the seed version is raised, but it never overwrites documents already created here.
+  if ((s.seedVersion || 0) < 2 && read('documents', []).length === 0) {
+    write('documents', DOCUMENTS.map(toDocumentShape));
+  }
   if (s.seedVersion !== SEED_VERSION) setSettings({ ...s, seedVersion: SEED_VERSION });
 }
 
