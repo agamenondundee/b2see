@@ -2,18 +2,25 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=42';
-import { CLAUSES } from './data/clauses.js?v=42';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=42';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=42';
+import { CONTROLS } from './data/controls.js?v=43';
+import { CLAUSES } from './data/clauses.js?v=43';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=43';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=43';
+import { LANGUAGES, STRINGS } from './i18n.js?v=43';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=42';
+} from './store.js?v=43';
+
+// Interface language. t(key) returns the string for the current language, falling back
+// to English, then to the key itself, so a missing translation never breaks the page.
+function lang() { const l = getSettings().lang; return STRINGS[l] ? l : 'en'; }
+function t(key) { return (STRINGS[lang()] && STRINGS[lang()][key]) || STRINGS.en[key] || key; }
 
 ensureSeed();
 applyTheme();
+document.documentElement.lang = lang() === 'en' ? 'en-GB' : lang();
 
 const app = document.getElementById('app');
 
@@ -90,6 +97,8 @@ const ROUTE_TITLES = {
   soa: 'Statement of Applicability', aims: 'AI management (42001)', architecture: 'Architecture and data flows', registers: 'Registers', audits: 'Internal audits', certbody: 'Certification body', audit: 'Audit log',
   search: 'Search', settings: 'Settings', report: 'Audit pack',
 };
+// The localised title for a route, falling back to the English route title.
+function routeTitle(route) { return (STRINGS[lang()] && STRINGS[lang()]['title.' + route]) || ROUTE_TITLES[route] || STRINGS.en['title.' + route] || 'Dashboard'; }
 
 function pct(n, d) { return d ? Math.round((n / d) * 100) : 0; }
 
@@ -201,7 +210,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=42').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=43').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -473,31 +482,31 @@ function applyTransition(doc, action) {
 // ---- views -----------------------------------------------------------------
 
 function shell(active) {
-  const nav = [
-    ['dashboard', 'Dashboard'], ['readiness', 'Readiness'], ['calendar', 'Calendar'], ['documents', 'Documents'], ['framework', 'Framework'],
-    ['soa', 'Statement of Applicability'], ['aims', 'AI management (42001)'], ['architecture', 'Architecture'], ['registers', 'Registers'], ['audits', 'Internal audits'], ['certbody', 'Certification body'],
-  ];
-  if (can('ISMS Manager')) nav.push(['audit', 'Audit log']);
-  nav.push(['search', 'Search'], ['settings', 'Settings']);
-  const links = nav.map(([key, label]) => `<a href="#/${key}" class="${active === key ? 'active' : ''}"><span class="nav-ic">${ICONS[key] || ''}</span>${label}</a>`).join('');
+  const nav = ['dashboard', 'readiness', 'calendar', 'documents', 'framework', 'soa', 'aims', 'architecture', 'registers', 'audits', 'certbody'];
+  if (can('ISMS Manager')) nav.push('audit');
+  nav.push('search', 'settings');
+  const links = nav.map((key) => `<a href="#/${key}" class="${active === key ? 'active' : ''}"><span class="nav-ic">${ICONS[key] || ''}</span>${esc(t('nav.' + key))}</a>`).join('');
   const roleOptions = CONFIG.roles.map((r) => `<option ${r === role() ? 'selected' : ''}>${r}</option>`).join('');
+  const langOptions = LANGUAGES.map((l) => `<option value="${l.code}" ${l.code === lang() ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
   app.innerHTML = `
     <aside class="sidebar">
       <h1><img class="logo" src="assets/cloudax-logo-white.png" alt="Cloudax" /></h1>
-      <div class="org">Information Security Management System</div>
+      <div class="org">${esc(t('chrome.org'))}</div>
       <nav aria-label="Primary">${links}</nav>
-      <div class="foot">ISO/IEC 27001:2022 and ISO/IEC 42001:2023. Data is held in this browser only; role checks here are a convenience, not server enforced.</div>
+      <div class="foot">${esc(t('chrome.footer'))}</div>
     </aside>
     <div class="content">
       <header class="topbar">
         <div class="topbar-left">
-          <div class="crumb">Cloudax ISMS <span aria-hidden="true">/</span> <b>${esc(ROUTE_TITLES[active] || 'Dashboard')}</b></div>
+          <div class="crumb">Cloudax ISMS <span aria-hidden="true">/</span> <b>${esc(routeTitle(active))}</b></div>
         </div>
         <div class="topbar-actions">
-          <button class="topbar-search" id="cmdk-open" aria-label="Search or jump to anything">${ICONS.search}<span>Search or jump to</span><span class="sk"><kbd>${IS_MAC ? 'Cmd' : 'Ctrl'}</kbd><kbd>K</kbd></span></button>
+          <button class="topbar-search" id="cmdk-open" aria-label="${esc(t('chrome.search'))}">${ICONS.search}<span>${esc(t('chrome.search'))}</span><span class="sk"><kbd>${IS_MAC ? 'Cmd' : 'Ctrl'}</kbd><kbd>K</kbd></span></button>
           <button class="icon-btn" id="theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">${currentTheme() === 'dark' ? ICONS.sun : ICONS.moon}</button>
-          <label for="role">Acting as</label>
-          <select id="role" aria-label="Acting as role">${roleOptions}</select>
+          <label for="lang" class="sr-only">${esc(t('chrome.language'))}</label>
+          <select id="lang" aria-label="${esc(t('chrome.language'))}" title="${esc(t('chrome.language'))}">${langOptions}</select>
+          <label for="role">${esc(t('chrome.actingAs'))}</label>
+          <select id="role" aria-label="${esc(t('chrome.actingAs'))}">${roleOptions}</select>
         </div>
       </header>
       <main class="main" id="view" tabindex="-1"></main>
@@ -505,6 +514,12 @@ function shell(active) {
   document.getElementById('role').addEventListener('change', (e) => {
     setSettings({ ...getSettings(), role: e.target.value });
     audit('RoleChanged', 'Settings', `Acting as ${e.target.value}`);
+    navigate();
+  });
+  document.getElementById('lang').addEventListener('change', (e) => {
+    setSettings({ ...getSettings(), lang: e.target.value });
+    document.documentElement.lang = e.target.value === 'en' ? 'en-GB' : e.target.value;
+    audit('Updated', 'Settings', `Interface language ${e.target.value}`);
     navigate();
   });
   const ck = document.getElementById('cmdk-open'); if (ck) ck.addEventListener('click', openPalette);
@@ -579,7 +594,7 @@ function renderDashboard() {
   };
 
   viewEl().innerHTML = `
-    <h2>Dashboard</h2>
+    <h2>${esc(routeTitle('dashboard'))}</h2>
     <div class="cards">
       ${kpi(readyScore >= 90 ? 'ok' : 'warn', ICONS.readiness, `${readyScore}%`, 'Certification readiness', `${checks.filter((c) => c.ok).length} of ${checks.length} checks met`, '#/readiness')}
       ${kpi('', ICONS.documents, docs.length, 'Controlled documents', `${published.length} published`, '#/documents')}
@@ -704,7 +719,7 @@ function renderDocuments() {
       <input id="docq" placeholder="Filter by reference or title" value="${esc(docFilter.q)}" style="width:260px" aria-label="Filter documents" />
       <span class="badge" id="doc-count"></span>
     </div>`;
-  viewEl().innerHTML = `<h2>Documents</h2>${createForm}${filterBar}<div class="panel" id="docs-table"></div>`;
+  viewEl().innerHTML = `<h2>${esc(routeTitle('documents'))}</h2>${createForm}${filterBar}<div class="panel" id="docs-table"></div>`;
   const columns = [{ key: 'ref', label: 'Reference' }, { key: 'system', label: 'System' }, { key: 'title', label: 'Title' }, { key: 'type', label: 'Type' }, { key: 'classification', label: 'Class' }, { key: 'status', label: 'Status' }, { key: 'version', label: 'Version' }, { key: 'review', label: 'Review by' }];
   const draw = () => {
     const q = docFilter.q.trim().toLowerCase();
@@ -973,7 +988,7 @@ function renderSoa() {
   const undecided = soa.length - applicable - excluded;
   const sel = (id, opts, cur, width) => `<select id="${id}" aria-label="${id}"${width ? ` style="max-width:${width}px"` : ''}>${opts.map((o) => `<option ${o === cur ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
   viewEl().innerHTML = `
-    <h2>Statement of Applicability</h2>
+    <h2>${esc(routeTitle('soa'))}</h2>
     <div class="panel">
       <div class="panel-head"><h3>Applicability across Annex A</h3><span class="muted">${soa.length} controls</span></div>
       ${stackedBar([
@@ -1201,7 +1216,7 @@ function renderRegisters() {
       <div class="toolbar" style="margin-top:12px"><button type="submit">${editing ? 'Save changes' : 'Save entry'}</button>${editing ? '<button type="button" class="secondary" id="reg-cancel">Cancel</button>' : ''}</div></form>
     </details>` : '';
 
-  viewEl().innerHTML = `<h2>Registers</h2>
+  viewEl().innerHTML = `<h2>${esc(routeTitle('registers'))}</h2>
     <div class="panel"><div class="panel-head"><h3>All registers</h3><span class="muted">${counts.reduce((a, c) => a + c.n, 0)} entries across ${counts.length} registers</span></div><div class="reg-chips">${chips}</div></div>
     <div class="panel"><div class="panel-head"><h3>${esc(def.label)}</h3><span class="muted">${all.length} ${all.length === 1 ? 'entry' : 'entries'}</span></div>${regSummary(def.key, all)}</div>
     <div class="toolbar">
@@ -1350,7 +1365,7 @@ function renderReadiness() {
   const sinceStart = first ? score - first.score : 0;
   const sincePrev = prev ? score - prev.score : 0;
   viewEl().innerHTML = `
-    <h2>Certification readiness</h2>
+    <h2>${esc(routeTitle('readiness'))}</h2>
     <div class="panel">
       <div class="readiness-hero">
         <div class="ring ${ring}" style="--p:${score}"><div class="inner"><div class="v">${score}%</div><div class="l">ready</div></div></div>
@@ -1486,7 +1501,7 @@ function renderCalendar() {
   const statusPill = (k) => pill(k === 'overdue' ? 'Overdue' : k === 'soon' ? 'Due soon' : 'Scheduled', k === 'overdue' ? 'danger' : k === 'soon' ? 'warn' : 'neutral');
   const evRow = (e) => ({ __html: true, date: esc(fmtDate(e.date)), type: `<span class="chip">${esc(e.type)}</span>`, item: e.view ? `<a href="#/${e.view}">${esc(e.title)}</a>` : esc(e.title), status: statusPill(e.kind) });
   const cols = [{ key: 'date', label: 'Date' }, { key: 'type', label: 'Type' }, { key: 'item', label: 'Item' }, { key: 'status', label: 'Status' }];
-  viewEl().innerHTML = `<h2>Compliance calendar</h2>
+  viewEl().innerHTML = `<h2>${esc(routeTitle('calendar'))}</h2>
     <div class="panel"><div class="panel-head"><h3>Obligations</h3><span class="muted">${ev.length} dated obligations across the management system</span></div>
       <div class="mini-cards">${mini(overdue.length, 'Overdue', overdue.length ? 'danger' : 'ok')}${mini(soon.length, 'Due within 30 days', soon.length ? 'warn' : 'ok')}${mini(upcoming.length, 'In the next year')}</div>
     </div>
@@ -1585,7 +1600,7 @@ function renderInternalAudits() {
     { label: 'In progress', value: inProgress, kind: 'warn' },
     { label: 'Planned', value: s.planned, kind: 'info' },
   ];
-  viewEl().innerHTML = `<h2>Internal audits</h2>
+  viewEl().innerHTML = `<h2>${esc(routeTitle('audits'))}</h2>
     <div class="panel"><div class="panel-head"><h3>Programme</h3><span class="muted">${covered.size} clauses and controls audited</span></div>
       <div class="mini-cards">${mini(s.total, 'Audits')}${mini(s.complete, 'Complete', 'ok')}${mini(s.planned, 'Planned', s.planned ? 'warn' : 'ok')}${mini(s.open, 'Open findings', s.open ? 'warn' : 'ok')}${mini(s.major, 'Major nonconformities', s.major ? 'danger' : 'ok')}${mini(s.minor, 'Minor nonconformities', s.minor ? 'warn' : 'ok')}</div>
     </div>
@@ -1744,7 +1759,7 @@ function renderCertBodies() {
     </a>`).join('');
   const cmpCols = [{ key: 'name', label: 'Body' }].concat(CERT_CRITERIA.map((c) => ({ key: c.key, label: `${c.label} (${c.weight})` }))).concat([{ key: 'total', label: 'Weighted score' }]);
   const cmpRows = scored.map(({ b, p }) => { const o = { __html: true, name: `<a href="#/certbody/${b.id}">${esc(b.name)}</a>` }; for (const c of CERT_CRITERIA) o[c.key] = esc(String((b.scores || {})[c.key] || '-')); o.total = pill(`${p}%`, scoreKind(p)); return o; });
-  viewEl().innerHTML = `<h2>Certification body</h2>
+  viewEl().innerHTML = `<h2>${esc(routeTitle('certbody'))}</h2>
     <div class="panel"><div class="panel-head"><h3>Assessment</h3><span class="muted">${bodies.length} bodies, scored against ${CERT_CRITERIA.length} weighted criteria</span></div>
       <p class="muted">A weighted scorecard to choose and review the external certification body. Open a body to score it; the highest weighted score is recommended.</p>
       <div class="cb-cards">${cards || '<p class="muted">No bodies recorded.</p>'}</div>
@@ -2052,7 +2067,7 @@ function renderArchitecture() {
   const implemented = soa.filter((s) => s.applicable === true && ['Implemented', 'Verified'].includes(s.status)).length;
   const legend = (cls, label) => `<span class="leg"><i class="mosaic-cell ${cls}" style="width:14px;height:14px"></i>${esc(label)}</span>`;
   viewEl().innerHTML = `
-    <h2>Architecture and data flows</h2>
+    <h2>${esc(routeTitle('architecture'))}</h2>
     <div class="panel">
       <div class="panel-head"><h3>System data flow</h3><span class="muted">${assets.length} assets, ${suppliers.length} suppliers, ${ukeu} in the UK or EU</span></div>
       <p class="muted">How conversation data moves through the Cloudax platform. Personal data stays within the UK or EU region. Dashed lines are control or supporting flows. Boxes link to where they are managed.</p>
@@ -2095,7 +2110,7 @@ function renderArchitecture() {
 function renderSettings() {
   const s = getSettings();
   viewEl().innerHTML = `
-    <h2>Settings</h2>
+    <h2>${esc(routeTitle('settings'))}</h2>
     <div class="panel">
       <h3>Organisation profile</h3>
       <label for="org-name">Organisation name</label>
@@ -2104,6 +2119,11 @@ function renderSettings() {
       <input id="org-scope" value="${esc(getOrg().scope)}" style="max-width:560px" />
       <p><button id="save-org">Save</button></p>
       <p class="muted">Shown on the audit pack cover and used as the scope statement of the management system.</p>
+    </div>
+    <div class="panel">
+      <h3>${esc(t('settings.language'))}</h3>
+      <label for="set-lang">${esc(t('settings.languageNote'))}</label>
+      <select id="set-lang" style="max-width:260px">${LANGUAGES.map((l) => `<option value="${l.code}" ${l.code === lang() ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}</select>
     </div>
     <div class="panel">
       <h3>Your name</h3>
@@ -2151,6 +2171,13 @@ function renderSettings() {
     setSettings({ ...getSettings(), org });
     audit('Updated', 'Settings', 'Organisation profile');
     toast('Organisation profile saved.');
+  });
+  const setLang = document.getElementById('set-lang');
+  if (setLang) setLang.addEventListener('change', (e) => {
+    setSettings({ ...getSettings(), lang: e.target.value });
+    document.documentElement.lang = e.target.value === 'en' ? 'en-GB' : e.target.value;
+    audit('Updated', 'Settings', `Interface language ${e.target.value}`);
+    navigate();
   });
   document.getElementById('save-name').addEventListener('click', () => {
     setSettings({ ...getSettings(), user: document.getElementById('uname').value.trim() || 'Local user' });
