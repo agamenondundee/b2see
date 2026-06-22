@@ -2,12 +2,12 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=3';
-import { CLAUSES } from './data/clauses.js?v=3';
+import { CONTROLS } from './data/controls.js?v=4';
+import { CLAUSES } from './data/clauses.js?v=4';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
-  resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, cid, addMonths, nextReference,
-} from './store.js?v=3';
+  resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, cid, addMonths, nextReference,
+} from './store.js?v=4';
 
 ensureSeed();
 
@@ -496,8 +496,21 @@ function renderRegisters() {
     if (editable) o.__del = `<button class="secondary" data-del="${r.id}">Delete</button>`;
     return o;
   });
-  viewEl().innerHTML = `<h2>Registers</h2><div class="toolbar">${selector}<button class="secondary" id="reg-csv">Export</button></div>${addForm}<div class="panel">${table(cols, tableRows)}</div>`;
+  const counts = CONFIG.registers.map((r) => ({ key: r.key, label: r.label, n: getCollection('register.' + r.key).length }));
+  const chips = counts.map((c) => `<button class="reg-chip ${c.key === def.key ? 'active' : ''}" data-reg="${c.key}">${esc(c.label)} <b>${c.n}</b></button>`).join('');
+  viewEl().innerHTML = `<h2>Registers</h2>
+    <div class="panel"><div class="panel-head"><h3>All registers</h3><span class="muted">${counts.reduce((a, c) => a + c.n, 0)} entries across ${counts.length} registers</span></div><div class="reg-chips">${chips}</div></div>
+    <div class="toolbar">${selector}<button class="secondary" id="reg-csv">Export this register</button>${editable ? '<button class="secondary" id="reg-load">Load the register set</button>' : ''}</div>
+    ${addForm}<div class="panel table-wrap">${table(cols, tableRows)}</div>`;
 
+  viewEl().querySelectorAll('[data-reg]').forEach((btn) => btn.addEventListener('click', () => { activeRegister = btn.dataset.reg; renderRegisters(); }));
+  const loadBtn = document.getElementById('reg-load');
+  if (loadBtn) loadBtn.addEventListener('click', () => {
+    if (!confirm('Load the starter content for every register? This replaces the entries currently held in this browser.')) return;
+    const n = loadRegisterSet();
+    audit('Imported', 'Register', `Loaded the register set (${n} entries)`);
+    renderRegisters();
+  });
   document.getElementById('reg-select').addEventListener('change', (e) => { activeRegister = e.target.value; renderRegisters(); });
   document.getElementById('reg-csv').addEventListener('click', () => {
     download(def.key + '-register.csv', toCsv(def.fields.map((f) => ({ key: f.name, label: f.label })), rows), 'text/csv');

@@ -195,6 +195,11 @@ tbody tr:last-child td { border-bottom: none; }
 .pill.neutral { background: var(--neutral-bg); color: var(--neutral); }
 .chip { display: inline-block; padding: 2px 9px; margin: 2px 4px 2px 0; border-radius: var(--r-sm); font-size: 12px; background: var(--brand-50); color: var(--brand-700); text-decoration: none; }
 a.chip:hover { background: var(--brand); color: #fff; }
+.reg-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.reg-chip { background: var(--panel); border: 1px solid var(--line); color: var(--ink-2); border-radius: var(--r-pill); padding: 6px 13px; font-size: 13px; font-weight: 500; cursor: pointer; }
+.reg-chip:hover { border-color: var(--brand); color: var(--brand-700); background: var(--brand-50); box-shadow: none; }
+.reg-chip.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+.reg-chip b { font-variant-numeric: tabular-nums; }
 
 /* ---- Forms and buttons -------------------------------------------------- */
 
