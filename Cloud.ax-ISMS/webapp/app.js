@@ -95,7 +95,7 @@ function shell(active) {
   const roleOptions = CONFIG.roles.map((r) => `<option ${r === role() ? 'selected' : ''}>${r}</option>`).join('');
   app.innerHTML = `
     <aside class="sidebar">
-      <h1>Cloud.ax ISMS</h1>
+      <h1><img class="logo" src="assets/cloudax-logo-white.png" alt="Cloudax" /></h1>
       <div class="org">Information Security Management System</div>
       <nav aria-label="Primary">${links}</nav>
       <div class="who">
