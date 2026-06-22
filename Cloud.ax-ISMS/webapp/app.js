@@ -2,13 +2,13 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=11';
-import { CLAUSES } from './data/clauses.js?v=11';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=11';
+import { CONTROLS } from './data/controls.js?v=12';
+import { CLAUSES } from './data/clauses.js?v=12';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=12';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
-} from './store.js?v=11';
+} from './store.js?v=12';
 
 ensureSeed();
 
@@ -119,13 +119,35 @@ function animateCounts(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=11').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=12').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 function snippet(text, i, len) {
   const start = Math.max(0, i - 60); const end = Math.min(text.length, i + len + 90);
   return (start > 0 ? '...' : '') + esc(text.slice(start, i)) + '<mark>' + esc(text.slice(i, i + len)) + '</mark>' + esc(text.slice(i + len, end)) + (end < text.length ? '...' : '');
+}
+
+function safeUrl(u) { return /^https?:\/\//i.test(u || '') ? u : '#'; }
+function mailto(to, subject, body) { return `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`; }
+// Load an RSS or Atom feed into an element. Cross origin feeds that do not allow the
+// browser to read them fall back to a link to the source, which is the expected
+// behaviour for a static site with no server.
+async function loadFeedInto(el, feed) {
+  try {
+    const res = await fetch(feed.url, { headers: { Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml' } });
+    if (!res.ok) throw new Error('status');
+    const xml = new DOMParser().parseFromString(await res.text(), 'text/xml');
+    const items = [...xml.querySelectorAll('item, entry')].slice(0, 5).map((it) => ({
+      title: (it.querySelector('title')?.textContent || '').trim(),
+      link: it.querySelector('link')?.getAttribute('href') || it.querySelector('link')?.textContent || feed.link,
+      date: (it.querySelector('pubDate, updated, published')?.textContent || '').trim(),
+    })).filter((x) => x.title);
+    if (!items.length) throw new Error('empty');
+    el.innerHTML = items.map((i) => { const d = new Date(i.date); const ds = Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB'); return `<p class="feed-item"><a href="${esc(safeUrl(i.link))}" target="_blank" rel="noopener">${esc(i.title)}</a>${ds ? ` <span class="muted">${esc(ds)}</span>` : ''}</p>`; }).join('');
+  } catch {
+    el.innerHTML = `<p class="muted">The live feed could not be read in the browser. <a href="${esc(safeUrl(feed.link))}" target="_blank" rel="noopener">View the latest from ${esc(feed.name)}</a>.</p>`;
+  }
 }
 
 // ---- register intelligence -------------------------------------------------
@@ -375,21 +397,50 @@ function renderDashboard() {
   const nextAudit = getCollection('audits').filter((a) => /plan|schedul/i.test(a.status)).map((a) => a.plannedDate).filter(Boolean).sort()[0];
   const lastMr = getCollection('register.management-review').map((r) => r.date).filter(Boolean).sort().filter((d) => new Date(d) <= new Date()).pop();
 
-  const kpi = (cls, ic, num, label, sub) => `
-    <div class="kpi ${cls}"><div class="kpi-top"><span class="label">${esc(label)}</span><span class="kpi-ic">${ic}</span></div>
-      <div class="num">${num}</div>${sub ? `<div class="sub">${esc(sub)}</div>` : ''}</div>`;
+  const checks = readinessData();
+  const readyScore = pct(checks.filter((c) => c.ok).length, checks.length);
+  const audits = getCollection('audits');
+  const openFindings = audits.flatMap((a) => a.findings || []).filter((f) => !/clos/i.test(f.status)).length;
+  const settings = getSettings();
+  const feeds = (settings.feeds && settings.feeds.length) ? settings.feeds : CONFIG.feeds;
+
+  const attention = [];
+  for (const d of overdueDocs) attention.push({ what: `Document review overdue: ${d.ref} ${d.title}`, owner: d.owner, due: fmtDate(d.nextReviewDate) });
+  for (const a of audits) for (const f of (a.findings || [])) if (!/clos/i.test(f.status)) attention.push({ what: `Open audit finding (${a.ref}): ${f.description}`, owner: f.owner, due: fmtDate(f.dueDate) });
+  for (const r of ncs) if (overdue(r.dueDate) && !/clos|resolv|verif|complet/i.test(r.status)) attention.push({ what: `Overdue corrective action: ${r.description}`, owner: r.owner, due: fmtDate(r.dueDate) });
+  for (const r of suppliers) if (overdue(r.reviewDate) || dueSoon(r.reviewDate)) attention.push({ what: `Supplier review due: ${r.name}`, owner: 'Procurement Lead', due: fmtDate(r.reviewDate) });
+  const summaryBody = `Cloudax ISMS summary\n\nCertification readiness: ${readyScore}%\nReviews overdue: ${overdueDocs.length}\nOpen audit findings: ${openFindings}\nOpen nonconformities: ${ncOpen}\n\nItems needing attention:\n` + (attention.length ? attention.map((a) => `- ${a.what} (owner: ${a.owner || 'unassigned'}${a.due ? `, due ${a.due}` : ''})`).join('\n') : '- None') + '\n\nSent from the Cloudax ISMS.';
+
+  const kpi = (cls, ic, num, label, sub, href) => {
+    const tag = href ? 'a' : 'div';
+    return `<${tag} class="kpi ${cls}"${href ? ` href="${href}"` : ''}><div class="kpi-top"><span class="label">${esc(label)}</span><span class="kpi-ic">${ic}</span></div>
+      <div class="num">${num}</div>${sub ? `<div class="sub">${esc(sub)}</div>` : ''}</${tag}>`;
+  };
 
   viewEl().innerHTML = `
     <h2>Dashboard</h2>
     <div class="cards">
-      ${kpi('', ICONS.documents, docs.length, 'Controlled documents', `${published.length} published`)}
-      ${kpi('ok', ICONS.soa, `${pct(applicable, soa.length)}%`, 'Controls applicable', `${applicable} of ${soa.length} Annex A`)}
-      ${kpi('', ICONS.framework, `${pct(documented, soa.length)}%`, 'Controls documented', `${documented} have a linked document`)}
-      ${kpi(overdueDocs.length ? 'danger' : 'ok', ICONS.audit, overdueDocs.length, 'Reviews overdue', `${dueDocs.length} due within ${CONFIG.reviewDueWithinDays} days`)}
-      ${kpi(gaps.length ? 'warn' : 'ok', ICONS.framework, gaps.length, 'Clause coverage gaps', `${mandatory.length - gaps.length} of ${mandatory.length} clauses covered`)}
+      ${kpi(readyScore >= 90 ? 'ok' : 'warn', ICONS.readiness, `${readyScore}%`, 'Certification readiness', `${checks.filter((c) => c.ok).length} of ${checks.length} checks met`, '#/readiness')}
+      ${kpi('', ICONS.documents, docs.length, 'Controlled documents', `${published.length} published`, '#/documents')}
+      ${kpi('ok', ICONS.soa, `${pct(applicable, soa.length)}%`, 'Controls applicable', `${applicable} of ${soa.length} Annex A`, '#/soa')}
+      ${kpi(overdueDocs.length ? 'danger' : 'ok', ICONS.audit, overdueDocs.length, 'Reviews overdue', `${dueDocs.length} due within ${CONFIG.reviewDueWithinDays} days`, '#/documents')}
+      ${kpi(openFindings ? 'warn' : 'ok', ICONS.audits, openFindings, 'Open audit findings', 'across the programme', '#/audits')}
+      ${kpi(gaps.length ? 'warn' : 'ok', ICONS.framework, gaps.length, 'Clause coverage gaps', `${mandatory.length - gaps.length} of ${mandatory.length} clauses covered`, '#/framework')}
     </div>
 
     <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><h3>Actions and notifications</h3>${attention.length ? `<span class="pill warn">${attention.length}</span>` : '<span class="pill ok">clear</span>'}</div>
+        ${attention.length ? `<div class="attn">${attention.slice(0, 8).map((a) => `<div class="attn-row"><span>${esc(a.what)}${a.due ? ` <span class="muted">due ${esc(a.due)}</span>` : ''}</span><a class="chip" href="${mailto(settings.notifyEmail, 'Cloudax ISMS: ' + a.what, `Owner: ${a.owner || 'unassigned'}\nDue: ${a.due || 'not set'}\n\nSent from the Cloudax ISMS.`)}">Email</a></div>`).join('')}</div>${attention.length > 8 ? `<p class="muted">and ${attention.length - 8} more.</p>` : ''}` : '<p class="muted">Nothing needs attention. Reviews, audit findings, corrective actions and supplier reviews are up to date.</p>'}
+        <div class="toolbar" style="margin-top:12px"><a class="email-btn" href="${mailto(settings.notifyEmail, 'Cloudax ISMS summary', summaryBody)}">Email this summary</a>${settings.notifyEmail ? `<span class="muted">to ${esc(settings.notifyEmail)}</span>` : '<span class="muted">Set a recipient in Settings.</span>'}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>Regulatory and standards updates</h3><a href="#/settings">Sources</a></div>
+        ${feeds.map((f) => `<div class="feed"><div class="feed-name">${esc(f.label || f.name)}</div><div class="feed-body" data-feed="${esc(f.name)}"><p class="muted">Loading the latest...</p></div></div>`).join('')}
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:18px">
       <div class="panel">
         <div class="panel-head"><h3>Annex A control applicability</h3><span class="muted">${soa.length} controls</span></div>
         ${stackedBar([
@@ -445,6 +496,7 @@ function renderDashboard() {
       )}
     </div>`;
   animateCounts(viewEl());
+  feeds.forEach((f) => { const el = viewEl().querySelector(`.feed-body[data-feed="${CSS.escape(f.name)}"]`); if (el) loadFeedInto(el, f); });
 }
 
 function table(columns, rows) {
@@ -1274,6 +1326,18 @@ function renderSettings() {
       <p><button id="save-name">Save</button></p>
     </div>
     <div class="panel">
+      <h3>Notifications and feeds</h3>
+      <label for="notify">Recipient for emailed summaries and notifications</label>
+      <input id="notify" type="email" value="${esc(s.notifyEmail || '')}" placeholder="isms@cloudax.example" style="max-width:320px" />
+      <p class="muted">Emails are composed in your mail client through the Actions and notifications panel on the dashboard. Automated sending requires the server based deployment.</p>
+      <label for="feed-ico">ICO feed URL</label>
+      <input id="feed-ico" value="${esc((s.feeds && s.feeds[0] && s.feeds[0].url) || CONFIG.feeds[0].url)}" />
+      <label for="feed-bsi">BSI feed URL</label>
+      <input id="feed-bsi" value="${esc((s.feeds && s.feeds[1] && s.feeds[1].url) || CONFIG.feeds[1].url)}" />
+      <p><button id="save-notify">Save</button></p>
+      <p class="muted">Feeds are read in the browser; a source that does not allow cross origin reads falls back to a link to its news page.</p>
+    </div>
+    <div class="panel">
       <h3>Evidence pack</h3>
       <label for="scope">Annex A control reference (for example A.8.9)</label>
       <input id="scope" placeholder="A.8.9" style="max-width:200px" />
@@ -1299,6 +1363,14 @@ function renderSettings() {
   document.getElementById('save-name').addEventListener('click', () => {
     setSettings({ ...getSettings(), user: document.getElementById('uname').value.trim() || 'Local user' });
     toast('Your name has been saved.');
+  });
+  document.getElementById('save-notify').addEventListener('click', () => {
+    const cur = getSettings();
+    const feeds = (cur.feeds && cur.feeds.length ? cur.feeds : CONFIG.feeds).map((f) => ({ ...f }));
+    feeds[0] = { ...feeds[0], url: document.getElementById('feed-ico').value.trim() || feeds[0].url };
+    feeds[1] = { ...feeds[1], url: document.getElementById('feed-bsi').value.trim() || feeds[1].url };
+    setSettings({ ...cur, notifyEmail: document.getElementById('notify').value.trim(), feeds });
+    toast('Notification settings saved.');
   });
   document.getElementById('evidence').addEventListener('click', () => {
     const ref = document.getElementById('scope').value.trim();

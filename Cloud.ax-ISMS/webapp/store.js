@@ -3,11 +3,11 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=11';
-import { DOCUMENTS } from './documents-data.js?v=11';
-import { REGISTER_SEED } from './data/registers.js?v=11';
-import { AUDIT_SEED } from './data/audits.js?v=11';
-import { CERT_BODY_SEED } from './data/cert-bodies.js?v=11';
+import { CONTROLS } from './data/controls.js?v=12';
+import { DOCUMENTS } from './documents-data.js?v=12';
+import { REGISTER_SEED } from './data/registers.js?v=12';
+import { AUDIT_SEED } from './data/audits.js?v=12';
+import { CERT_BODY_SEED } from './data/cert-bodies.js?v=12';
 
 const NS = 'cloudax.isms.';
 const SEED_VERSION = 7;
@@ -21,6 +21,10 @@ export const CONFIG = {
   roles: ['Administrator', 'ISMS Manager', 'Document Owner', 'Reviewer', 'Approver', 'Reader'],
   statuses: ['Draft', 'In Review', 'Approved', 'Published', 'Under Revision', 'Retired'],
   implementationStatuses: ['Not started', 'In progress', 'Implemented', 'Verified'],
+  feeds: [
+    { name: 'ICO', label: 'Information Commissioner', url: 'https://ico.org.uk/about-the-ico/media-centre/news-and-blogs/rss/', link: 'https://ico.org.uk/about-the-ico/media-centre/news-and-blogs/' },
+    { name: 'BSI', label: 'BSI standards and insights', url: 'https://www.bsigroup.com/en-GB/rss/', link: 'https://www.bsigroup.com/en-GB/insights-and-media/insights/' },
+  ],
   registers: [
     { key: 'risk', label: 'Risk register', fields: [
       { name: 'riskId', label: 'Risk ID' }, { name: 'description', label: 'Description' },
@@ -81,7 +85,7 @@ export function setCollection(name, value) {
 }
 
 export function getSettings() {
-  return read('settings', { role: 'Administrator', user: 'Local user', seedVersion: 0 });
+  return read('settings', { role: 'Administrator', user: 'Local user', seedVersion: 0, notifyEmail: '' });
 }
 export function setSettings(value) {
   write('settings', value);
