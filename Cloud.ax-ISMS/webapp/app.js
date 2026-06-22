@@ -2,15 +2,15 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=35';
-import { CLAUSES } from './data/clauses.js?v=35';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=35';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=35';
+import { CONTROLS } from './data/controls.js?v=36';
+import { CLAUSES } from './data/clauses.js?v=36';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=36';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=36';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=35';
+} from './store.js?v=36';
 
 ensureSeed();
 applyTheme();
@@ -187,7 +187,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=35').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=36').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -1361,6 +1361,12 @@ function renderReport() {
         [{ key: 'check', label: 'Check' }, { key: 'status', label: 'Status' }, { key: 'detail', label: 'Detail' }],
         checks.map((c) => ({ __html: true, check: esc(c.label), status: pill(c.ok ? 'Met' : c.sev === 'danger' ? 'Gap' : 'Action', c.sev), detail: esc(c.detail) })),
       )}</section>
+      <section class="report-section break"><h3>System architecture and data flow</h3>
+        <p class="muted">How conversation data moves through the platform, with the UK or EU trust boundary and the external providers.</p>
+        ${dataFlowDiagram()}
+        <h3 style="margin-top:18px">Management system operating model</h3>
+        ${operatingModelDiagram()}
+      </section>
       <section class="report-section break"><h3>Statement of Applicability</h3>
         ${stackedBar([{ label: 'Applicable', value: applicable, kind: 'ok' }, { label: 'Excluded', value: excluded, kind: 'neutral' }, { label: 'Undecided', value: undecided, kind: 'warn' }])}
         ${table(
