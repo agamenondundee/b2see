@@ -3,11 +3,11 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=14';
-import { DOCUMENTS } from './documents-data.js?v=14';
-import { REGISTER_SEED } from './data/registers.js?v=14';
-import { AUDIT_SEED } from './data/audits.js?v=14';
-import { CERT_BODY_SEED } from './data/cert-bodies.js?v=14';
+import { CONTROLS } from './data/controls.js?v=15';
+import { DOCUMENTS } from './documents-data.js?v=15';
+import { REGISTER_SEED } from './data/registers.js?v=15';
+import { AUDIT_SEED } from './data/audits.js?v=15';
+import { CERT_BODY_SEED } from './data/cert-bodies.js?v=15';
 
 const NS = 'cloudax.isms.';
 const SEED_VERSION = 7;
