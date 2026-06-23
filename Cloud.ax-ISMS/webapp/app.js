@@ -2,16 +2,16 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=52';
-import { CLAUSES } from './data/clauses.js?v=52';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=52';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=52';
-import { LANGUAGES, STRINGS, RTL_LANGS } from './i18n.js?v=52';
+import { CONTROLS } from './data/controls.js?v=53';
+import { CLAUSES } from './data/clauses.js?v=53';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=53';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=53';
+import { LANGUAGES, STRINGS, RTL_LANGS } from './i18n.js?v=53';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness, getSoaSnapshots, addSoaSnapshot,
-} from './store.js?v=52';
+} from './store.js?v=53';
 
 // Interface language. t(key) returns the string for the current language, falling back
 // to English, then to the key itself, so a missing translation never breaks the page.
@@ -217,7 +217,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=52').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=53').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -824,6 +824,8 @@ function renderDocumentDetail(id) {
         : '<div class="reader" id="doc-reader"><div class="skeleton skeleton-line" style="width:55%"></div><div class="skeleton skeleton-line" style="width:92%"></div><div class="skeleton skeleton-line" style="width:84%"></div><div class="skeleton skeleton-line" style="width:96%"></div><div class="skeleton skeleton-line" style="width:68%"></div></div>'}
     </div>` : '';
   viewEl().innerHTML = `
+    <div class="doc-view">
+    <div class="doc-tag">${ICONS.documents}Document</div>
     <h2>${esc(doc.ref)} ${esc(doc.title)}</h2>
     <div class="panel">
       <p>${pill(doc.status)} ${doc.system ? `<span class="badge">${esc(doc.system)}</span>` : ''} <span class="muted">${esc(doc.type)} | ${esc(doc.classification)} | version ${esc(doc.currentVersion || '1.0')} | reviewed every ${doc.reviewMonths} months</span></p>
@@ -844,6 +846,7 @@ function renderDocumentDetail(id) {
       <input id="controlRefs" value="${esc((doc.controlRefs || []).join(', '))}" ${can('Document Owner', 'ISMS Manager') ? '' : 'disabled'} />
       ${can('Document Owner', 'ISMS Manager') ? '<p><button data-act="save-links">Save mapping</button></p>' : ''}
       <p class="muted">Known controls: ${allRefs.length}. Use the references exactly as shown in the Framework view.</p>
+    </div>
     </div>`;
   const readerEl = document.getElementById('doc-reader');
   if (readerEl) {
@@ -2110,7 +2113,7 @@ function flowSvg(nodes, edges, w, h, extra = '') {
 
 function dataFlowDiagram() {
   const nodes = [
-    { id: 'region', kind: 'boundary', x: 196, y: 36, w: 470, h: 470, title: 'UK / EU region, AWS eu-west-1' },
+    { id: 'region', kind: 'boundary', x: 196, y: 36, w: 470, h: 470, title: 'UK / EU region, Azure North Europe' },
     { id: 'customer', kind: 'actor', x: 18, y: 118, w: 132, h: 56, title: 'Customer', sub: 'Conversation data' },
     { id: 'admin', kind: 'actor', x: 18, y: 320, w: 132, h: 56, title: 'Administrator', sub: 'Console access' },
     { id: 'webapp', kind: 'system', x: 232, y: 118, w: 150, h: 56, title: 'Web app', sub: 'TLS in transit' },
