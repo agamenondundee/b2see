@@ -2,25 +2,32 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=49';
-import { CLAUSES } from './data/clauses.js?v=49';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=49';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=49';
-import { LANGUAGES, STRINGS } from './i18n.js?v=49';
+import { CONTROLS } from './data/controls.js?v=50';
+import { CLAUSES } from './data/clauses.js?v=50';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=50';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=50';
+import { LANGUAGES, STRINGS, RTL_LANGS } from './i18n.js?v=50';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness,
-} from './store.js?v=49';
+} from './store.js?v=50';
 
 // Interface language. t(key) returns the string for the current language, falling back
 // to English, then to the key itself, so a missing translation never breaks the page.
 function lang() { const l = getSettings().lang; return STRINGS[l] ? l : 'en'; }
 function t(key) { return (STRINGS[lang()] && STRINGS[lang()][key]) || STRINGS.en[key] || key; }
+// Set the document language and text direction for the current interface language, so
+// right to left languages such as Arabic lay out correctly and screen readers are right.
+function applyLang() {
+  const l = lang();
+  document.documentElement.lang = l === 'en' ? 'en-GB' : l;
+  document.documentElement.dir = RTL_LANGS.includes(l) ? 'rtl' : 'ltr';
+}
 
 ensureSeed();
 applyTheme();
-document.documentElement.lang = lang() === 'en' ? 'en-GB' : lang();
+applyLang();
 
 const app = document.getElementById('app');
 
@@ -210,7 +217,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=49').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=50').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -544,7 +551,7 @@ function shell(active) {
   });
   document.getElementById('lang').addEventListener('change', (e) => {
     setSettings({ ...getSettings(), lang: e.target.value });
-    document.documentElement.lang = e.target.value === 'en' ? 'en-GB' : e.target.value;
+    applyLang();
     audit('Updated', 'Settings', `Interface language ${e.target.value}`);
     navigate();
   });
@@ -2280,7 +2287,7 @@ function renderSettings() {
   const setLang = document.getElementById('set-lang');
   if (setLang) setLang.addEventListener('change', (e) => {
     setSettings({ ...getSettings(), lang: e.target.value });
-    document.documentElement.lang = e.target.value === 'en' ? 'en-GB' : e.target.value;
+    applyLang();
     audit('Updated', 'Settings', `Interface language ${e.target.value}`);
     navigate();
   });
