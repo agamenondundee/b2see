@@ -3,15 +3,15 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=50';
-import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=50';
-import { DOCUMENTS } from './documents-data.js?v=50';
-import { REGISTER_SEED } from './data/registers.js?v=50';
-import { AUDIT_SEED } from './data/audits.js?v=50';
-import { CERT_BODY_SEED } from './data/cert-bodies.js?v=50';
+import { CONTROLS } from './data/controls.js?v=52';
+import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=52';
+import { DOCUMENTS } from './documents-data.js?v=52';
+import { REGISTER_SEED } from './data/registers.js?v=52';
+import { AUDIT_SEED } from './data/audits.js?v=52';
+import { CERT_BODY_SEED } from './data/cert-bodies.js?v=52';
 
 const NS = 'cloudax.isms.';
-const SEED_VERSION = 12;
+const SEED_VERSION = 13;
 
 export const CONFIG = {
   prefixes: { Policy: 'POL', Procedure: 'PROC', Standard: 'STD', Guideline: 'GUI', Plan: 'PLAN', Register: 'REG', Record: 'REC', Form: 'FORM' },
@@ -232,6 +232,30 @@ export function populateSoaFromDocuments() {
   return changed;
 }
 
+// Statement of Applicability version history. A snapshot stores a compact map of each
+// control's applicability and status with a summary, so the SoA can be shown to be
+// maintained and changes between points in time can be listed.
+function soaSummary(soa) {
+  const applicable = soa.filter((s) => s.applicable === true).length;
+  const excluded = soa.filter((s) => s.applicable === false).length;
+  const implemented = soa.filter((s) => s.applicable === true && (s.status === 'Implemented' || s.status === 'Verified')).length;
+  return { total: soa.length, applicable, excluded, undecided: soa.length - applicable - excluded, implemented };
+}
+function soaState(soa) {
+  const state = {};
+  for (const s of soa) state[s.ref] = { a: s.applicable, s: s.status };
+  return state;
+}
+export function getSoaSnapshots() { return read('soaSnapshots', []); }
+export function addSoaSnapshot(by, note) {
+  const soa = read('soa', []);
+  const h = read('soaSnapshots', []);
+  h.push({ id: cid(), ts: new Date().toISOString(), by: by || 'Local user', note: note || '', summary: soaSummary(soa), state: soaState(soa) });
+  const trimmed = h.slice(-60);
+  write('soaSnapshots', trimmed);
+  return trimmed;
+}
+
 export function ensureSeed() {
   const s = getSettings();
   if (!read('soa', null)) {
@@ -257,6 +281,20 @@ export function ensureSeed() {
   // controls they address are marked applicable and linked. Runs once when the seed
   // version is raised; it fills only blanks and does not overwrite recorded decisions.
   if ((s.seedVersion || 0) < 3) populateSoaFromDocuments();
+  // Seed one historical Statement of Applicability snapshot, derived from the current
+  // state rolled back a little, so the version history shows progression from the first
+  // visit. Created once and never overwritten.
+  if (!read('soaSnapshots', null)) {
+    const soa = read('soa', []);
+    const state = soaState(soa);
+    let downgraded = 0; let undecided = 0;
+    for (const e of soa) {
+      if (e.applicable === true && (e.status === 'Implemented' || e.status === 'Verified') && downgraded < 14) { state[e.ref] = { a: true, s: 'In progress' }; downgraded += 1; }
+      else if (e.applicable === true && undecided < 6 && downgraded >= 14) { state[e.ref] = { a: null, s: e.status }; undecided += 1; }
+    }
+    const summary = { total: soa.length, applicable: Object.values(state).filter((v) => v.a === true).length, excluded: Object.values(state).filter((v) => v.a === false).length, undecided: Object.values(state).filter((v) => v.a == null).length, implemented: Object.values(state).filter((v) => v.a === true && (v.s === 'Implemented' || v.s === 'Verified')).length };
+    write('soaSnapshots', [{ id: cid(), ts: new Date(Date.now() - 100 * 86400000).toISOString(), by: 'Information Security Lead', note: 'Baseline before the last implementation push', summary, state }]);
+  }
   // Fill the registers with their starter content, but only those still empty, so a
   // register a user has cleared or edited is left as it is.
   if ((s.seedVersion || 0) < 4) {
@@ -331,13 +369,13 @@ export function ensureSeed() {
 }
 
 export function resetAll() {
-  for (const k of ['documents', 'soa', 'aimsSoa', 'readinessHistory', 'audit', 'audits', 'certBodies', 'settings']) localStorage.removeItem(NS + k);
+  for (const k of ['documents', 'soa', 'aimsSoa', 'soaSnapshots', 'readinessHistory', 'audit', 'audits', 'certBodies', 'settings']) localStorage.removeItem(NS + k);
   for (const r of CONFIG.registers) localStorage.removeItem(NS + 'register.' + r.key);
   ensureSeed();
 }
 
 export function exportAll() {
-  const data = { settings: getSettings(), documents: read('documents', []), soa: read('soa', []), aimsSoa: read('aimsSoa', []), readinessHistory: read('readinessHistory', []), audit: read('audit', []), registers: {} };
+  const data = { settings: getSettings(), documents: read('documents', []), soa: read('soa', []), aimsSoa: read('aimsSoa', []), soaSnapshots: read('soaSnapshots', []), readinessHistory: read('readinessHistory', []), audit: read('audit', []), registers: {} };
   for (const r of CONFIG.registers) data.registers[r.key] = read('register.' + r.key, []);
   return data;
 }
@@ -346,6 +384,7 @@ export function importAll(data) {
   if (data.documents) write('documents', data.documents);
   if (data.soa) write('soa', data.soa);
   if (data.aimsSoa) write('aimsSoa', data.aimsSoa);
+  if (data.soaSnapshots) write('soaSnapshots', data.soaSnapshots);
   if (data.readinessHistory) write('readinessHistory', data.readinessHistory);
   if (data.audit) write('audit', data.audit);
   if (data.settings) write('settings', data.settings);
