@@ -18,6 +18,7 @@
   --line-2: #eef1f6;
   --bg: #f4f6f9;
   --panel: #ffffff;
+  --doc-bg: #e7eaf0;
   --field: #ffffff;
   --field-disabled: #f1f4f8;
   --heading: var(--surface-dark);
@@ -75,6 +76,7 @@ html[data-theme="dark"] {
   --line-2: #1b2436;
   --bg: #0b101e;
   --panel: #131a2b;
+  --doc-bg: #0a1120;
   --field: #0d1424;
   --field-disabled: #1a2233;
   --heading: #eaedf7;
@@ -270,6 +272,12 @@ tbody tr:last-child td { border-bottom: none; }
 .spec th { position: static; background: none; top: auto; z-index: 0; width: 210px; text-align: left; padding: 10px 12px; color: var(--muted); font-weight: 600; text-transform: none; letter-spacing: 0; font-size: 13.5px; vertical-align: top; border-bottom: 1px solid var(--line-2); }
 .spec tbody tr:hover { background: none; }
 .spec tbody tr:last-child th, .spec tbody tr:last-child td { border-bottom: none; }
+/* An opened document is shown on a slightly grey backing, so it reads clearly as a
+   document distinct from the other views. */
+.doc-view { background: var(--doc-bg); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 20px 20px; }
+.doc-view > h2 { margin-top: 4px; }
+.doc-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; color: var(--muted); background: var(--neutral-bg); border: 1px solid var(--line); padding: 3px 10px 3px 8px; border-radius: var(--r-pill); }
+.doc-tag svg { width: 13px; height: 13px; }
 .table-wrap { overflow: auto; }
 /* Inside a horizontal scroll container the header sticks to the top of the wrap,
    not 60px down, otherwise it would cover the first row. */

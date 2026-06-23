@@ -3,15 +3,15 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=52';
-import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=52';
-import { DOCUMENTS } from './documents-data.js?v=52';
-import { REGISTER_SEED } from './data/registers.js?v=52';
-import { AUDIT_SEED } from './data/audits.js?v=52';
-import { CERT_BODY_SEED } from './data/cert-bodies.js?v=52';
+import { CONTROLS } from './data/controls.js?v=53';
+import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=53';
+import { DOCUMENTS } from './documents-data.js?v=53';
+import { REGISTER_SEED } from './data/registers.js?v=53';
+import { AUDIT_SEED } from './data/audits.js?v=53';
+import { CERT_BODY_SEED } from './data/cert-bodies.js?v=53';
 
 const NS = 'cloudax.isms.';
-const SEED_VERSION = 13;
+const SEED_VERSION = 14;
 
 export const CONFIG = {
   prefixes: { Policy: 'POL', Procedure: 'PROC', Standard: 'STD', Guideline: 'GUI', Plan: 'PLAN', Register: 'REG', Record: 'REC', Form: 'FORM' },
@@ -364,6 +364,23 @@ export function ensureSeed() {
     const have = new Set(read('audits', []).map((a) => a.ref));
     const add = AUDIT_SEED.filter((a) => !have.has(a.ref)).map((a) => ({ id: cid(), ...a, findings: (a.findings || []).map((f) => ({ id: cid(), ...f })) }));
     if (add.length) write('audits', read('audits', []).concat(add));
+  }
+  // The platform runs on Microsoft Azure, not AWS. Update the starter asset and supplier
+  // entries from the original AWS wording to Azure, only where they still hold the seeded
+  // value, so any edit a user has made is left untouched.
+  if ((s.seedVersion || 0) < 14) {
+    const assets = read('register.asset', []); let aTouched = false;
+    for (const a of assets) {
+      if (a.assetId === 'AST-002' && a.name === 'Production Kubernetes cluster, eu-west') { a.name = 'Production Kubernetes cluster (AKS), North Europe'; aTouched = true; }
+      if (a.assetId === 'AST-003' && a.name === 'Object storage for transcripts, eu-west-1') { a.name = 'Blob storage for transcripts, North Europe'; aTouched = true; }
+    }
+    if (aTouched) write('register.asset', assets);
+    const sups = read('register.supplier', []); let sTouched = false;
+    for (const sup of sups) {
+      if (sup.supplierId === 'SUP-001' && sup.name === 'Amazon Web Services') { sup.name = 'Microsoft Azure'; sTouched = true; }
+      if (sup.supplierId === 'SUP-001' && sup.dataLocation === 'EU (eu-west-1, Ireland)') { sup.dataLocation = 'EU (North Europe, Ireland)'; sTouched = true; }
+    }
+    if (sTouched) write('register.supplier', sups);
   }
   if (s.seedVersion !== SEED_VERSION) setSettings({ ...s, seedVersion: SEED_VERSION });
 }

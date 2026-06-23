@@ -17,8 +17,8 @@ export const REGISTER_SEED = {
   ],
   asset: [
     { assetId: 'AST-001', name: 'Customer conversation datastore (PostgreSQL)', type: 'Information', owner: 'Head of Platform', classification: 'Confidential', status: 'In use' },
-    { assetId: 'AST-002', name: 'Production Kubernetes cluster, eu-west', type: 'Infrastructure', owner: 'Head of Platform', classification: 'Confidential', status: 'In use' },
-    { assetId: 'AST-003', name: 'Object storage for transcripts, eu-west-1', type: 'Information', owner: 'Head of Platform', classification: 'Confidential', status: 'In use' },
+    { assetId: 'AST-002', name: 'Production Kubernetes cluster (AKS), North Europe', type: 'Infrastructure', owner: 'Head of Platform', classification: 'Confidential', status: 'In use' },
+    { assetId: 'AST-003', name: 'Blob storage for transcripts, North Europe', type: 'Information', owner: 'Head of Platform', classification: 'Confidential', status: 'In use' },
     { assetId: 'AST-004', name: 'Conversational AI inference service', type: 'Software', owner: 'Head of Engineering', classification: 'Confidential', status: 'In use' },
     { assetId: 'AST-005', name: 'Single sign-on identity provider', type: 'Service', owner: 'IT Manager', classification: 'Restricted', status: 'In use' },
     { assetId: 'AST-006', name: 'Source code repository', type: 'Information', owner: 'Head of Engineering', classification: 'Confidential', status: 'In use' },
@@ -27,7 +27,7 @@ export const REGISTER_SEED = {
     { assetId: 'AST-009', name: 'Customer support platform', type: 'Service', owner: 'Head of Customer', classification: 'Confidential', status: 'In use' },
   ],
   supplier: [
-    { supplierId: 'SUP-001', name: 'Amazon Web Services', service: 'Cloud hosting and storage', dataLocation: 'EU (eu-west-1, Ireland)', dpa: 'Yes', reviewDate: '2027-01-31' },
+    { supplierId: 'SUP-001', name: 'Microsoft Azure', service: 'Cloud hosting and storage', dataLocation: 'EU (North Europe, Ireland)', dpa: 'Yes', reviewDate: '2027-01-31' },
     { supplierId: 'SUP-002', name: 'Primary model provider, EU endpoint', service: 'Large language model inference', dataLocation: 'EU', dpa: 'Yes', reviewDate: '2026-12-31' },
     { supplierId: 'SUP-003', name: 'Twilio', service: 'Messaging gateway', dataLocation: 'EU and UK', dpa: 'Yes', reviewDate: '2026-12-31' },
     { supplierId: 'SUP-004', name: 'Datadog', service: 'Observability and logging', dataLocation: 'EU', dpa: 'Yes', reviewDate: '2027-02-28' },
