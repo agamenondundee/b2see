@@ -2,16 +2,16 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=50';
-import { CLAUSES } from './data/clauses.js?v=50';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=50';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=50';
-import { LANGUAGES, STRINGS, RTL_LANGS } from './i18n.js?v=50';
+import { CONTROLS } from './data/controls.js?v=52';
+import { CLAUSES } from './data/clauses.js?v=52';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=52';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=52';
+import { LANGUAGES, STRINGS, RTL_LANGS } from './i18n.js?v=52';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
-  getReadinessHistory, recordReadiness,
-} from './store.js?v=50';
+  getReadinessHistory, recordReadiness, getSoaSnapshots, addSoaSnapshot,
+} from './store.js?v=52';
 
 // Interface language. t(key) returns the string for the current language, falling back
 // to English, then to the key itself, so a missing translation never breaks the page.
@@ -217,7 +217,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=50').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=52').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -1020,6 +1020,32 @@ function renderSoa() {
   const excluded = soa.filter((s) => s.applicable === false).length;
   const undecided = soa.length - applicable - excluded;
   const sel = (id, opts, cur, width) => `<select id="${id}" aria-label="${id}"${width ? ` style="max-width:${width}px"` : ''}>${opts.map((o) => `<option ${o === cur ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  const appLabel = (a) => (a === true ? 'Applicable' : a === false ? 'Excluded' : 'Undecided');
+  const snaps = getSoaSnapshots().slice().sort((a, b) => new Date(b.ts) - new Date(a.ts));
+  const latest = snaps[0];
+  const changes = latest ? soa.flatMap((s) => {
+    const o = latest.state[s.ref];
+    if (!o) return [];
+    if (appLabel(s.applicable) !== appLabel(o.a)) return [{ ref: s.ref, field: 'Applicability', from: appLabel(o.a), to: appLabel(s.applicable) }];
+    if (s.applicable === true && s.status !== o.s) return [{ ref: s.ref, field: 'Status', from: o.s, to: s.status }];
+    return [];
+  }) : [];
+  const changesTable = changes.length ? table(
+    [{ key: 'ref', label: 'Control' }, { key: 'field', label: 'Change' }, { key: 'from', label: 'From' }, { key: 'to', label: 'To' }],
+    changes.map((c) => ({ __html: true, ref: `<a href="#/control/${esc(c.ref)}">${esc(c.ref)}</a>`, field: esc(c.field), from: `<span class="muted">${esc(c.from)}</span>`, to: `<b>${esc(c.to)}</b>` })),
+  ) : '';
+  const changesHtml = latest ? `<div class="panel-head" style="margin-top:4px"><h3 style="font-size:13px">Changes since ${esc(fmtDate(latest.ts))}</h3>${changes.length ? `<span class="pill warn">${changes.length}</span>` : '<span class="pill ok">no changes</span>'}</div>${changesTable}` : '';
+  const snapsHtml = snaps.length ? table(
+    [{ key: 'date', label: 'Date' }, { key: 'by', label: 'By' }, { key: 'note', label: 'Note' }, { key: 'app', label: 'Applicable' }, { key: 'impl', label: 'Implemented' }, { key: 'und', label: 'Undecided' }],
+    snaps.map((sn) => ({ date: fmtDate(sn.ts), by: sn.by, note: sn.note || '-', app: String(sn.summary.applicable), impl: String(sn.summary.implemented), und: String(sn.summary.undecided) })),
+  ) : '<p class="muted">No snapshots recorded yet.</p>';
+  const historyPanel = `
+    <div class="panel">
+      <div class="panel-head"><h3>Version history</h3><span class="muted">${snaps.length} snapshot${snaps.length === 1 ? '' : 's'}</span></div>
+      <p class="muted">Snapshots evidence that the Statement of Applicability is maintained. Take a snapshot after a review to record the position at that point.</p>
+      ${changesHtml}
+      ${snapsHtml}
+    </div>`;
   viewEl().innerHTML = `
     <h2>${esc(routeTitle('soa'))}</h2>
     <div class="panel">
@@ -1039,10 +1065,12 @@ function renderSoa() {
       <span class="spacer"></span>
       <button class="secondary" id="soa-csv">${esc(t('btn.export'))}</button>
       <button class="secondary" id="soa-print">${esc(t('btn.print'))}</button>
+      ${editable ? '<button class="secondary" id="soa-snapshot">Take snapshot</button>' : ''}
       ${editable ? '<button class="secondary" id="soa-populate">Populate from the document set</button>' : ''}
       ${editable ? `<button id="soa-save">${esc(t('btn.save'))}</button>` : ''}
     </div>
-    <div class="panel table-wrap" id="soa-rows"></div>`;
+    <div class="panel table-wrap" id="soa-rows"></div>
+    ${historyPanel}`;
 
   const draw = () => {
     const q = soaFilter.q.trim().toLowerCase();
@@ -1093,6 +1121,13 @@ function renderSoa() {
     audit('Exported', 'SoaEntry', 'Statement of Applicability to CSV');
   });
   document.getElementById('soa-print').addEventListener('click', () => window.print());
+  const snapshot = document.getElementById('soa-snapshot');
+  if (snapshot) snapshot.addEventListener('click', () => {
+    addSoaSnapshot(getSettings().user, '');
+    audit('Created', 'SoaSnapshot', 'Statement of Applicability snapshot');
+    toast('Snapshot of the Statement of Applicability recorded.');
+    renderSoa();
+  });
   const populate = document.getElementById('soa-populate');
   if (populate) populate.addEventListener('click', () => {
     const n = populateSoaFromDocuments();
