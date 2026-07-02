@@ -2,16 +2,16 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=54';
-import { CLAUSES } from './data/clauses.js?v=54';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=54';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=54';
-import { LANGUAGES, STRINGS, RTL_LANGS } from './i18n.js?v=54';
+import { CONTROLS } from './data/controls.js?v=55';
+import { CLAUSES } from './data/clauses.js?v=55';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=55';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=55';
+import { LANGUAGES, STRINGS, RTL_LANGS } from './i18n.js?v=55';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness, getSoaSnapshots, addSoaSnapshot,
-} from './store.js?v=54';
+} from './store.js?v=55';
 
 // Interface language. t(key) returns the string for the current language, falling back
 // to English, then to the key itself, so a missing translation never breaks the page.
@@ -217,7 +217,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=54').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=55').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -1471,8 +1471,45 @@ function trendDelta(value, suffix) {
   const arrow = value > 0 ? '↑' : value < 0 ? '↓' : '→';
   return `<span class="pill ${kind}">${arrow} ${value > 0 ? '+' : ''}${value} ${esc(suffix)}</span>`;
 }
+// Scan the management system for broken threads: references to controls or clauses
+// that do not exist, and records missing the fields the rest of the system relies on.
+// Each finding says where to fix it. Clean data is what keeps the golden thread true.
+function integrityIssues() {
+  const issues = [];
+  const add = (sev, what, view) => issues.push({ sev, what, view });
+  const parse = (v) => String(v || '').split(/[,;]/).map((x) => x.trim()).filter(Boolean);
+  const clauseNums = new Set(CLAUSES.map((c) => c.number));
+  const badRefs = (v) => parse(v).filter((r) => /^A\./i.test(r) && !CONTROL_REFS.has(r));
+  for (const r of getCollection('register.risk')) {
+    for (const ref of badRefs(r.relatedControls)) add('danger', `${r.riskId} names control ${ref}, which does not exist`, 'registers');
+    if (!(r.owner || '').trim()) add('warn', `${r.riskId} has no owner`, 'registers');
+  }
+  for (const e of getCollection('register.evidence')) {
+    const ref = String(e.controlRef || '').trim();
+    if (ref && !CONTROL_REFS.has(ref)) add('danger', `${e.evidenceId} points at control ${ref}, which does not exist`, 'registers');
+    if (!ref) add('warn', `${e.evidenceId} is not linked to a control`, 'registers');
+  }
+  for (const i of getCollection('register.incident')) {
+    for (const ref of badRefs(i.relatedControls)) add('danger', `${i.incidentId} names control ${ref}, which does not exist`, 'registers');
+  }
+  for (const d of getCollection('documents')) {
+    for (const ref of (d.controlRefs || []).filter((r) => !CONTROL_REFS.has(r))) add('danger', `${d.ref} links control ${ref}, which does not exist`, 'documents/' + d.id);
+    for (const ref of (d.clauseRefs || []).filter((r) => !clauseNums.has(r))) add('warn', `${d.ref} links clause ${ref}, which is not a management clause`, 'documents/' + d.id);
+    if (!(d.owner || '').trim()) add('warn', `${d.ref} has no owner`, 'documents/' + d.id);
+    if (d.status === 'Published' && !d.nextReviewDate) add('warn', `${d.ref} is published with no review date`, 'documents/' + d.id);
+  }
+  for (const a of getCollection('audits')) {
+    for (const ref of (a.controlRefs || []).filter((r) => !CONTROL_REFS.has(r))) add('warn', `${a.ref} covers control ${ref}, which does not exist`, 'audits/' + a.id);
+  }
+  for (const s of getCollection('soa')) {
+    if (s.applicable === true && !(s.owner || '').trim()) add('warn', `${s.ref} is applicable with no owner`, 'control/' + s.ref);
+  }
+  return issues;
+}
+
 function renderReadiness() {
   const checks = readinessData();
+  const issues = integrityIssues();
   const met = checks.filter((c) => c.ok).length;
   const score = pct(met, checks.length);
   const ring = score >= 90 ? 'ok' : score >= 70 ? 'warn' : 'danger';
@@ -1503,6 +1540,14 @@ function renderReadiness() {
           <span class="pill ${c.sev}${!c.ok && c.sev === 'danger' ? ' pulse' : ''}">${c.ok ? 'Met' : c.sev === 'danger' ? 'Gap' : 'Action'}</span>
           <span class="check-body"><span class="check-label">${esc(c.label)}</span><span class="check-detail">${esc(c.detail)}</span></span>
         </a>`).join('')}</div>
+    </div>
+    <div class="panel"><div class="panel-head"><h3>Data integrity</h3>${issues.length ? `<span class="pill ${issues.some((i) => i.sev === 'danger') ? 'danger' : 'warn'}">${issues.length} to tidy</span>` : '<span class="pill ok">clean</span>'}</div>
+      <p class="muted">Broken references and missing fields weaken the thread from risk to control to document to evidence. ${issues.length ? 'Each finding links to where it is fixed.' : 'Every reference resolves and the key fields are filled in.'}</p>
+      ${issues.length ? `<div class="checks">${issues.slice(0, 20).map((i) => `
+        <a class="check" href="#/${i.view}">
+          <span class="pill ${i.sev}">${i.sev === 'danger' ? 'Broken' : 'Tidy'}</span>
+          <span class="check-body"><span class="check-label">${esc(i.what)}</span></span>
+        </a>`).join('')}</div>${issues.length > 20 ? `<p class="muted">and ${issues.length - 20} more.</p>` : ''}` : ''}
     </div>`;
   const btn = document.getElementById('audit-pack');
   if (btn) btn.addEventListener('click', () => go('report'));
