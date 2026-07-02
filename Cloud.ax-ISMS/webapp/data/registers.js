@@ -35,6 +35,13 @@ export const REGISTER_SEED = {
     { supplierId: 'SUP-006', name: 'Stripe', service: 'Payment processing', dataLocation: 'EU and UK', dpa: 'Yes', reviewDate: '2027-03-31' },
     { supplierId: 'SUP-007', name: 'GitHub', service: 'Source code hosting', dataLocation: 'EU and UK', dpa: 'Yes', reviewDate: '2027-02-28' },
   ],
+  incident: [
+    { incidentId: 'INC-001', title: 'Phishing email led to a compromised staff mailbox', severity: 'High', detectedAt: '2026-02-11', personalData: 'Yes', icoNotifiedAt: '2026-02-13', relatedControls: 'A.5.24, A.5.26, A.6.3', owner: 'Information Security Lead', status: 'Closed', lessons: 'Rolled out phishing resistant multi factor authentication to all staff.' },
+    { incidentId: 'INC-002', title: 'Expired TLS certificate caused a two hour customer facing outage', severity: 'Medium', detectedAt: '2026-03-28', personalData: 'No', icoNotifiedAt: '', relatedControls: 'A.8.14, A.8.16', owner: 'Head of Platform', status: 'Closed', lessons: 'Certificate renewal is now automated with expiry alerting.' },
+    { incidentId: 'INC-003', title: 'Prompt injection attempt against the assistant was detected and blocked', severity: 'Low', detectedAt: '2026-05-06', personalData: 'No', icoNotifiedAt: '', relatedControls: 'A.8.26, A.8.16', owner: 'AI Governance Lead', status: 'Closed', lessons: 'Detection rules shared with the model provider; no data was disclosed.' },
+    { incidentId: 'INC-004', title: 'Laptop stolen from an employee while travelling', severity: 'Medium', detectedAt: '2026-06-02', personalData: 'No', icoNotifiedAt: '', relatedControls: 'A.7.9, A.8.1, A.8.24', owner: 'IT Manager', status: 'Resolved', lessons: 'Device was encrypted and remotely wiped; no data at risk.' },
+    { incidentId: 'INC-005', title: 'Unusual volume of failed logins against the administration console', severity: 'Medium', detectedAt: '2026-06-18', personalData: 'No', icoNotifiedAt: '', relatedControls: 'A.5.17, A.8.5, A.8.16', owner: 'Information Security Lead', status: 'Contained', lessons: '' },
+  ],
   nonconformity: [
     { ncId: 'NC-001', source: 'Internal audit', description: 'Access reviews for the production console were not evidenced for the first quarter', reference: 'A.5.18', owner: 'Information Security Lead', dueDate: '2026-08-15', status: 'Open' },
     { ncId: 'NC-002', source: 'Management review', description: 'Two suppliers lacked a current data processing agreement', reference: 'A.5.19', owner: 'Procurement Lead', dueDate: '2026-07-31', status: 'In progress' },

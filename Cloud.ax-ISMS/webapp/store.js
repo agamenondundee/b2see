@@ -3,15 +3,15 @@
 // another machine, or reset the data. This suits evaluation and single user use; the
 // multi user, server enforced version lives in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=53';
-import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=53';
-import { DOCUMENTS } from './documents-data.js?v=53';
-import { REGISTER_SEED } from './data/registers.js?v=53';
-import { AUDIT_SEED } from './data/audits.js?v=53';
-import { CERT_BODY_SEED } from './data/cert-bodies.js?v=53';
+import { CONTROLS } from './data/controls.js?v=54';
+import { AIMS_CONTROLS, AIMS_SOA_SEED } from './data/aims-controls.js?v=54';
+import { DOCUMENTS } from './documents-data.js?v=54';
+import { REGISTER_SEED } from './data/registers.js?v=54';
+import { AUDIT_SEED } from './data/audits.js?v=54';
+import { CERT_BODY_SEED } from './data/cert-bodies.js?v=54';
 
 const NS = 'cloudax.isms.';
-const SEED_VERSION = 14;
+const SEED_VERSION = 15;
 
 export const CONFIG = {
   prefixes: { Policy: 'POL', Procedure: 'PROC', Standard: 'STD', Guideline: 'GUI', Plan: 'PLAN', Register: 'REG', Record: 'REC', Form: 'FORM' },
@@ -42,6 +42,17 @@ export const CONFIG = {
     { key: 'supplier', label: 'Supplier and sub-processor register', fields: [
       { name: 'supplierId', label: 'Supplier ID' }, { name: 'name', label: 'Name' }, { name: 'service', label: 'Service' },
       { name: 'dataLocation', label: 'Data location' }, { name: 'dpa', label: 'DPA in place', type: 'select', options: ['Yes', 'No'] }, { name: 'reviewDate', label: 'Review date', type: 'date' },
+    ] },
+    { key: 'incident', label: 'Security incident register', fields: [
+      { name: 'incidentId', label: 'Incident ID' }, { name: 'title', label: 'Title' },
+      { name: 'severity', label: 'Severity', type: 'select', options: ['Low', 'Medium', 'High', 'Critical'] },
+      { name: 'detectedAt', label: 'Detected', type: 'date' },
+      { name: 'personalData', label: 'Personal data affected', type: 'select', options: ['No', 'Yes'] },
+      { name: 'icoNotifiedAt', label: 'ICO notified', type: 'date' },
+      { name: 'relatedControls', label: 'Related controls' },
+      { name: 'owner', label: 'Owner' },
+      { name: 'status', label: 'Status', type: 'select', options: ['Open', 'Contained', 'Resolved', 'Closed'] },
+      { name: 'lessons', label: 'Lessons learned' },
     ] },
     { key: 'nonconformity', label: 'Nonconformity and corrective action', fields: [
       { name: 'ncId', label: 'NC ID' }, { name: 'source', label: 'Source' }, { name: 'description', label: 'Description' },
@@ -381,6 +392,12 @@ export function ensureSeed() {
       if (sup.supplierId === 'SUP-001' && sup.dataLocation === 'EU (eu-west-1, Ireland)') { sup.dataLocation = 'EU (North Europe, Ireland)'; sTouched = true; }
     }
     if (sTouched) write('register.supplier', sups);
+  }
+  // Seed the security incident register once for systems created before it existed, but
+  // only if it is still empty, so a register the user has populated is left as it is.
+  if ((s.seedVersion || 0) < 15 && read('register.incident', []).length === 0) {
+    const seed = REGISTER_SEED.incident || [];
+    if (seed.length) write('register.incident', seed.map((e) => ({ id: cid(), ...e })));
   }
   if (s.seedVersion !== SEED_VERSION) setSettings({ ...s, seedVersion: SEED_VERSION });
 }
