@@ -2,16 +2,16 @@
 // held in the browser through store.js. All access checks here are a convenience for
 // a single user; the server enforced version is in the backend in the parent folder.
 
-import { CONTROLS } from './data/controls.js?v=53';
-import { CLAUSES } from './data/clauses.js?v=53';
-import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=53';
-import { CERT_CRITERIA } from './data/cert-bodies.js?v=53';
-import { LANGUAGES, STRINGS, RTL_LANGS } from './i18n.js?v=53';
+import { CONTROLS } from './data/controls.js?v=54';
+import { CLAUSES } from './data/clauses.js?v=54';
+import { AIMS_CONTROLS, AIMS_OBJECTIVES, AIMS_CLAUSES } from './data/aims-controls.js?v=54';
+import { CERT_CRITERIA } from './data/cert-bodies.js?v=54';
+import { LANGUAGES, STRINGS, RTL_LANGS } from './i18n.js?v=54';
 import {
   CONFIG, getCollection, setCollection, getSettings, setSettings, audit, ensureSeed,
   resetAll, exportAll, importAll, loadDocumentSet, populateSoaFromDocuments, loadRegisterSet, loadAuditSet, loadCertBodySet, cid, addMonths, nextReference,
   getReadinessHistory, recordReadiness, getSoaSnapshots, addSoaSnapshot,
-} from './store.js?v=53';
+} from './store.js?v=54';
 
 // Interface language. t(key) returns the string for the current language, falling back
 // to English, then to the key itself, so a missing translation never breaks the page.
@@ -217,7 +217,7 @@ function animateRings(root) {
 
 let searchIndexPromise = null;
 function loadSearchIndex() {
-  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=53').then((m) => m.SEARCH_INDEX).catch(() => []);
+  if (!searchIndexPromise) searchIndexPromise = import('./search-index.js?v=54').then((m) => m.SEARCH_INDEX).catch(() => []);
   return searchIndexPromise;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -262,6 +262,22 @@ function riskLevel(s) {
 }
 function riskStatusKind(s) { return /open|new/i.test(s) ? 'warn' : /treat|clos|accept|mitigat|resolv/i.test(s) ? 'ok' : 'neutral'; }
 function ncStatusKind(s) { return /clos|resolv|verif|complet/i.test(s) ? 'ok' : /progress/i.test(s) ? 'warn' : 'danger'; }
+function incSevKind(s) { return ({ Critical: 'danger', High: 'danger', Medium: 'warn', Low: 'ok' })[s] || 'neutral'; }
+function incStatusKind(s) { return /clos/i.test(s) ? 'ok' : /resolv/i.test(s) ? 'info' : /contain/i.test(s) ? 'warn' : 'danger'; }
+// The state of the seventy two hour ICO notification clock for an incident. Only runs
+// for incidents that affect personal data; others need no notification.
+function icoCell(e) {
+  if (!/^y/i.test(e.personalData || '')) return '<span class="muted">not required</span>';
+  const deadline = new Date(e.detectedAt).getTime() + 72 * 3600000;
+  if (e.icoNotifiedAt) {
+    const onTime = new Date(e.icoNotifiedAt).getTime() <= deadline;
+    return `${fmtDate(e.icoNotifiedAt)} ${onTime ? pill('within 72h', 'ok') : pill('late', 'danger')}`;
+  }
+  if (!e.detectedAt || Number.isNaN(deadline)) return pill('required', 'warn');
+  if (Date.now() > deadline) return pill('overdue', 'danger') + ' <span class="muted">72h passed</span>';
+  const hoursLeft = Math.max(0, Math.round((deadline - Date.now()) / 3600000));
+  return pill(`${hoursLeft}h left`, 'warn');
+}
 function auditStatusKind(s) { return /complet|clos/i.test(s) ? 'ok' : /progress/i.test(s) ? 'warn' : 'neutral'; }
 function classKind(c) { return ({ Restricted: 'danger', Confidential: 'warn', Internal: 'info', Public: 'neutral' })[c] || 'neutral'; }
 function isUkEu(loc) { return /\b(uk|eu|united kingdom|ireland|europe|eea|germany|france|netherlands|frankfurt|dublin)\b/i.test(loc || ''); }
@@ -329,6 +345,11 @@ const REG_DISPLAY = {
   supplier: {
     columns: [{ key: 'supplierId', label: 'Supplier ID' }, { key: 'name', label: 'Name' }, { key: 'service', label: 'Service' }, { key: 'dataLocation', label: 'Data location' }, { key: 'dpa', label: 'DPA' }, { key: 'review', label: 'Review' }],
     row: (e) => ({ supplierId: esc(e.supplierId), name: esc(e.name), service: esc(e.service), dataLocation: `${esc(e.dataLocation || '-')} ${isUkEu(e.dataLocation) ? pill('UK or EU', 'ok') : pill('check residency', 'danger')}`, dpa: /^y/i.test(e.dpa || '') ? pill('Yes', 'ok') : pill('No', 'danger'), review: reviewCell(e.reviewDate) }),
+  },
+  incident: {
+    columns: [{ key: 'incidentId', label: 'Incident' }, { key: 'title', label: 'Title' }, { key: 'severity', label: 'Severity' }, { key: 'detected', label: 'Detected' }, { key: 'ico', label: 'ICO notification' }, { key: 'controls', label: 'Controls' }, { key: 'owner', label: 'Owner' }, { key: 'status', label: 'Status' }],
+    sort: (a, b) => String(b.detectedAt || '').localeCompare(String(a.detectedAt || '')),
+    row: (e) => ({ incidentId: esc(e.incidentId), title: `${esc(e.title)}${e.lessons ? `<div class="muted" style="font-size:12px">${esc(e.lessons)}</div>` : ''}`, severity: pill(e.severity || '-', incSevKind(e.severity)), detected: esc(fmtDate(e.detectedAt) || '-'), ico: icoCell(e), controls: controlChips(e.relatedControls), owner: esc(e.owner), status: pill(e.status || '-', incStatusKind(e.status)) }),
   },
   nonconformity: {
     columns: [{ key: 'ncId', label: 'NC ID' }, { key: 'source', label: 'Source' }, { key: 'description', label: 'Description' }, { key: 'reference', label: 'Reference' }, { key: 'owner', label: 'Owner' }, { key: 'due', label: 'Due' }, { key: 'status', label: 'Status' }],
@@ -432,6 +453,15 @@ function regSummary(key, rows) {
     const stale = rows.filter((e) => isStale(e.date)).length;
     const types = new Set(rows.map((e) => e.type).filter(Boolean)).size;
     return `<div class="mini-cards">${mini(rows.length, 'Evidence items')}${mini(linked, 'Linked to a control', linked === rows.length ? 'ok' : 'warn')}${mini(stale, 'Older than 12 months', stale ? 'warn' : 'ok')}${mini(types, 'Types of evidence')}</div>`;
+  }
+  if (key === 'incident') {
+    const active = rows.filter((r) => !/clos|resolv/i.test(r.status)).length;
+    const breaches = rows.filter((r) => /^y/i.test(r.personalData || ''));
+    const lateOrDue = breaches.filter((r) => { const d = new Date(r.detectedAt).getTime() + 72 * 3600000; return r.icoNotifiedAt ? new Date(r.icoNotifiedAt).getTime() > d : Date.now() > d; }).length;
+    const sevSeg = ['Critical', 'High', 'Medium', 'Low'].map((l) => ({ label: l, value: rows.filter((r) => r.severity === l).length, kind: incSevKind(l) }));
+    const withLessons = rows.filter((r) => (r.lessons || '').trim()).length;
+    return `<div class="mini-cards">${mini(rows.length, 'Incidents')}${mini(active, 'Active', active ? 'warn' : 'ok')}${mini(breaches.length, 'Personal data breaches', breaches.length ? 'warn' : 'ok')}${mini(lateOrDue, 'ICO notification late or overdue', lateOrDue ? 'danger' : 'ok')}${mini(withLessons, 'With lessons learned', 'ok')}</div>
+      <div class="muted" style="font-size:12px;margin:12px 0 4px">Incidents by severity</div>${stackedBar(sevSeg)}`;
   }
   if (key === 'nonconformity') {
     const open = rows.filter((r) => /open|new/i.test(r.status)).length;
@@ -599,6 +629,7 @@ function renderDashboard() {
   const ncs = getCollection('register.nonconformity');
   const ncOpen = ncs.filter((r) => !/clos|resolv|verif|complet/i.test(r.status)).length;
   const ncOverdue = ncs.filter((r) => overdue(r.dueDate) && !/clos|resolv|verif|complet/i.test(r.status)).length;
+  const activeIncidents = getCollection('register.incident').filter((r) => !/clos|resolv/i.test(r.status)).length;
   const suppliers = getCollection('register.supplier');
   const supDue = suppliers.filter((r) => overdue(r.reviewDate) || dueSoon(r.reviewDate)).length;
   const supNoDpa = suppliers.filter((r) => !/^y/i.test(r.dpa || '')).length;
@@ -703,6 +734,7 @@ function renderDashboard() {
       <div class="panel">
         <div class="panel-head"><h3>${esc(t('dash.governance'))}</h3></div>
         <div class="mini-cards">
+          ${mini(activeIncidents, 'Active incidents', activeIncidents ? 'danger' : 'ok')}
           ${mini(ncOpen, 'Open nonconformities', ncOpen ? 'warn' : 'ok')}
           ${mini(ncOverdue, 'Overdue actions', ncOverdue ? 'danger' : 'ok')}
           ${mini(supDue, 'Supplier reviews due', supDue ? 'warn' : 'ok')}
@@ -949,6 +981,7 @@ function renderControlDetail(ref) {
   const parse = (v) => String(v || '').split(/[,;]/).map((x) => x.trim()).filter(Boolean);
   const risks = getCollection('register.risk').filter((r) => parse(r.relatedControls).includes(ref));
   const evidence = getCollection('register.evidence').filter((e) => String(e.controlRef || '').trim() === ref);
+  const incidents = getCollection('register.incident').filter((e) => parse(e.relatedControls).includes(ref));
   const idx = CONTROLS.findIndex((x) => x.ref === ref);
   const prev = idx > 0 ? CONTROLS[idx - 1] : null;
   const next = idx < CONTROLS.length - 1 ? CONTROLS[idx + 1] : null;
@@ -1009,6 +1042,13 @@ function renderControlDetail(ref) {
         evidence.map((e) => ({ __html: true, id: `<a href="#/registers">${esc(e.evidenceId)}</a>`, title: esc(e.title), type: `<span class="chip">${esc(e.type || '-')}</span>`, date: ageCell(e.date), owner: esc(e.owner), location: esc(e.location) })),
       ) : '<p class="muted">No evidence is recorded against this control yet. Add it in the evidence register.</p>'}
     </div>
+    ${incidents.length ? `<div class="panel">
+      <div class="panel-head"><h3>Incidents involving this control</h3><span class="muted">${incidents.length}</span></div>
+      ${table(
+        [{ key: 'id', label: 'Incident' }, { key: 'title', label: 'Title' }, { key: 'sev', label: 'Severity' }, { key: 'detected', label: 'Detected' }, { key: 'status', label: 'Status' }],
+        incidents.map((e) => ({ __html: true, id: `<a href="#/registers">${esc(e.incidentId)}</a>`, title: esc(e.title), sev: pill(e.severity || '-', incSevKind(e.severity)), detected: esc(fmtDate(e.detectedAt) || '-'), status: pill(e.status || '-', incStatusKind(e.status)) })),
+      )}
+    </div>` : ''}
     <div class="toolbar">${prev ? `<a class="chip" href="#/control/${esc(prev.ref)}">Previous ${esc(prev.ref)}</a>` : ''}${next ? `<a class="chip" href="#/control/${esc(next.ref)}">Next ${esc(next.ref)}</a>` : ''}<span class="spacer"></span><a class="chip" href="#/framework">All controls</a></div>`;
 }
 
@@ -1401,6 +1441,11 @@ function readinessData() {
   const supNoDpa = suppliers.filter((s) => !/^y/i.test(s.dpa || '')).length;
   const supOverdue = suppliers.filter((s) => s.reviewDate && new Date(s.reviewDate).getTime() < now).length;
   const ctx = getCollection('register.context').length;
+  const lateBreaches = getCollection('register.incident').filter((r) => {
+    if (!/^y/i.test(r.personalData || '')) return false;
+    const deadline = new Date(r.detectedAt).getTime() + 72 * 3600000;
+    return r.icoNotifiedAt ? new Date(r.icoNotifiedAt).getTime() > deadline : Date.now() > deadline;
+  }).length;
   const C = (label, ok, sev, detail, view) => ({ label, ok, sev: ok ? 'ok' : sev, detail, view });
   return [
     C('Mandatory documented information', clauseGaps.length === 0, 'danger', `${mandatory.length - clauseGaps.length} of ${mandatory.length} clauses with required records are covered`, 'framework'),
@@ -1417,6 +1462,7 @@ function readinessData() {
     C('Context and interested parties', ctx > 0, 'warn', `${ctx} context entries recorded`, 'registers'),
     C('AI management applicability decided', aims.length > 0 && aimsUndecided === 0, 'warn', aimsUndecided === 0 ? 'All ISO 42001 controls have an applicability decision' : `${aimsUndecided} AI controls undecided`, 'aims'),
     C('AI controls implemented', aimsApplicable.length > 0 && aimsImplemented === aimsApplicable.length, 'warn', `${aimsImplemented} of ${aimsApplicable.length} applicable AI controls implemented or verified`, 'aims'),
+    C('Breach notifications on time', lateBreaches === 0, 'danger', lateBreaches === 0 ? 'Every personal data breach was notified to the ICO within 72 hours' : `${lateBreaches} personal data breach notifications late or overdue`, 'registers'),
   ];
 }
 
@@ -1482,6 +1528,7 @@ function renderReport() {
   const audits = getCollection('audits');
   const mrs = getCollection('register.management-review');
   const evidence = getCollection('register.evidence').slice().sort((a, b) => String(a.controlRef || '').localeCompare(String(b.controlRef || '')));
+  const incidents = getCollection('register.incident').slice().sort((a, b) => String(b.detectedAt || '').localeCompare(String(a.detectedAt || '')));
   const today = new Date().toISOString().slice(0, 10);
   viewEl().innerHTML = `
     <div class="toolbar"><button class="secondary" id="pack-back">Back</button><button id="print-pack">${esc(t('btn.print'))}</button></div>
@@ -1526,6 +1573,7 @@ function renderReport() {
       <section class="report-section break"><h3>Internal audit programme</h3>${table([{ key: 'ref', label: 'Audit' }, { key: 'scope', label: 'Scope' }, { key: 'standard', label: 'Standard' }, { key: 'date', label: 'Date' }, { key: 'auditor', label: 'Auditor' }, { key: 'status', label: 'Status' }, { key: 'findings', label: 'Findings' }], audits.map((a) => ({ ref: a.ref, scope: a.scope, standard: a.standard, date: fmtDate(a.completedDate || a.plannedDate), auditor: a.auditor, status: a.status, findings: String((a.findings || []).length) })))}</section>
       <section class="report-section"><h3>Management review log</h3>${table([{ key: 'reviewId', label: 'Review' }, { key: 'date', label: 'Date' }, { key: 'attendees', label: 'Attendees' }, { key: 'decisions', label: 'Decisions' }], mrs.map((m) => ({ reviewId: m.reviewId, date: fmtDate(m.date), attendees: m.attendees, decisions: m.decisions })))}</section>
       <section class="report-section break"><h3>Controlled document register</h3>${table([{ key: 'ref', label: 'Reference' }, { key: 'title', label: 'Title' }, { key: 'sys', label: 'System' }, { key: 'ver', label: 'Version' }, { key: 'status', label: 'Status' }, { key: 'review', label: 'Review by' }], docs.map((d) => ({ __html: true, ref: esc(d.ref), title: esc(d.title), sys: esc(d.system || ''), ver: esc(d.currentVersion || ''), status: pill(d.status), review: esc(fmtDate(d.nextReviewDate) || '-') })))}</section>
+      ${incidents.length ? `<section class="report-section break"><h3>Security incident register</h3><p class="muted">${incidents.length} incidents recorded, with the assessment of personal data impact and ICO notification.</p>${table([{ key: 'id', label: 'Incident' }, { key: 'title', label: 'Title' }, { key: 'sev', label: 'Severity' }, { key: 'detected', label: 'Detected' }, { key: 'ico', label: 'ICO notification' }, { key: 'status', label: 'Status' }, { key: 'lessons', label: 'Lessons learned' }], incidents.map((e) => ({ __html: true, id: esc(e.incidentId), title: esc(e.title), sev: pill(e.severity || '-', incSevKind(e.severity)), detected: esc(fmtDate(e.detectedAt) || '-'), ico: icoCell(e), status: pill(e.status || '-', incStatusKind(e.status)), lessons: esc(e.lessons || '-') })))}</section>` : ''}
       ${evidence.length ? `<section class="report-section break"><h3>Evidence register</h3><p class="muted">${evidence.length} items of evidence supporting the controls.</p>${table([{ key: 'id', label: 'Evidence' }, { key: 'title', label: 'Title' }, { key: 'type', label: 'Type' }, { key: 'control', label: 'Control' }, { key: 'date', label: 'Date' }, { key: 'owner', label: 'Owner' }, { key: 'location', label: 'Location' }], evidence.map((e) => ({ id: e.evidenceId, title: e.title, type: e.type, control: e.controlRef, date: fmtDate(e.date), owner: e.owner, location: e.location })))}</section>` : ''}
     </div>`;
   const back = document.getElementById('pack-back');
@@ -1623,6 +1671,8 @@ function renderManagementReview(id) {
   const findings = audits.flatMap((a) => a.findings || []);
   const openFindings = findings.filter((f) => !/clos/i.test(f.status));
   const opportunities = findings.filter((f) => /opportun/i.test(f.type));
+  const incidents = getCollection('register.incident');
+  const breaches = incidents.filter((r) => /^y/i.test(r.personalData || '')).length;
   const checks = readinessData(); const ready = pct(checks.filter((c) => c.ok).length, checks.length);
   const risks = getCollection('register.risk');
   const riskSeg = [['Critical', 'danger'], ['High', 'danger'], ['Medium', 'warn'], ['Low', 'ok']].map(([l, k]) => ({ label: l, value: risks.filter((e) => riskLevel(residualScore(e) || riskScore(e)).label === l).length, kind: k }));
@@ -1650,7 +1700,7 @@ function renderManagementReview(id) {
         prev.map((p) => ({ reviewId: p.reviewId, date: fmtDate(p.date), decisions: p.decisions || '-' })),
       ) : '<p class="muted">This is the first recorded management review.</p>')}
       ${section('b', 'Changes in external and internal issues', `<div class="mini-cards">${mini(ctx.length, 'Context entries')}${mini(ctx.filter((c) => /interested/i.test(c.category)).length, 'Interested parties')}${mini(climate, 'Climate related', climate ? 'info' : '')}</div>`)}
-      ${section('c', 'Performance: nonconformities, monitoring, audits and objectives', `<div class="mini-cards">${mini(ncOpen.length, 'Open nonconformities', ncOpen.length ? 'warn' : 'ok')}${mini(ncOverdue.length, 'Overdue actions', ncOverdue.length ? 'danger' : 'ok')}${mini(ready + '%', 'Certification readiness', ready >= 90 ? 'ok' : 'warn')}${mini(completedAudits.length, 'Audits completed', 'ok')}${mini(openFindings.length, 'Open audit findings', openFindings.length ? 'warn' : 'ok')}</div>${openFindings.length ? table([{ key: 'ref', label: 'Reference' }, { key: 'desc', label: 'Finding' }, { key: 'owner', label: 'Owner' }, { key: 'due', label: 'Due' }], openFindings.slice(0, 12).map((f) => ({ ref: f.reference || '-', desc: f.description, owner: f.owner || '-', due: fmtDate(f.dueDate) || '-' }))) : ''}`)}
+      ${section('c', 'Performance: incidents, nonconformities, monitoring, audits and objectives', `<div class="mini-cards">${mini(incidents.length, 'Security incidents', incidents.length ? 'warn' : 'ok')}${mini(breaches, 'Personal data breaches', breaches ? 'danger' : 'ok')}${mini(ncOpen.length, 'Open nonconformities', ncOpen.length ? 'warn' : 'ok')}${mini(ncOverdue.length, 'Overdue actions', ncOverdue.length ? 'danger' : 'ok')}${mini(ready + '%', 'Certification readiness', ready >= 90 ? 'ok' : 'warn')}${mini(completedAudits.length, 'Audits completed', 'ok')}${mini(openFindings.length, 'Open audit findings', openFindings.length ? 'warn' : 'ok')}</div>${openFindings.length ? table([{ key: 'ref', label: 'Reference' }, { key: 'desc', label: 'Finding' }, { key: 'owner', label: 'Owner' }, { key: 'due', label: 'Due' }], openFindings.slice(0, 12).map((f) => ({ ref: f.reference || '-', desc: f.description, owner: f.owner || '-', due: fmtDate(f.dueDate) || '-' }))) : ''}`)}
       ${section('d', 'Feedback from interested parties', `<div class="mini-cards">${mini(suppliers.length, 'Suppliers')}${mini(supNoDpa, 'Without a DPA', supNoDpa ? 'danger' : 'ok')}${mini(supOffshore, 'Outside UK or EU', supOffshore ? 'danger' : 'ok')}</div>`)}
       ${section('e', 'Results of risk assessment and risk treatment', `<p class="muted">Residual risk levels across ${risks.length} risks.</p>${risks.length ? stackedBar(riskSeg) : '<p class="muted">No risks recorded.</p>'}`)}
       ${section('f', 'Opportunities for continual improvement', opportunities.length ? table([{ key: 'ref', label: 'Reference' }, { key: 'desc', label: 'Opportunity' }, { key: 'owner', label: 'Owner' }], opportunities.map((f) => ({ ref: f.reference || '-', desc: f.description, owner: f.owner || '-' }))) : '<p class="muted">No improvement opportunities are currently open from audits.</p>')}
